@@ -1,0 +1,264 @@
+/* Importação da Fonte */
+@font-face {
+    font-family: 'Basic Choice';
+    src: url('../fonts/Basic Choice 2.ttf') format('truetype'); /* Verifique o caminho correto */
+}
+
+/* Estilo global */
+body {
+    font-family: Arial, sans-serif;
+    background-color: #ED704F;
+    color: #ED704F;
+    padding: 0;
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    background-image: url('../images/fundo site.png'); /* Caminho para a imagem de fundo */
+    background-size: cover;
+    background-position: center;
+}
+
+/* Cabeçalho */
+header {
+    width: 100%;
+    height: auto;
+    margin: 0;
+}
+
+.header-image {
+    width: 100%;
+    height: auto;
+    display: block;
+    object-fit: cover;
+}
+
+/* Conteúdo Principal */
+.main-content {
+    text-align: center;
+    margin-top: 2vh; /* Responsivo */
+    flex-grow: 1;
+    background-image: none; /* Remove a imagem de fundo entre logo e cabeçalho */
+}
+
+.main-image {
+    width: 100%;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+}
+
+/* Seção dos Botões */
+.buttons-section {
+    background-color: #F4E6CB;
+    padding: 2vh 0; /* Responsivo */
+    text-align: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Botões */
+.buttons-container {
+    display: flex;
+    flex-direction: column; /* Alteração para empilhar os botões */
+    justify-content: center;
+    align-items: center;
+    gap: 1vh; /* Responsivo */
+    width: 100%;
+    max-width: 90%; /* Responsivo para não ultrapassar a largura da tela */
+    margin: 0 auto;
+}
+
+.button {
+    background-color: #399466;
+    color: #F4E6CB;
+    padding: 2vh 0; /* Responsivo */
+    font-size: 1.5rem; /* Responsivo */
+    font-family: 'Basic Choice', Arial, sans-serif;
+    text-decoration: none;
+    border-radius: 1.5rem;
+    text-align: center;
+    transition: background-color 0.3s;
+    width: 100%;
+    max-width: 100%;
+    white-space: nowrap;
+    box-sizing: border-box;
+    display: inline-block;
+}
+
+/* Versão Mobile */
+@media (max-width: 768px) {
+    .main-image {
+        width: 100%;
+    }
+
+    .buttons-section {
+        padding: 2vh 0;
+    }
+
+    .buttons-container {
+        gap: 1vh;
+        padding-left: 2vw;
+        padding-right: 2vw;
+        width: calc(100% - 4vw);
+    }
+
+    .button {
+        font-size: 1.25rem;
+        padding: 3vh 0;
+        width: 100%;
+        height: auto;
+        border-radius: 1.5rem;
+    }
+
+    .slideshow-section {
+        height: 30vh;
+    }
+}
+
+/* Versão Desktop */
+@media (min-width: 769px) {
+    body {
+        height: 100vh;
+        overflow-y: auto;
+        width: 40%; /* Largura ajustada */
+        margin: 0 auto;
+        border: 1px solid rgba(0, 0, 0, 0.1); /* Contorno sutil */
+        border-radius: 8px; /* Bordas arredondadas */
+    }
+
+    .main-image {
+        width: auto;
+        max-width: 90%;
+        margin: 0 auto;
+    }
+
+    .buttons-container {
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 1.5vh;
+        width: 100%;
+        max-width: 90%;
+        margin: 0 auto;
+    }
+
+    .button {
+        font-size: 2rem;
+        padding: 1.5vh 2vw;
+        width: 100%;
+        max-width: 100%;
+        border-radius: 1.5rem;
+    }
+
+    .buttons-section {
+        width: 100%;
+        max-width: 100%;
+        margin: 0 auto;
+    }
+
+    .slideshow-section {
+        height: auto;
+    }
+
+    .slideshow .slide {
+        width: 30vw;
+        height: 30vw;
+    }
+
+    .slide img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        margin: 0;
+    }
+
+    /* Alteração das imagens no desktop */
+    header .header-image {
+        content: url('../images/toponatal.png');
+    }
+
+    footer .footer-image {
+        content: url('../images/rodanatal.png');
+    }
+}
+
+/* Slideshow */
+.slideshow-section {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    margin: 0;
+    height: 50vh; /* Responsivo */
+}
+
+.slideshow {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    animation: slideAnimation 200s linear infinite; /* Animação contínua */
+}
+
+.slide {
+    width: 100%;
+    flex-shrink: 0;
+    opacity: 0;
+    animation: fadeInOut 200s linear infinite;
+}
+
+.slide img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    margin: 0;
+}
+
+/* Animação para transição dos slides */
+@keyframes slideAnimation {
+    0% { transform: translateX(0); }
+    6.67% { transform: translateX(-100%); }
+    13.33% { transform: translateX(-200%); }
+    20% { transform: translateX(-300%); }
+    26.67% { transform: translateX(-400%); }
+    33.33% { transform: translateX(-500%); }
+    40% { transform: translateX(-600%); }
+    46.67% { transform: translateX(-700%); }
+    53.33% { transform: translateX(-800%); }
+    60% { transform: translateX(-900%); }
+    66.67% { transform: translateX(-1000%); }
+    73.33% { transform: translateX(-1100%); }
+    80% { transform: translateX(-1200%); }
+    86.67% { transform: translateX(-1300%); }
+    93.33% { transform: translateX(-1400%); }
+    100% { transform: translateX(0); } /* Retorna para o primeiro slide */
+}
+
+@keyframes fadeInOut {
+    0%, 100% { opacity: 0; }
+    4.17%, 95.83% { opacity: 1; }
+}
+
+/* Rodapé */
+footer {
+    width: 100%;
+    height: auto;
+    margin: 0;
+    position: relative;
+}
+
+.footer-image {
+    width: 100%;
+    height: auto;
+    display: block;
+    object-fit: cover;
+    margin: 0;
+    padding: 0;
+}
+
+/* Logo e fundo do campo específico */
+.main-content {
+    background-color: #ED704F; /* Cor de fundo para a área com logo */
+    background-image: none; /* Remove a imagem de fundo */
+}
