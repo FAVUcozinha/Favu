@@ -7,7 +7,7 @@
 /* Estilo global */
 body {
     font-family: Arial, sans-serif;
-    background-color: #ED704F;
+    background-color: #E09f41;
     color: #ED704F;
     padding: 0;
     margin: 0;
@@ -72,7 +72,7 @@ header {
 }
 
 .button {
-    background-color: #399466;
+    background-color: #7FB1C8;
     color: #F4E6CB;
     padding: 2vh 0; /* Responsivo */
     font-size: 1.5rem; /* Responsivo */
@@ -177,11 +177,11 @@ header {
 
     /* Alteração das imagens no desktop */
     header .header-image {
-        content: url('../images/toponatal.png');
+        content: url('../images/topodesktop.png');
     }
 
     footer .footer-image {
-        content: url('../images/rodanatal.png');
+        content: url('../images/rodadesktop.png');
     }
 }
 
@@ -259,6 +259,6 @@ footer {
 
 /* Logo e fundo do campo específico */
 .main-content {
-    background-color: #ED704F; /* Cor de fundo para a área com logo */
+    background-color: #E09F41; /* Cor de fundo para a área com logo */
     background-image: none; /* Remove a imagem de fundo */
 }
