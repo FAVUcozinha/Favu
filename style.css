@@ -1,0 +1,396 @@
+/* --- Fontes --- */
+@font-face {
+    font-family: 'Basic Choice';
+    src: url('Basic Choice 2.ttf') format('truetype');
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Cocogoose';
+    src: url('Cocogoose-Pro-Darkmode-trial.ttf') format('truetype');
+    font-display: swap;
+}
+
+/* --- Variáveis --- */
+:root {
+    /* COR DE FUNDO DA PÁGINA (Bege Areia) */
+    --bg-color: #F4E6CB; 
+    
+    /* COR DE FUNDO DE MENUS E CARDS (Claro) */
+    /* Valor Hex: #FFF5EB */
+    --card-bg: #FFF5EB;
+    
+    --text-dark: #2C2C2C;
+    --text-light: #666666;
+    --accent-orange: #E09F41;
+    --accent-rust: #E09F41;
+    
+    --font-display: 'Basic Choice', cursive;
+    --font-body: 'Cocogoose', sans-serif;
+    
+    --radius: 16px;
+    --shadow: 0 4px 20px rgba(0,0,0,0.08);
+}
+
+/* --- Reset --- */
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body { 
+    background-color: var(--bg-color); 
+    color: var(--text-dark); 
+    font-family: var(--font-body); 
+    overflow-x: hidden; 
+}
+ul { list-style: none; }
+a { text-decoration: none; color: inherit; }
+
+/* --- Utilitários --- */
+.container { width: 90%; max-width: 1200px; margin: 0 auto; }
+.section-padding { padding: 40px 0; }
+.full-width { width: 100%; text-align: center; display: block; }
+.font-display { font-family: var(--font-display); font-weight: normal; }
+.font-body { font-family: var(--font-body); font-weight: normal; }
+.font-cocogoose { font-family: 'Cocogoose', sans-serif; }
+
+/* --- Header --- */
+header { 
+    background-image: url('images/topo.png');
+    background-repeat: repeat-x; background-position: center top;
+    position: sticky; top: 0; z-index: 1000; 
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1); padding: 5px 0;
+}
+.header-container-full { width: 100%; display: flex; justify-content: flex-start; padding-left: 0; }
+
+.menu-btn { 
+    /* AJUSTE: Cor do botão MENU igual aos cards (#FFF5EB) */
+    background-color: var(--card-bg); 
+    
+    width: 50px; height: 40px; 
+    border-radius: 0 12px 12px 0; border: none; 
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.5rem; 
+    
+    /* Ícone do Menu Hambúrguer: Verde Escuro */
+    color: #1D2814; 
+    
+    cursor: pointer; 
+    box-shadow: 2px 2px 10px rgba(0,0,0,0.1); transition: transform 0.2s; margin-left: 0;
+}
+.menu-btn:active { transform: scale(0.95); }
+
+/* --- Menu Lateral --- */
+.side-menu { 
+    position: fixed; top: 0; left: -100%; width: 280px; height: 100vh; 
+    background: var(--card-bg); z-index: 2000; transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1); 
+    box-shadow: 4px 0 20px rgba(0,0,0,0.1); padding: 30px 20px; 
+    display: flex; flex-direction: column; overflow-y: auto;
+}
+.side-menu.active { left: 0; }
+.side-menu-content { display: flex; flex-direction: column; height: 100%; }
+.menu-logo-container { width: 100%; display: flex; justify-content: center; margin-bottom: 30px; padding: 0 10px; }
+.menu-logo-img { max-width: 100%; width: 140px; height: auto; object-fit: contain; }
+.nav-links { flex-grow: 1; }
+.nav-links li { margin-bottom: 20px; border-bottom: 1px solid #f0f0f0; padding-bottom: 10px; }
+
+/* Links do Menu: Verde Escuro */
+.menu-link { 
+    font-family: var(--font-display); 
+    font-size: 1.3rem; 
+    color: #1D2814; 
+    transition: 0.3s; 
+    display: block; 
+}
+.menu-link:hover { transform: translateX(5px); color: var(--accent-rust); }
+.close-menu-btn { position: absolute; top: 15px; right: 20px; background: none; border: none; font-size: 2rem; color: #999; cursor: pointer; }
+
+.menu-socials { margin-top: auto; padding-top: 20px; border-top: 2px solid #f5f5f5; display: flex; flex-direction: column; gap: 20px; }
+
+/* Links Sociais Menu: Verde Escuro */
+.menu-social-link { 
+    font-size: 0.95rem; 
+    color: #1D2814; 
+    display: flex; 
+    align-items: center; 
+    gap: 15px; 
+    transition: 0.3s; 
+    font-weight: bold; 
+}
+.menu-social-link i { font-size: 1.5rem; }
+.menu-social-link:hover { color: var(--accent-rust); transform: translateX(5px); }
+
+/* --- Hero --- */
+.hero { text-align: center; padding: 40px 0 20px; }
+.hero-image-wrapper { width: 100%; margin: 0 auto; }
+.hero-logo-big { width: 100%; height: auto; display: block; filter: drop-shadow(0 10px 20px rgba(224, 159, 65, 0.15)); margin: 0 auto; }
+
+/* --- Cards / Links Section --- */
+.links-section { padding: 10px 0 30px; }
+.grid-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+
+/* CONFIGURAÇÃO DOS BOTÕES (Cards) */
+.clean-card { 
+    /* Fundo do botão: Claro (#FFF5EB) */
+    background: #FFF5EB; 
+    
+    padding: 15px 25px; border-radius: var(--radius);
+    box-shadow: var(--shadow); display: flex; align-items: center; gap: 15px; 
+    cursor: pointer; transition: 0.3s ease; justify-content: center; 
+}
+.clean-card:hover { transform: translateY(-3px); filter: brightness(0.95); }
+
+.card-icon { 
+    font-size: 1.8rem; 
+    /* Ícone do botão: Verde Escuro (#1D2814) */
+    color: #1D2814; 
+    
+    width: 40px; text-align: center; flex-shrink: 0; 
+}
+
+.card-info { flex: 1; }
+
+.card-info h3 { 
+    font-size: 1.6rem; 
+    margin-bottom: 2px; 
+    /* Título do botão: Verde Escuro (#1D2814) */
+    color: #1D2814; 
+}
+
+.card-info p { 
+    font-size: 0.8rem; 
+    /* Descrição do botão: Verde Musgo (#46493A) */
+    color: #46493A; 
+}
+
+.card-arrow { display: none; } 
+
+/* --- Galeria --- */
+.gallery-section { padding: 0 0 20px; background: transparent; overflow: hidden; }
+.slideshow-wrapper { width: 100%; overflow-x: hidden; overflow-y: hidden; cursor: grab; white-space: nowrap; user-select: none; -webkit-overflow-scrolling: touch; }
+.slideshow-wrapper:active { cursor: grabbing; }
+.slideshow-track { display: inline-flex; gap: 15px; padding: 0 15px; }
+.slide-item { width: 200px; height: 200px; flex-shrink: 0; border-radius: var(--radius); overflow: hidden; position: relative; pointer-events: none; box-shadow: var(--shadow); }
+.slide-item img { width: 100%; height: 100%; object-fit: cover; }
+
+/* --- Botões (Falar com o Favu) --- */
+.btn-primary { 
+    /* AJUSTE: Fundo Claro (#FFF5EB) igual aos cards */
+    background: var(--card-bg); 
+    
+    /* AJUSTE: Texto Verde Escuro (#1D2814) */
+    color: #1D2814; 
+    
+    /* AJUSTE: Sombra igual aos cards */
+    box-shadow: var(--shadow);
+
+    padding: 12px; 
+    border-radius: 30px; 
+    font-weight: bold; 
+    text-align: center; 
+    display: block; 
+    border: none; 
+    cursor: pointer; 
+    transition: 0.3s; 
+    margin-top: 20px;
+}
+
+.btn-primary:hover { 
+    /* AJUSTE: Efeito hover igual aos cards */
+    transform: translateY(-3px); 
+    filter: brightness(0.95); 
+}
+
+/* --- Footer --- */
+footer { 
+    background-image: url('images/roda.png');
+    background-repeat: repeat-x;
+    background-position: bottom center;
+    background-size: auto 100%; 
+    min-height: 130px; 
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-end; 
+    padding: 0 0 10px 0; margin-top: 0; 
+}
+.footer-container-center { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.footer-logo { max-width: 150px; height: auto; display: block; filter: drop-shadow(0 3px 3px rgba(224, 159, 65, 0.2)); margin-top: 40px; margin-bottom: 5px; }
+
+/* Assinatura Desktop (oculta no mobile) */
+.desktop-signature { display: none; }
+
+.copy { 
+    font-family: Helvetica, Arial, sans-serif; 
+    font-size: 0.7rem; 
+    color: #000000; 
+    margin-top: 0; 
+    font-weight: bold; 
+    opacity: 0.7; 
+}
+
+/* --- Modal Estilo Clean --- */
+.modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 5000; justify-content: center; align-items: center; backdrop-filter: blur(5px); opacity: 0; transition: 0.3s; }
+.modal.show { display: flex; opacity: 1; }
+
+.modal-content { 
+    /* AJUSTE: Cor do Popup igual ao fundo do Site (#F4E6CB) */
+    background: var(--bg-color); 
+    
+    padding: 0; 
+    border-radius: 30px; 
+    width: 90%; max-width: 450px; 
+    position: relative; text-align: center; 
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2); 
+    transform: translateY(20px); transition: 0.3s; 
+    overflow: hidden;
+    max-height: 90vh; 
+}
+.modal.show .modal-content { transform: translateY(0); }
+
+/* Botão Fechar */
+.close-btn-wrapper { 
+    position: absolute; 
+    top: 20px; 
+    right: 25px; 
+    width: 30px; height: 30px; 
+    background-color: transparent; 
+    display: flex; align-items: center; justify-content: center; 
+    cursor: pointer; z-index: 20; 
+}
+.close-btn-icon { font-size: 1.2rem; color: #999; transition: 0.3s; }
+.close-btn-wrapper:hover .close-btn-icon { color: #333; }
+
+/* Corpo com Rolagem (BARRA INVISÍVEL) */
+.modal-body-scroll { 
+    padding: 40px 30px; 
+    padding-bottom: 50px; 
+    
+    /* Mantém a rolagem funcionando */
+    overflow-y: auto; 
+    max-height: calc(90vh); 
+    
+    /* AJUSTE: Remove a barra no Firefox */
+    scrollbar-width: none; 
+}
+
+/* AJUSTE: Remove a barra no Chrome, Safari e Mobile */
+.modal-body-scroll::-webkit-scrollbar { 
+    display: none; 
+}
+
+.modal-img { max-width: 60%; height: auto; border-radius: 15px; margin: 0 auto 20px; display: block; }
+.modal-text { text-align: center; font-family: 'Cocogoose', sans-serif; }
+.modal-text p { font-size: 0.9rem; color: var(--text-light); margin-bottom: 15px; line-height: 1.6; }
+.highlight { color: var(--accent-orange); font-weight: bold; margin-top: 20px; display: block; text-align: center; font-size: 1rem; }
+
+/* =========================================================
+   MEDIA QUERIES (TABLET)
+   ========================================================= */
+@media (min-width: 768px) and (max-width: 1023px) {
+    body {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    
+    header { flex-shrink: 0; }
+    
+    footer { 
+        flex-shrink: 0; 
+        margin-top: auto;
+    }
+}
+
+/* =========================================================
+   MEDIA QUERIES (DESKTOP)
+   ========================================================= */
+@media (min-width: 1024px) {
+    body {
+        height: 100vh;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    header { flex-shrink: 0; }
+    
+    .hero { padding: 0; flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; }
+    .hero-logo-big { 
+        width: auto; 
+        height: auto; 
+        max-height: 50vh; 
+        max-width: none; 
+    }
+    
+    .links-section { padding: 0; flex-shrink: 0; display: flex; align-items: center; margin-bottom: 2vh; }
+    
+    .grid-links { 
+        grid-template-columns: repeat(4, 1fr); 
+        max-width: 1250px; 
+        width: 95%; 
+        margin: 0 auto; 
+        gap: 15px; 
+    }
+    
+    .clean-card { 
+        padding: 0.9vh 15px; 
+        gap: 12px;            
+        border-radius: 12px;
+    }
+    .clean-card .card-icon { font-size: 1.4rem; } 
+    .clean-card .card-info h3 { font-size: 1.3rem; } 
+    
+    .clean-card .card-info p { 
+        font-size: 0.8rem; 
+        white-space: nowrap; 
+    } 
+
+    .gallery-section { margin: 0 0 2vh 0; padding: 0; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+    .slide-item { width: 24vh; height: 24vh; }
+    
+    /* RODAPÉ DESKTOP */
+    footer { 
+        flex-shrink: 0; 
+        min-height: 6vh; 
+        padding: 0; 
+        width: 100%; 
+        background-size: 100% 100%; 
+        
+        display: flex;
+        flex-direction: column;
+        
+        /* Centralização Vertical e Horizontal */
+        justify-content: center; 
+        align-items: center;      
+        
+        /* Gap ZERO para aproximar as linhas */
+        gap: 0; 
+    }
+    
+    .footer-logo { display: none; }
+    
+    .desktop-signature {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        margin-bottom: 0; 
+        opacity: 0.6; 
+    }
+
+    .desktop-signature span {
+        font-family: 'Cocogoose', sans-serif;
+        font-size: 0.7rem; 
+        color: #000;
+        font-weight: normal; 
+    }
+
+    .desktop-signature img {
+        height: 1.2em; 
+        width: auto;
+        display: block;
+    }
+    
+    .copy { 
+        font-size: 0.7rem; 
+        margin-top: 0; 
+        line-height: 1.2; /* Line-height suave para não encavalar, mas manter próximo */
+        opacity: 0.6; 
+    }
+}

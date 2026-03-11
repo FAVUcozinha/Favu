@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cardápio - FAVU Cozinha Afetiva</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style-cardapio.css">
+</head>
+<body>
+    <nav id="side-menu" class="side-menu">
+        <button id="close-menu-btn" class="close-menu-btn">&times;</button>
+        <div class="side-menu-content">
+            <div class="menu-logo-container">
+                <img src="images/favu.png" alt="Logo FAVU" class="menu-logo-img">
+            </div>
+            <ul class="nav-links">
+                <li><a href="#" id="menu-quem-somos" class="menu-link">QUEM SOMOS</a></li>
+                <li><a href="index.html" id="menu-inicial-link" class="menu-link">MENU INICIAL</a></li>
+            </ul>
+            <div class="menu-socials">
+                <a href="https://www.instagram.com/favucozinha/" target="_blank" class="menu-social-link">
+                    <i class="fab fa-instagram"></i> Nos siga no Instagram
+                </a>
+                <a href="http://wa.me/558195256641" target="_blank" class="menu-social-link">
+                    <i class="fab fa-whatsapp"></i> Falar com o Favu
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <header id="header">
+        <div class="header-container-full">
+            <button id="mobile-menu-btn" class="menu-btn"><i class="fa-solid fa-bars"></i></button>
+        </div>
+    </header>
+
+    <nav id="categorias-nav" class="categorias-nav">
+        <div class="categorias-nav-wrapper">
+            <div id="categorias-horizontal" class="categorias-draggable"></div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <main class="menu-content" id="menu-principal"></main>
+        
+        <div id="popup-resumo" class="popup">
+            <div class="popup-conteudo">
+                <span class="fechar" onclick="window.fecharResumoPopup()">&times;</span>
+                <h2 class="font-display">RESUMO DO PEDIDO</h2>
+                
+                <div id="popup-resumo-itens" class="resumo-itens"></div>
+                
+                <div id="cupom-container">
+                    <strong>CUPOM DE DESCONTO</strong>
+                    <div id="cupom-input-group">
+                        <input type="text" id="cupom-input" placeholder="CÓDIGO">
+                        <button id="apply-cupom-btn" onclick="window.aplicarCupom()">APLICAR</button>
+                    </div>
+                    <div id="cupom-message" class="cupom-message"></div>
+                </div>
+                
+                <div class="resumo-footer-area">
+                    <div id="popup-resumo-total" class="resumo-total"></div>
+                    <div id="fazer-pedido-button-container"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="popup-pedido" class="popup">
+            <div class="popup-conteudo">
+                <span class="fechar" onclick="window.fecharPopup()">&times;</span>
+                <h2 class="font-display">INFORMAÇÕES DO PEDIDO</h2>
+                
+                <form id="form-pedido">
+                    <div class="input-group">
+                        <label for="nome">NOME:</label>
+                        <input type="text" id="nome" name="nome" placeholder="SEU NOME COMPLETO" required>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="telefone">NÚMERO (WHATSAPP):</label>
+                        <input type="tel" id="telefone" name="telefone" placeholder="(DDD) 9XXXX-XXXX" required>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="data">DATA DA ENTREGA:</label>
+                        <input type="date" id="data" name="data" required>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="horario">HORÁRIO DA ENTREGA:</label>
+                        <input type="time" id="horario" name="horario" required>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="pagamento">FORMA DE PAGAMENTO:</label>
+                        <select id="pagamento" name="pagamento" required>
+                            <option value="" disabled selected>SELECIONE...</option>
+                            <option value="Pix">Pix</option>
+                            <option value="Dinheiro">Dinheiro</option>
+                            <option value="Cartão">Cartão</option>
+                        </select>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="observacoes">OBSERVAÇÕES:</label>
+                        <textarea id="observacoes" name="Observacoes" placeholder="EX: RETIRAR CEBOLA, ALERGIAS, ETC." rows="2"></textarea>
+                    </div>
+                </form>
+
+                <div class="popup-footer-actions">
+                    <div class="popup-footer-actions-top">
+                        <button type="button" class="btn-secondary" onclick="window.fecharPopup()">VOLTAR</button>
+                        <button type="button" class="btn-secondary" onclick="window.editarPedido()">EDITAR PEDIDO</button>
+                    </div>
+                    <button type="button" class="btn-primary-large" onclick="window.confirmarPedido()">CONFIRMAR PEDIDO</button>
+                </div>
+            </div>
+        </div>
+        
+        <button type="button" id="fixed-summary">
+            <div class="summary-content">
+                <div id="summary-text">
+                    <span id="summary-total">R$: 0,00</span>
+                    <span id="summary-item-count">/ 0 itens</span>
+                </div>
+                <div id="summary-button"><i class="fas fa-shopping-cart"></i></div>
+            </div>
+        </button>
+    </div>
+
+    <footer>
+        <div class="footer-container-center">
+            <img src="images/logoroda.png" alt="FAVU Rodapé" class="footer-logo">
+            <div class="desktop-signature">
+                <img src="images/BS.png" alt="Icone"><span>FAVU Cozinha Afetiva</span>
+            </div>
+            <p class="copy">&copy; 2026 Todos os direitos reservados.</p>
+        </div>
+    </footer>
+
+    <div id="aboutModal" class="modal">
+        <div class="modal-content">
+            <div class="close-btn-wrapper" onclick="window.closeAboutModal()"><i class="fa-solid fa-xmark close-btn-icon"></i></div>
+            <div class="modal-body-scroll">
+                <div class="modal-body">
+                    <img src="images/BS.png" alt="História FAVU" class="modal-img">
+                    <div class="font-cocogoose modal-text">
+                        <p>Inspirada nas receitas e lembranças de família, juntamos a tradição e a criatividade para criar pratos, bolos e salgados sob encomenda, uma coisa melhor que a outra.</p>
+                        <p>Tudo artesanal, feito a quatro mãos, de <strong>mãe para filho</strong>, com ingredientes selecionados e um toque especial que só a FAVU tem!</p>
+                        <p class="highlight">Faça sua encomenda e vamos transformar seus momentos especiais em inesquecíveis!</p>
+                    </div>
+                    <a href="http://wa.me/558195256641" target="_blank" class="btn-primary full-width">Falar com o Favu</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="popup-item-imagem" class="modal">
+        <div class="modal-content modal-item-imagem">
+            <div class="close-btn-wrapper" onclick="window.fecharImagemPopup()"><i class="fa-solid fa-xmark close-btn-icon"></i></div>
+            <div class="modal-body-scroll">
+                <div class="modal-body modal-item-body">
+                    <img id="item-imagem-display" src="" alt="Imagem do Item" class="item-imagem-display">
+                    <div class="item-info">
+                        <h3 id="item-nome-display" class="font-display"></h3>
+                        <p id="item-descricao-display" style="font-family: 'Segoe UI', sans-serif; font-size: 1rem; line-height: 1.5; color: var(--text-dark);"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="popup-aviso" class="modal">
+        <div class="modal-content" style="padding: 40px 20px; border: 3px solid var(--accent-orange); background: var(--card-bg);">
+            <span class="close-btn-wrapper" onclick="document.getElementById('popup-aviso').classList.remove('show'); setTimeout(() => document.getElementById('popup-aviso').style.display='none', 300);"><i class="fa-solid fa-xmark close-btn-icon"></i></span>
+            <h2 id="aviso-titulo" class="font-display" style="color: var(--accent-orange); font-size: 2.2rem; margin-bottom: 15px; margin-top: 0;"></h2>
+            <div id="aviso-texto" style="font-family: 'Segoe UI', Arial, sans-serif; color: var(--text-dark); font-size: 1.05rem; line-height: 1.6;"></div>
+        </div>
+    </div>
+
+    <script type="module" src="script-cardapio.js"></script>
+</body>
+</html>
