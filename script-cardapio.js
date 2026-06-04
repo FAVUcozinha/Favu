@@ -182,7 +182,8 @@ document.addEventListener("DOMContentLoaded", async function () {
                 <th class="col-qtd"><span class="th-mobile">QTD</span><span class="th-desktop">Quantidade</span></th>
             </tr>`;
 
-            const infoBoxHTML = (config.mensagemObs && config.mensagemObs.trim() !== '') ? `<div class="info-box"><p>${config.mensagemObs}</p></div>` : '';
+            // CORREÇÃO: Aplicado window.formatText na mensagem de observação da categoria para obedecer as regras de markdown (* e _)
+            const infoBoxHTML = (config.mensagemObs && config.mensagemObs.trim() !== '') ? `<div class="info-box"><p>${window.formatText(config.mensagemObs)}</p></div>` : '';
 
             mainContent.innerHTML += `
                 <div class="categoria-group ${primeiraCategoria ? 'active-group' : ''}" id="${config.idGrupo}">
@@ -300,7 +301,6 @@ document.addEventListener("DOMContentLoaded", async function () {
                     tr.innerHTML = `<td style="display:none;"></td><td style="display:none;"></td>${celulasRestantesHTML}`; 
                 }
                 
-                // CORRIGIDO: Modificado de groupoOrdenado para grupoOrdenado para evitar o travamento por ReferenceError
                 const nextChave = i < grupoOrdenado.length - 1 ? ((grupoOrdenado[i+1].nome || 'Sem Nome').trim().toLowerCase() + '|||' + (grupoOrdenado[i+1].descricaoItem || '').trim().toLowerCase()) : null;
                 if (i === grupoOrdenado.length - 1 || nextChave !== chaveAtual) { tr.classList.add('group-separator'); }
             } else {
@@ -454,21 +454,33 @@ document.addEventListener("DOMContentLoaded", async function () {
         if (!resumoItensPopup) return; resumoItensPopup.innerHTML = ''; 
         const gruposResumo = {}; const totaisPorGrupo = {};
         
+        let temErroMinimo = false;
+
         document.querySelectorAll(".quantidade-input").forEach(input => {
             const q = parseInt(input.value) || 0;
+            const g = input.getAttribute("data-grupo"); 
+            if (!totaisPorGrupo[g]) totaisPorGrupo[g] = 0; 
+            totaisPorGrupo[g] += q;
+
             if(q > 0) {
                 const grp = input.getAttribute("data-grupo"); const p = parseFloat(input.getAttribute("data-preco")) || 0;
-                totalBruto += (q * p); totalItens += q;
-                if (!gruposResumo[grp]) gruposResumo[grp] = [];
-                gruposResumo[grp].push({ input, quantidade: q, preco: p, descricaoResumo: input.getAttribute("data-resumo"), itemId: input.getAttribute("data-item-id") });
+                const minIndividualItem = parseInt(input.getAttribute("data-min")) || 1;
+                const configGrupo = configCategorias[grp] || { minIndividual: false };
+
+                // CORREÇÃO: Se a categoria exige mínimo individual e a quantidade for inferior ao mínimo, ativa a trava de erro geral.
+                if (configGrupo.minIndividual && q < minIndividualItem) {
+                    temErroMinimo = true;
+                } else {
+                    // Só entra no objeto e no resumo visual se estiver igual ou acima do mínimo exigido.
+                    totalBruto += (q * p); totalItens += q;
+                    if (!gruposResumo[grp]) gruposResumo[grp] = [];
+                    gruposResumo[grp].push({ input, quantidade: q, preco: p, descricaoResumo: input.getAttribute("data-resumo"), itemId: input.getAttribute("data-item-id") });
+                }
             }
-            const g = input.getAttribute("data-grupo"); if (!totaisPorGrupo[g]) totaisPorGrupo[g] = 0; totaisPorGrupo[g] += q;
         });
 
         let totalLiquido = totalBruto - cupomAplicado.desconto; if(totalLiquido < 0) totalLiquido = 0;
         window.totalPedidoAtivo = totalBruto; 
-        
-        let temErroMinimo = false;
 
         for (const grupo in gruposResumo) {
             const config = configCategorias[grupo]; const erroCategoria = document.getElementById('erro-' + grupo.toLowerCase().replace(/\s/g, '-'));
@@ -484,6 +496,18 @@ document.addEventListener("DOMContentLoaded", async function () {
                     </div>`;
             });
         }
+
+        // Caso as travas extras de mínimo de categoria também peguem algum grupo zerado no resumo
+        document.querySelectorAll(".quantidade-input").forEach(input => {
+            const q = parseInt(input.value) || 0;
+            const grp = input.getAttribute("data-grupo");
+            const config = configCategorias[grp];
+            if (q > 0 && config && config.minTotal > 0 && totaisPorGrupo[grp] < config.minTotal) {
+                temErroMinimo = true;
+                const erroCategoria = document.getElementById('erro-' + grp.toLowerCase().replace(/\s/g, '-'));
+                if(erroCategoria) { erroCategoria.textContent = `Mínimo de ${config.minTotal} unidades nesta categoria.`; erroCategoria.style.display = 'block'; }
+            }
+        });
 
         if (totalBruto === 0) {
             resumoTotalPopup.style.display = 'none'; btnContainer.innerHTML = ''; fixedSummary.style.display = 'none'; window.fecharResumoPopup();
@@ -514,8 +538,16 @@ document.addEventListener("DOMContentLoaded", async function () {
         document.querySelectorAll(".quantidade-input").forEach(i => {
             const q = parseInt(i.value) || 0;
             if (q > 0) { 
-                temItens = true; 
                 const grp = i.getAttribute("data-grupo"); 
+                const minIndividualItem = parseInt(i.getAttribute("data-min")) || 1;
+                const configGrupo = configCategorias[grp] || { minIndividual: false };
+
+                // CORREÇÃO: Garante que itens com quantidade abaixo do mínimo individual sejam rejeitados no envio final.
+                if (configGrupo.minIndividual && q < minIndividualItem) {
+                    return; 
+                }
+
+                temItens = true; 
                 const p = parseFloat(i.getAttribute("data-preco"))||0; 
                 const desc = i.getAttribute("data-resumo");
                 
@@ -528,7 +560,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         });
         
         if (!temItens) { 
-            alert("Pedido vazio."); 
+            alert("Pedido inválido ou com quantidades abaixo do mínimo permitido."); 
             btn.textContent = txtOriginal; btn.disabled = false; 
             return; 
         }
