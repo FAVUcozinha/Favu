@@ -18,50 +18,38 @@ let bancoDeProdutos = {};
 window.totalPedidoAtivo = 0; 
 
 // =========================================================
-// INTEGRAÇÃO SUPABASE (API REST)
+// PLANILHA GOOGLE SCRIPT URL
 // =========================================================
-const SUPABASE_URL = "https://qwvahbcmveykygqnqojk.supabase.co/rest/v1/pedidos"; 
-const SUPABASE_ANON_KEY = "sb_publishable_l28DfyACihd294wG9w4Z8w_KOIvxHML";
+const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxg41fkz_lDRKUTcnukG-LmuasWR_W6C7QovJo7Vdll58snz9MknU9f5QZ2KWKOOSA/exec";
 
-async function enviarPedidoParaSupabase(dadosPedido) {
+async function enviarPedidoParaPlanilha(dadosPedido) {
     try {
-        const payload = {
-            id_pedido: dadosPedido.ID_do_Pedido,
-            nome_cliente: dadosPedido.Nome_Cliente,
-            numero: dadosPedido.Numero,
-            data_entrega: dadosPedido.Data_Entrega,
-            horario_entrega: dadosPedido.Horario_Entrega,
-            resumo_itens: dadosPedido.Resumo_dos_Itens,
-            total_final: dadosPedido.Total_Final,
-            forma_pagamento: dadosPedido.Forma_de_Pagamento,
-            cupom: dadosPedido.Cupom,
-            status_pedido: dadosPedido.Status_do_Pedido,
-            status_pagamento: dadosPedido.Status_Pagamento,
-            observacoes: dadosPedido.Observacoes
-        };
-
-        const response = await fetch(SUPABASE_URL, {
-            method: "POST",
-            headers: {
-                "apikey": SUPABASE_ANON_KEY,
-                "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
-                "Content-Type": "application/json",
-                "Prefer": "return=minimal" // Retorna vazio se der sucesso
-            },
-            body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) {
-            const erroSupabase = await response.json();
-            console.error("Erro detalhado do Supabase:", erroSupabase);
-            alert("Erro ao salvar no banco de dados! Motivo: " + (erroSupabase.message || erroSupabase.details));
-            return false;
+        const params = new URLSearchParams();
+        const action = dadosPedido.action || 'create';
+        params.append('action', action);
+        
+        if (action === 'replacePedido' && dadosPedido.oldId) {
+            params.append('oldId', dadosPedido.oldId);
         }
-        return true;
-
+        
+        for (const key in dadosPedido) {
+            if (key !== 'action' && key !== 'oldId') {
+                params.append(key, dadosPedido[key] || '');
+            }
+        }
+        
+        // Agora aguarda o fetch de forma assíncrona
+        await fetch(GOOGLE_SHEETS_URL, {
+            method: "POST",
+            mode: 'no-cors', // Mantido no-cors para evitar restrições de redirecionamento do Apps Script
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: params.toString()
+        });
+        
+        return true; // Em modo no-cors, se a rede não falhar, assumimos sucesso
     } catch (err) { 
-        console.error("Erro na requisição para o Supabase:", err); 
-        alert("Erro de conexão ao salvar pedido.");
+        console.error("Erro planilha:", err); 
+        alert("Erro de conexão ao salvar pedido na planilha.");
         return false;
     }
 }
@@ -105,8 +93,6 @@ document.addEventListener("DOMContentLoaded", async function () {
                     const popup = document.getElementById('popup-aviso');
                     if(popup) {
                         document.getElementById('aviso-titulo').textContent = a.titulo;
-                        
-                        // AQUI: Aplica o formatText no aviso
                         document.getElementById('aviso-texto').innerHTML = window.formatText(a.texto);
                         
                         if(a.imagemUrl) {
@@ -246,7 +232,6 @@ document.addEventListener("DOMContentLoaded", async function () {
         
         if (agruparPorNome) { 
             grupoOrdenado.forEach(item => { 
-                // AQUI: Forçando tudo para minúsculo para a chave de agrupamento ser sempre idêntica
                 const chave = ((item.nome || 'Sem Nome').trim().toLowerCase() + '|||' + (item.descricaoItem || '').trim().toLowerCase());
                 contagemNomes[chave] = (contagemNomes[chave] || 0) + 1; 
             }); 
@@ -256,8 +241,6 @@ document.addEventListener("DOMContentLoaded", async function () {
         for (let i = 0; i < grupoOrdenado.length; i++) {
             const item = grupoOrdenado[i]; const tr = document.createElement("tr"); tr.id = item.id; const itemId = item.id; 
             const itemNameClean = (item.nome || 'Sem Nome').trim();
-            
-            // AQUI TAMBÉM: Chave idêntica blindada contra maiúsculas/minúsculas
             const chaveAgrupamento = (itemNameClean.toLowerCase() + '|||' + (item.descricaoItem || '').trim().toLowerCase());
 
             const precoFormatado = Number(item.preco).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -294,12 +277,9 @@ document.addEventListener("DOMContentLoaded", async function () {
             let tdSecundaria = '';
             if (configCategoria.tipoColuna && configCategoria.tipoColuna !== 'Nenhuma') {
                 let exibicaoColuna2 = configCategoria.tipoColuna === 'Mínimo' ? (item.min || 1) : (item.tamanho || '-');
-                
-                // Isola o texto do peso em uma classe para o mobile
                 if (typeof exibicaoColuna2 === 'string' && exibicaoColuna2.includes(' (')) {
                     exibicaoColuna2 = exibicaoColuna2.replace(' (', ' <span class="peso-mobile">(') + '</span>';
                 }
-                
                 tdSecundaria = `<td class="col-sec">${exibicaoColuna2}</td>`;
             }
 
@@ -321,8 +301,7 @@ document.addEventListener("DOMContentLoaded", async function () {
                     tr.innerHTML = `<td style="display:none;"></td><td style="display:none;"></td>${celulasRestantesHTML}`; 
                 }
                 
-                // AQUI: Blindando o verificador de final de linha também
-                const nextChave = i < grupoOrdenado.length - 1 ? ((grupoOrdenado[i+1].nome || 'Sem Nome').trim().toLowerCase() + '|||' + (grupoOrdenado[i+1].descricaoItem || '').trim().toLowerCase()) : null;
+                const nextChave = i < groupOrdenado.length - 1 ? ((grupoOrdenado[i+1].nome || 'Sem Nome').trim().toLowerCase() + '|||' + (grupoOrdenado[i+1].descricaoItem || '').trim().toLowerCase()) : null;
                 if (i === grupoOrdenado.length - 1 || nextChave !== chaveAtual) { tr.classList.add('group-separator'); }
             } else {
                 tr.innerHTML = `
@@ -358,8 +337,6 @@ document.addEventListener("DOMContentLoaded", async function () {
 
         const modal = document.getElementById('popup-item-imagem');
         document.getElementById('item-nome-display').textContent = itemInfo.nome;
-        
-        // AQUI: Aplica o formatText E usar .innerHTML para as tags funcionarem visualmente
         document.getElementById('item-descricao-display').innerHTML = window.formatText(itemInfo.descricaoPopup || itemInfo.descricaoItem || '');
         
         const img = document.getElementById('item-imagem-display');
@@ -521,7 +498,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         }
     }
 
-    // AQUI OCORRE A MÁGICA: Transformamos em Async!
+    // Tornamos assíncrona para que o await do envio funcione perfeitamente
     window.confirmarPedido = async function() {
         const btn = document.querySelector('.btn-primary-large');
         const txtOriginal = btn.textContent;
@@ -579,8 +556,8 @@ document.addEventListener("DOMContentLoaded", async function () {
         let totalLiquido = total - cupomAplicado.desconto;
         if(totalLiquido < 0) totalLiquido = 0;
 
-        // INVERSÃO DA DATA PARA O PADRÃO BRASILEIRO NO WHATSAPP E SUPABASE
-        const dataFormatada = dt.split('-').reverse().join('/');
+        // Inversão correta da data para o WhatsApp
+        const dataFormatada = dt.split("-").reverse().join("/");
 
         txt += `- *Informações:*\nNome: ${nm}\nNúmero: ${validarEFormatarTelefone(tel)}\nData: ${dataFormatada}\nHorário: ${hr.substring(0,5)}\nPagamento: ${pag}\n`;
         if(obs) txt += `Observações: ${obs}\n`;
@@ -597,19 +574,18 @@ document.addEventListener("DOMContentLoaded", async function () {
             Total_Final: `R$ ${totalLiquido.toLocaleString('pt-BR',{minimumFractionDigits:2})}`,
             Forma_de_Pagamento: pag,
             Cupom: cupomAplicado.codigo || "",
-            Status_do_Pedido: "Pedido Recebido",
+            Observacoes: obs || "",
             Status_Pagamento: "Pendente",
-            Observacoes: obs || ""
+            Status_do_Pedido: "Pedido Recebido"
         };
         
-        // AGUARDA (await) o envio para o Supabase!
-        const sucesso = await enviarPedidoParaSupabase(dadosPedido);
+        // AGUARDA o retorno da gravação na planilha antes de disparar o WhatsApp!
+        const sucesso = await enviarPedidoParaPlanilha(dadosPedido);
 
-        // Se deu erro, ele não abre o WhatsApp e não limpa o carrinho
         if (!sucesso) {
             btn.textContent = txtOriginal; 
             btn.disabled = false;
-            return;
+            return; // Interrompe o processo se der erro na rede
         }
 
         window.open(`https://wa.me/558195256641?text=${encodeURIComponent(txt)}`, '_blank');
