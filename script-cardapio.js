@@ -38,15 +38,14 @@ async function enviarPedidoParaPlanilha(dadosPedido) {
             }
         }
         
-        // Agora aguarda o fetch de forma assíncrona
         await fetch(GOOGLE_SHEETS_URL, {
             method: "POST",
-            mode: 'no-cors', // Mantido no-cors para evitar restrições de redirecionamento do Apps Script
+            mode: 'no-cors', 
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
             body: params.toString()
         });
         
-        return true; // Em modo no-cors, se a rede não falhar, assumimos sucesso
+        return true; 
     } catch (err) { 
         console.error("Erro planilha:", err); 
         alert("Erro de conexão ao salvar pedido na planilha.");
@@ -301,7 +300,8 @@ document.addEventListener("DOMContentLoaded", async function () {
                     tr.innerHTML = `<td style="display:none;"></td><td style="display:none;"></td>${celulasRestantesHTML}`; 
                 }
                 
-                const nextChave = i < groupOrdenado.length - 1 ? ((grupoOrdenado[i+1].nome || 'Sem Nome').trim().toLowerCase() + '|||' + (grupoOrdenado[i+1].descricaoItem || '').trim().toLowerCase()) : null;
+                // CORRIGIDO: Modificado de groupoOrdenado para grupoOrdenado para evitar o travamento por ReferenceError
+                const nextChave = i < grupoOrdenado.length - 1 ? ((grupoOrdenado[i+1].nome || 'Sem Nome').trim().toLowerCase() + '|||' + (grupoOrdenado[i+1].descricaoItem || '').trim().toLowerCase()) : null;
                 if (i === grupoOrdenado.length - 1 || nextChave !== chaveAtual) { tr.classList.add('group-separator'); }
             } else {
                 tr.innerHTML = `
@@ -498,7 +498,6 @@ document.addEventListener("DOMContentLoaded", async function () {
         }
     }
 
-    // Tornamos assíncrona para que o await do envio funcione perfeitamente
     window.confirmarPedido = async function() {
         const btn = document.querySelector('.btn-primary-large');
         const txtOriginal = btn.textContent;
@@ -556,7 +555,6 @@ document.addEventListener("DOMContentLoaded", async function () {
         let totalLiquido = total - cupomAplicado.desconto;
         if(totalLiquido < 0) totalLiquido = 0;
 
-        // Inversão correta da data para o WhatsApp
         const dataFormatada = dt.split("-").reverse().join("/");
 
         txt += `- *Informações:*\nNome: ${nm}\nNúmero: ${validarEFormatarTelefone(tel)}\nData: ${dataFormatada}\nHorário: ${hr.substring(0,5)}\nPagamento: ${pag}\n`;
@@ -579,13 +577,12 @@ document.addEventListener("DOMContentLoaded", async function () {
             Status_do_Pedido: "Pedido Recebido"
         };
         
-        // AGUARDA o retorno da gravação na planilha antes de disparar o WhatsApp!
         const sucesso = await enviarPedidoParaPlanilha(dadosPedido);
 
         if (!sucesso) {
             btn.textContent = txtOriginal; 
             btn.disabled = false;
-            return; // Interrompe o processo se der erro na rede
+            return; 
         }
 
         window.open(`https://wa.me/558195256641?text=${encodeURIComponent(txt)}`, '_blank');
