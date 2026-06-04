@@ -112,7 +112,10 @@ document.addEventListener("DOMContentLoaded", async function () {
                 return;
             }
             e.target.classList.remove('show');
-            setTimeout(() => e.target.style.display = 'none', 300);
+            setTimeout(() => {
+                e.target.style.display = 'none';
+                document.body.style.overflow = 'auto';
+            }, 300);
         }
     }
 
@@ -182,7 +185,6 @@ document.addEventListener("DOMContentLoaded", async function () {
                 <th class="col-qtd"><span class="th-mobile">QTD</span><span class="th-desktop">Quantidade</span></th>
             </tr>`;
 
-            // CORREÇÃO: Aplicado window.formatText na mensagem de observação da categoria para obedecer as regras de markdown (* e _)
             const infoBoxHTML = (config.mensagemObs && config.mensagemObs.trim() !== '') ? `<div class="info-box"><p>${window.formatText(config.mensagemObs)}</p></div>` : '';
 
             mainContent.innerHTML += `
@@ -213,7 +215,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         if (!tabelaBase) return;
         const tbodyBase = tabelaBase.querySelector('tbody');
 
-        const grupoOrdenado = [...grupo].sort((a, b) => {
+        const groupoOrdenado = [...grupo].sort((a, b) => {
             const nomeA = (a.nome || '').trim().toLocaleLowerCase('pt-BR');
             const nomeB = (b.nome || '').trim().toLocaleLowerCase('pt-BR');
             if (nomeA !== nomeB) return nomeA.localeCompare(nomeB, 'pt-BR');
@@ -231,15 +233,15 @@ document.addEventListener("DOMContentLoaded", async function () {
         const contagemNomes = {};
         
         if (agruparPorNome) { 
-            grupoOrdenado.forEach(item => { 
+            groupoOrdenado.forEach(item => { 
                 const chave = ((item.nome || 'Sem Nome').trim().toLowerCase() + '|||' + (item.descricaoItem || '').trim().toLowerCase());
                 contagemNomes[chave] = (contagemNomes[chave] || 0) + 1; 
             }); 
         }
 
         let chaveAtual = null;
-        for (let i = 0; i < grupoOrdenado.length; i++) {
-            const item = grupoOrdenado[i]; const tr = document.createElement("tr"); tr.id = item.id; const itemId = item.id; 
+        for (let i = 0; i < groupoOrdenado.length; i++) {
+            const item = groupoOrdenado[i]; const tr = document.createElement("tr"); tr.id = item.id; const itemId = item.id; 
             const itemNameClean = (item.nome || 'Sem Nome').trim();
             const chaveAgrupamento = (itemNameClean.toLowerCase() + '|||' + (item.descricaoItem || '').trim().toLowerCase());
 
@@ -248,10 +250,11 @@ document.addEventListener("DOMContentLoaded", async function () {
             const isIndividualMinCheck = (configCategoria.minIndividual && item.min > 1) || isMiniCookie;
             let erroHtml = isIndividualMinCheck ? `<div class="erro-item-unico">Mín ${item.min} Unid.</div>` : '';
 
+            // MODIFICADO: Removido o atributo readonly para permitir escrita manual
             const inputHtml = `
                 <div class="quantidade-input-group">
                     <button type="button" class="qtd-btn-table" onclick="window.alterarQuantidadeTabela('${itemId}', -1, ${item.min || 1})">-</button>
-                    <input type="number" value="0" data-min="${item.min || 1}" data-preco="${item.preco}" data-resumo="${item.descricaoResumo || item.nome}" data-grupo="${nomeGrupo}" data-item-id="${itemId}" class="quantidade-input" readonly>
+                    <input type="number" value="0" min="0" data-min="${item.min || 1}" data-preco="${item.preco}" data-resumo="${item.descricaoResumo || item.nome}" data-grupo="${nomeGrupo}" data-item-id="${itemId}" class="quantidade-input">
                     <button type="button" class="qtd-btn-table" onclick="window.alterarQuantidadeTabela('${itemId}', 1, ${item.min || 1})">+</button>
                 </div>`;
 
@@ -301,8 +304,8 @@ document.addEventListener("DOMContentLoaded", async function () {
                     tr.innerHTML = `<td style="display:none;"></td><td style="display:none;"></td>${celulasRestantesHTML}`; 
                 }
                 
-                const nextChave = i < grupoOrdenado.length - 1 ? ((grupoOrdenado[i+1].nome || 'Sem Nome').trim().toLowerCase() + '|||' + (grupoOrdenado[i+1].descricaoItem || '').trim().toLowerCase()) : null;
-                if (i === grupoOrdenado.length - 1 || nextChave !== chaveAtual) { tr.classList.add('group-separator'); }
+                const nextChave = i < groupoOrdenado.length - 1 ? ((groupoOrdenado[i+1].nome || 'Sem Nome').trim().toLowerCase() + '|||' + (groupoOrdenado[i+1].descricaoItem || '').trim().toLowerCase()) : null;
+                if (i === groupoOrdenado.length - 1 || nextChave !== chaveAtual) { tr.classList.add('group-separator'); }
             } else {
                 tr.innerHTML = `
                     <td class="col-item ${cssClickable}" ${inlineClickable}>
@@ -318,10 +321,30 @@ document.addEventListener("DOMContentLoaded", async function () {
             tbodyBase.appendChild(tr);
         }
 
+        // MODIFICADO: Atualizado listeners para capturar digitação manual em tempo real de forma segura
         tbodyBase.querySelectorAll('.quantidade-input').forEach(input => {
-            input.addEventListener("input", atualizarTotal);
+            input.addEventListener("input", function() {
+                let q = parseInt(this.value);
+                if (isNaN(q) || q < 0) q = 0;
+                
+                const grupo = this.getAttribute('data-grupo');
+                const min = parseInt(this.getAttribute('data-min')) || 1;
+                const erroElemento = this.closest('.quantidade-container')?.querySelector('.erro-item-unico');
+                const configGrupo = configCategorias[grupo] || {minIndividual: false};
+                
+                if (configGrupo.minIndividual && q > 0 && q < min) {
+                    if (erroElemento) { erroElemento.textContent = `Mín ${min} Unid.`; erroElemento.style.display = 'block'; }
+                } else {
+                    if (erroElemento) erroElemento.style.display = 'none';
+                }
+                
+                atualizarTotal();
+                if (cupomAplicado.codigo) window.aplicarCupom();
+            });
             input.addEventListener("blur", function() {
-                const q = parseInt(this.value) || 0; this.value = (this.value === "" || q <= 0) ? "0" : q.toString(); atualizarTotal();
+                const q = parseInt(this.value) || 0; 
+                this.value = (this.value === "" || q <= 0) ? "0" : q.toString(); 
+                atualizarTotal();
             });
         });
     }
@@ -350,12 +373,13 @@ document.addEventListener("DOMContentLoaded", async function () {
         
         modal.style.display = 'flex'; 
         modal.classList.add('show'); 
-        document.body.style.overflow = 'hidden';
+        document.body.style.overflow = 'hidden'; 
     }
     
     window.fecharImagemPopup = function() {
         const modal = document.getElementById('popup-item-imagem'); modal.classList.remove('show');
-        setTimeout(() => { modal.style.display = 'none'; }, 300); document.body.style.overflow = 'auto';
+        setTimeout(() => { modal.style.display = 'none'; }, 300); 
+        document.body.style.overflow = 'auto'; 
     }
     document.addEventListener('click', function(e) { const itemNome = e.target.closest('.item-nome-clickable'); if (itemNome) window.abrirImagemPopupDb(itemNome.getAttribute('data-item-id')); });
 
@@ -369,11 +393,12 @@ document.addEventListener("DOMContentLoaded", async function () {
     if (document.getElementById('menu-quem-somos')) document.getElementById('menu-quem-somos').addEventListener('click', (e) => { e.preventDefault(); window.openAboutModal(); });
 
     function configurarEventosDrag() {
-        const categoriasNav = document.getElementById('categorias-horizontal'); if(!categoriasNav) return;
+        const categoriesNav = document.getElementById('categorias-horizontal'); if(!categoriesNav) return;
         let isDown = false; let startX, scrollLeft;
-        categoriasNav.addEventListener('mousedown', (e) => { isDown = true; startX = e.pageX - categoriasNav.offsetLeft; scrollLeft = categoriasNav.scrollLeft; });
-        categoriasNav.addEventListener('mouseleave', () => isDown = false); categoriasNav.addEventListener('mouseup', () => isDown = false);
-        categoriasNav.addEventListener('mousemove', (e) => { if (!isDown) return; e.preventDefault(); const x = e.pageX - categoriasNav.offsetLeft; const walk = (x - startX) * 2; categoriasNav.scrollLeft = scrollLeft - walk; });
+        
+        categoriesNav.addEventListener('mousedown', (e) => { isDown = true; startX = e.pageX - categoriesNav.offsetLeft; scrollLeft = categoriesNav.scrollLeft; });
+        categoriesNav.addEventListener('mouseleave', () => isDown = false); categoriesNav.addEventListener('mouseup', () => isDown = false);
+        categoriesNav.addEventListener('mousemove', (e) => { if (!isDown) return; e.preventDefault(); const x = e.pageX - categoriesNav.offsetLeft; const walk = (x - startX) * 2; categoriesNav.scrollLeft = scrollLeft - walk; });
     }
     function configurarEventosMenu() {
         const links = document.querySelectorAll('#categorias-horizontal a');
@@ -388,21 +413,116 @@ document.addEventListener("DOMContentLoaded", async function () {
         });
     }
 
-    window.fecharResumoPopup = function() { const p = document.getElementById("popup-resumo"); if(p) { p.classList.remove('show'); setTimeout(() => p.style.display = "none", 300); } }
-    window.fecharPopup = function() { const p = document.getElementById("popup-pedido"); if(p) { p.classList.remove('show'); setTimeout(() => p.style.display = "none", 300); } }
+    window.fecharResumoPopup = function() { const p = document.getElementById("popup-resumo"); if(p) { p.classList.remove('show'); setTimeout(() => { p.style.display = "none"; document.body.style.overflow = 'auto'; }, 300); } }
+    window.fecharPopup = function() { const p = document.getElementById("popup-pedido"); if(p) { p.classList.remove('show'); setTimeout(() => { p.style.display = "none"; document.body.style.overflow = 'auto'; }, 300); } }
     
     window.abrirResumoPopup = function() {
         if (window.totalPedidoAtivo > 0) { 
             const p = document.getElementById("popup-resumo");
             p.style.display = "flex"; 
             setTimeout(() => p.classList.add('show'), 10);
+            document.body.style.overflow = 'hidden'; 
         } else { alert("Seu pedido está vazio!"); }
     }
     
     const btnCarrinho = document.getElementById("fixed-summary");
     if(btnCarrinho) { btnCarrinho.addEventListener('click', function(e) { e.preventDefault(); e.stopPropagation(); window.abrirResumoPopup(); }); }
     
-    window.abrirPopup = function() { window.fecharResumoPopup(); const p = document.getElementById("popup-pedido"); if(p) { p.style.display = "flex"; setTimeout(() => p.classList.add('show'), 10); } }
+    // AJUSTADO: Controle dinâmico de selects para a campanha de Namorados
+    window.abrirPopup = function() { 
+        window.fecharResumoPopup(); 
+        const p = document.getElementById("popup-pedido"); 
+        if(p) { 
+            p.style.display = "flex"; 
+            setTimeout(() => p.classList.add('show'), 10); 
+            document.body.style.overflow = 'hidden'; 
+
+            const dateInput = document.getElementById("data");
+            const timeInput = document.getElementById("horario");
+            const timeGroup = timeInput.closest('.input-group');
+            
+            let temNamorados = false;
+            document.querySelectorAll(".quantidade-input").forEach(i => {
+                if ((parseInt(i.value) || 0) > 0 && i.getAttribute("data-grupo") === "❤️ Namorados ❤️") {
+                    temNamorados = true;
+                }
+            });
+
+            // Estrutura de horários configurada por data
+            const horariosCampanha = {
+                "2026-06-12": ["16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00"],
+                "2026-06-13": ["13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00"]
+            };
+
+            if (temNamorados) {
+                // 1º PASSO: Transformar o campo de data em um SELECT com as opções válidas
+                const selectData = document.createElement("select");
+                selectData.id = "data";
+                selectData.name = "data";
+                selectData.required = true;
+                selectData.innerHTML = `
+                    <option value="" disabled selected>Selecione a data de entrega...</option>
+                    <option value="2026-06-12">12/06/2026</option>
+                    <option value="2026-06-13">13/06/2026</option>
+                `;
+                dateInput.parentNode.replaceChild(selectData, dateInput);
+
+                // 2º PASSO: Transformar o campo de horário em um SELECT vazio por padrão
+                const selectHorario = document.createElement("select");
+                selectHorario.id = "horario";
+                selectHorario.name = "horario";
+                selectHorario.required = true;
+                timeInput.parentNode.replaceChild(selectHorario, timeInput);
+
+                // Oculta o container de horário até que a data seja escolhida
+                if (timeGroup) timeGroup.style.display = "none";
+
+                // Listener para popular os horários de meia em meia hora baseados na data
+                selectData.onchange = function() {
+                    const dataSelecionada = this.value;
+                    selectHorario.innerHTML = '<option value="" disabled selected>Selecione o horário...</option>';
+                    
+                    if (horariosCampanha[dataSelecionada]) {
+                        horariosCampanha[dataSelecionada].forEach(hora => {
+                            selectHorario.innerHTML += `<option value="${hora}">${hora.replace(':', 'h')}</option>`;
+                        });
+                        if (timeGroup) timeGroup.style.display = "flex";
+                    } else {
+                        if (timeGroup) timeGroup.style.display = "none";
+                    }
+                };
+            } else {
+                // Caso NÃO tenha namorados, garante que os campos voltem a ser Inputs normais
+                if (dateInput.tagName === "SELECT") {
+                    const inputData = document.createElement("input");
+                    inputData.type = "date";
+                    inputData.id = "data";
+                    inputData.name = "data";
+                    inputData.required = true;
+                    dateInput.parentNode.replaceChild(inputData, dateInput);
+                }
+                if (timeInput.tagName === "SELECT") {
+                    const inputHorario = document.createElement("input");
+                    inputHorario.type = "time";
+                    inputHorario.id = "horario";
+                    inputHorario.name = "horario";
+                    inputHorario.required = true;
+                    timeInput.parentNode.replaceChild(inputHorario, timeInput);
+                }
+
+                // readquire referências atualizadas dos inputs recriados
+                const finalDateInput = document.getElementById("data");
+                const finalTimeInput = document.getElementById("horario");
+                const finalTimeGroup = finalTimeInput.closest('.input-group');
+
+                finalDateInput.removeAttribute("min");
+                finalDateInput.removeAttribute("max");
+                if (finalTimeGroup) finalTimeGroup.style.display = "flex";
+                finalDateInput.onchange = null;
+            }
+        } 
+    };
+    
     window.editarPedido = function() { window.fecharPopup(); setTimeout(() => window.abrirResumoPopup(), 300); }
 
     let cupomAplicado = { codigo: null, desconto: 0, mensagem: '' };
@@ -424,7 +544,13 @@ document.addEventListener("DOMContentLoaded", async function () {
     
     window.atualizarQuantidadeDireta = function(inputElement) {
         const itemId = inputElement.getAttribute('data-item-id'); const inputNoMain = document.querySelector(`.quantidade-input[data-item-id="${itemId}"]`);
-        if (inputNoMain) { inputNoMain.value = Math.max(0, parseInt(inputElement.value.replace(/[^0-9]/g, '')) || 0); atualizarTotal(); if (cupomAplicado.codigo) window.aplicarCupom(); }
+        if (inputNoMain) { 
+            let q = parseInt(inputElement.value.replace(/[^0-9]/g, ''));
+            if (isNaN(q) || q < 0) q = 0;
+            inputNoMain.value = q; 
+            atualizarTotal(); 
+            if (cupomAplicado.codigo) window.aplicarCupom(); 
+        }
     }
 
     window.alterarQuantidadeTabela = function(itemId, delta, minimo) {
@@ -438,14 +564,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         atualizarTotal();
     };
 
-    window.aplicarCupom = async function() {
-        const cupomInput = document.getElementById('cupom-input'); const cupomCode = cupomInput.value.toUpperCase().trim(); const cupomMessage = document.getElementById('cupom-message');
-        cupomAplicado = { codigo: null, desconto: 0, mensagem: '' }; let totalBrutoPedido = 0;   
-        document.querySelectorAll(".quantidade-input").forEach(input => { const q = parseInt(input.value) || 0; const p = parseFloat(input.getAttribute("data-preco")) || 0; if (q > 0) totalBrutoPedido += q * p; });
-        const cupom = CUPONS_GERADOS[cupomCode];
-        if (cupom) { let descontoTotal = cupom.descontoTipo === 'percentual' ? totalBrutoPedido * cupom.valor : cupom.valor; cupomAplicado = { codigo: cupomCode, desconto: descontoTotal, mensagem: `CUPOM APLICADO!` }; cupomMessage.className = 'cupom-success'; cupomMessage.textContent = cupomAplicado.mensagem; } else if (cupomCode) { cupomMessage.className = 'cupom-error'; cupomMessage.textContent = "Código inválido."; }
-        atualizarTotal();
-    }
+    window.openAgendarPopup = function() { window.fecharResumoPopup(); const p = document.getElementById("popup-pedido"); if(p) { p.style.display = "flex"; setTimeout(() => p.classList.add('show'), 10); document.body.style.overflow = 'hidden'; } }
 
     function atualizarTotal() {
         let totalBruto = 0; let totalItens = 0;
@@ -467,15 +586,24 @@ document.addEventListener("DOMContentLoaded", async function () {
                 const minIndividualItem = parseInt(input.getAttribute("data-min")) || 1;
                 const configGrupo = configCategorias[grp] || { minIndividual: false };
 
-                // CORREÇÃO: Se a categoria exige mínimo individual e a quantidade for inferior ao mínimo, ativa a trava de erro geral.
+                totalBruto += (q * p); totalItens += q;
+                if (!gruposResumo[grp]) gruposResumo[grp] = [];
+                
+                let erroItemResumo = false;
                 if (configGrupo.minIndividual && q < minIndividualItem) {
                     temErroMinimo = true;
-                } else {
-                    // Só entra no objeto e no resumo visual se estiver igual ou acima do mínimo exigido.
-                    totalBruto += (q * p); totalItens += q;
-                    if (!gruposResumo[grp]) gruposResumo[grp] = [];
-                    gruposResumo[grp].push({ input, quantidade: q, preco: p, descricaoResumo: input.getAttribute("data-resumo"), itemId: input.getAttribute("data-item-id") });
+                    erroItemResumo = true;
                 }
+
+                gruposResumo[grp].push({ 
+                    input, 
+                    quantidade: q, 
+                    preco: p, 
+                    descricaoResumo: input.getAttribute("data-resumo"), 
+                    itemId: input.getAttribute("data-item-id"),
+                    minimoExigido: minIndividualItem,
+                    comErro: erroItemResumo
+                });
             }
         });
 
@@ -484,20 +612,57 @@ document.addEventListener("DOMContentLoaded", async function () {
 
         for (const grupo in gruposResumo) {
             const config = configCategorias[grupo]; const erroCategoria = document.getElementById('erro-' + grupo.toLowerCase().replace(/\s/g, '-'));
-            if(config && config.minTotal > 0 && totaisPorGrupo[grupo] > 0 && totaisPorGrupo[grupo] < config.minTotal) { temErroMinimo = true; if(erroCategoria) { erroCategoria.textContent = `Mínimo de ${config.minTotal} unidades nesta categoria.`; erroCategoria.style.display = 'block'; } } else { if(erroCategoria) erroCategoria.style.display = 'none'; }
+            let categoriaComErroTotal = false;
+
+            if(config && config.minTotal > 0 && totaisPorGrupo[grupo] > 0 && totaisPorGrupo[grupo] < config.minTotal) { 
+                temErroMinimo = true; 
+                categoriaComErroTotal = true;
+                if(erroCategoria) { 
+                    erroCategoria.textContent = `Mínimo de ${config.minTotal} unidades nesta categoria.`; 
+                    if (config.mensagemObs && config.mensagemObs.trim() !== '') {
+                        erroCategoria.style.display = 'none';
+                    } else {
+                        erroCategoria.style.display = 'block'; 
+                    }
+                } 
+            } else { 
+                if(erroCategoria) erroCategoria.style.display = 'none'; 
+            }
             
             resumoItensPopup.innerHTML += `<div class="resumo-grupo-titulo">${grupo}:</div>`;
             gruposResumo[grupo].forEach(item => {
+                let avisoMinimoHTML = item.comErro ? `<div class="erro-item-unico" style="display:block; text-align:center; margin-top:4px; text-transform: uppercase;">Mín ${item.minimoExigido} Unid.</div>` : '';
+
+                // MODIFICADO: Removido o atributo readonly do input de quantidade no resumo também
                 resumoItensPopup.innerHTML += `
-                    <div class="resumo-item-line">
-                        <div class="resumo-item-name">${window.formatText(item.descricaoResumo)} <small>R$ ${(item.quantidade * item.preco).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</small></div>
-                        <div class="resumo-item-input-group"><button type="button" class="resumo-qtd-btn" onclick="window.alterarQuantidadeResumo('${item.itemId}', -1)">-</button><input type="number" value="${item.quantidade}" data-item-id="${item.itemId}" readonly><button type="button" class="resumo-qtd-btn" onclick="window.alterarQuantidadeResumo('${item.itemId}', 1)">+</button></div>
-                        <button class="btn-excluir" onclick="window.excluirItem('${item.itemId}')"><i class="fas fa-trash"></i></button>
+                    <div class="resumo-item-line" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px dashed rgba(29, 40, 20, 0.2);">
+                        <div class="resumo-item-name" style="flex: 1; text-align: left; padding-right: 10px;">
+                            ${window.formatText(item.descricaoResumo)} <small style="display: block; color: var(--text-light); margin-top: 2px;">R$ ${(item.quantidade * item.preco).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</small>
+                        </div>
+                        <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <div class="resumo-item-input-group" style="display: flex; align-items: center; gap: 5px;">
+                                    <button type="button" class="resumo-qtd-btn" onclick="window.alterarQuantidadeResumo('${item.itemId}', -1)">-</button>
+                                    <input type="number" value="${item.quantidade}" min="0" data-item-id="${item.itemId}" oninput="window.atualizarQuantidadeDireta(this)" style="width: 38px; height: 30px; text-align: center; border: 1px solid rgba(29, 40, 20, 0.2); border-radius: 6px;">
+                                    <button type="button" class="resumo-qtd-btn" onclick="window.alterarQuantidadeResumo('${item.itemId}', 1)">+</button>
+                                </div>
+                                <button class="btn-excluir" onclick="window.excluirItem('${item.itemId}')" style="background: none; border: none; color: #E60000; cursor: pointer;"><i class="fas fa-trash"></i></button>
+                            </div>
+                            ${avisoMinimoHTML}
+                        </div>
                     </div>`;
             });
+
+            if (categoriaComErroTotal) {
+                resumoItensPopup.innerHTML += `
+                    <div style="display: flex; justify-content: flex-end; margin-top: 5px; margin-bottom: 10px;">
+                        <div class="erro-item-unico" style="width: 140px; text-align: center; display: block; text-transform: uppercase;">
+                            Mín ${config.minTotal} Unid.
+                        </div>
+                    </div>`;
+            }
         }
 
-        // Caso as travas extras de mínimo de categoria também peguem algum grupo zerado no resumo
         document.querySelectorAll(".quantidade-input").forEach(input => {
             const q = parseInt(input.value) || 0;
             const grp = input.getAttribute("data-grupo");
@@ -505,7 +670,14 @@ document.addEventListener("DOMContentLoaded", async function () {
             if (q > 0 && config && config.minTotal > 0 && totaisPorGrupo[grp] < config.minTotal) {
                 temErroMinimo = true;
                 const erroCategoria = document.getElementById('erro-' + grp.toLowerCase().replace(/\s/g, '-'));
-                if(erroCategoria) { erroCategoria.textContent = `Mínimo de ${config.minTotal} unidades nesta categoria.`; erroCategoria.style.display = 'block'; }
+                if(erroCategoria) { 
+                    erroCategoria.textContent = `Mínimo de ${config.minTotal} unidades nesta categoria.`; 
+                    if (config.mensagemObs && config.mensagemObs.trim() !== '') {
+                        erroCategoria.style.display = 'none';
+                    } else {
+                        erroCategoria.style.display = 'block'; 
+                    }
+                }
             }
         });
 
@@ -528,22 +700,35 @@ document.addEventListener("DOMContentLoaded", async function () {
         btn.textContent = "Processando...";
         btn.disabled = true;
 
+        const form = document.getElementById("form-pedido");
+        if (form && !form.checkValidity()) {
+            form.reportValidity(); 
+            btn.textContent = txtOriginal; 
+            btn.disabled = false;
+            return;
+        }
+
         const idPedido = gerarIdPedido(); 
         let txt = `Olá, Favu!\nGostaria de encomendar os itens abaixo:\n\n*ID: ${idPedido}*\n\n- *Resumo:*\n\n`;
         let total = 0; 
         const gResumo = {}; 
         let temItens = false; 
         let itensParaPlanilha = ""; 
-        
+        let blocoSeguroTravado = false;
+        let temNamorados = false;
+
         document.querySelectorAll(".quantidade-input").forEach(i => {
             const q = parseInt(i.value) || 0;
             if (q > 0) { 
                 const grp = i.getAttribute("data-grupo"); 
+                if (grp === "❤️ Namorados ❤️") {
+                    temNamorados = true;
+                }
                 const minIndividualItem = parseInt(i.getAttribute("data-min")) || 1;
                 const configGrupo = configCategorias[grp] || { minIndividual: false };
 
-                // CORREÇÃO: Garante que itens com quantidade abaixo do mínimo individual sejam rejeitados no envio final.
                 if (configGrupo.minIndividual && q < minIndividualItem) {
+                    blocoSeguroTravado = true;
                     return; 
                 }
 
@@ -559,16 +744,10 @@ document.addEventListener("DOMContentLoaded", async function () {
             }
         });
         
-        if (!temItens) { 
+        if (!temItens || blocoSeguroTravado) { 
             alert("Pedido inválido ou com quantidades abaixo do mínimo permitido."); 
             btn.textContent = txtOriginal; btn.disabled = false; 
             return; 
-        }
-        
-        for (const g in gResumo) { 
-            txt += `⤷${g}:\n`; 
-            gResumo[g].forEach(x => { txt += `${x.desc} - ${x.q} un = R$ ${(x.q*x.p).toLocaleString('pt-BR',{minimumFractionDigits:2})}\n`; }); 
-            txt += `\n`; 
         }
         
         const nm = document.getElementById("nome").value;
@@ -582,6 +761,20 @@ document.addEventListener("DOMContentLoaded", async function () {
             alert("Preencha todos os campos obrigatórios!"); 
             btn.textContent = txtOriginal; btn.disabled = false; 
             return; 
+        }
+
+        // AJUSTADO: Validação secundária à prova de falhas para o horário dos Namorados
+        if (temNamorados) {
+            if (dt === "2026-06-12" && (hr < "16:00" || hr > "19:00")) {
+                alert("Para o dia 12/06, o horário de entrega deve ser entre 16:00 e 19:00.");
+                btn.textContent = txtOriginal; btn.disabled = false;
+                return;
+            }
+            if (dt === "2026-06-13" && (hr < "13:00" || hr > "16:00")) {
+                alert("Para o dia 13/06, o horário de entrega deve ser entre 13:00 e 16:00.");
+                btn.textContent = txtOriginal; btn.disabled = false;
+                return;
+            }
         }
         
         let totalLiquido = total - cupomAplicado.desconto;
