@@ -61,16 +61,7 @@ footer { flex-shrink: 0; margin-top: auto; background-image: url('images/roda.pn
 .categorias-draggable:active { cursor: grabbing; }
 
 .categoria-btn { display: none; }
-/* BOTÕES DE CATEGORIA: Basic Choice sem bold forçado */
-#categorias-horizontal a { 
-    display: inline-flex; align-items: center; justify-content: center; 
-    padding: 6px 18px; height: auto; background-color: white; 
-    color: var(--text-dark); text-decoration: none; border-radius: 30px; 
-    font-size: 1rem; font-weight: normal; font-family: 'Basic Choice', cursive;
-    white-space: nowrap; transition: 0.3s ease; 
-    border: 1px solid rgba(224, 159, 65, 0.3); box-shadow: 0 4px 10px rgba(0,0,0,0.05); opacity: 1; 
-    text-transform: uppercase;
-}
+#categorias-horizontal a { display: inline-flex; align-items: center; justify-content: center; padding: 6px 18px; height: auto; background-color: white; color: var(--text-dark); text-decoration: none; border-radius: 30px; font-size: 1rem; font-weight: normal; font-family: 'Basic Choice', cursive; white-space: nowrap; transition: 0.3s ease; border: 1px solid rgba(224, 159, 65, 0.3); box-shadow: 0 4px 10px rgba(0,0,0,0.05); opacity: 1; text-transform: uppercase; }
 #categorias-horizontal a:hover { transform: translateY(-2px); border-color: var(--accent-orange); }
 #categorias-horizontal a.active-link { background-color: var(--accent-orange) !important; color: white !important; border-color: var(--accent-orange) !important; box-shadow: 0 4px 15px rgba(224, 159, 65, 0.3) !important; }
 
@@ -94,27 +85,34 @@ footer { flex-shrink: 0; margin-top: auto; background-image: url('images/roda.pn
 .categoria-group.active-group { display: block; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-/* TAMANHOS GERAIS DA TABELA BASE */
-.categoria-title { font-family: 'Basic Choice', cursive; font-size: 2.2rem; color: var(--accent-orange); text-align: center; margin: 20px 0; font-weight: normal; }
+.categoria-title { font-family: 'Basic Choice', cursive; font-size: 2.6rem; color: var(--accent-orange); text-align: center; margin: 5px 0 25px 0; font-weight: normal; }
 
+/* ================== TABELA: 5 COLUNAS ================== */
 .table-card { background: var(--card-bg); border-radius: var(--border-radius); padding: 15px 10px; box-shadow: var(--shadow); border: 1px solid rgba(255,255,255,0.5); width: 100%; overflow: hidden; }
+
+/* Simetria perfeita do Desktop (mantida) */
 table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 
 thead th { font-family: 'Basic Choice', cursive; color: #1D2814; font-size: 1rem; padding-bottom: 12px; text-align: center; border-bottom: 2px solid rgba(29, 40, 20, 0.2); text-transform: uppercase; font-weight: normal;}
-thead th:first-child { text-align: left; padding-left: 5px; width: 42%; }
-thead th:nth-child(2), thead th:nth-child(3), thead th:nth-child(4) { width: 19.3%; }
+
+/* Larguras originais em porcentagem (Desktop) */
+th.col-item, td.col-item { text-align: left; padding-left: 5px; width: 35%; word-wrap: break-word; }
+th.col-icon, td.col-icon { width: 6%; text-align: center; vertical-align: middle; }
+th.col-sec, td.col-sec { width: 19.6%; text-align: center; }
+th.col-unid, td.col-unid { width: 19.6%; text-align: center; }
+th.col-qtd, td.col-qtd { width: 19.6%; text-align: center; }
 
 tbody tr { border-bottom: 1px dashed rgba(224, 159, 65, 0.2); transition: background-color 0.2s ease; }
 tbody tr:hover { background-color: rgba(224, 159, 65, 0.05); }
 tbody tr.group-separator { border-bottom: 2px solid rgba(224, 159, 65, 0.4); }
 tbody tr:last-child { border-bottom: none; }
 
-td { padding: 12px 5px; vertical-align: middle; color: var(--text-dark); font-size: 0.95rem; text-align: center; font-family: 'Basic Choice', cursive; font-weight: normal; }
+td { padding: 12px 5px; vertical-align: middle; color: var(--text-dark); font-size: 0.95rem; font-family: 'Basic Choice', cursive; font-weight: normal; }
+td.col-item { font-size: 1.1rem; text-transform: uppercase; padding-right: 5px; }
+td.col-icon { padding: 12px 0; }
 
-td:first-child { text-align: left; font-weight: normal; width: 42%; padding-right: 15px; word-wrap: break-word; font-family: 'Basic Choice', cursive; font-size: 1.1rem; text-transform: uppercase; }
-td:nth-child(2), td:nth-child(3), td:nth-child(4) { width: 19.3%; padding: 12px 3px; }
-
-.descricao { font-size: 0.8rem; color: var(--text-light); font-weight: normal; margin-top: 5px; line-height: 1.3; font-family: 'Basic Choice', cursive; text-transform: none; }
+.item-nome-texto { line-height: 1.2; }
+.descricao { font-size: 0.8rem; color: var(--text-light); font-weight: normal; margin-top: 5px; line-height: 1.3; font-family: 'Basic Choice', cursive; text-transform: none; text-align: left; }
 
 .quantidade-container { display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .quantidade-input-group { display: flex; align-items: center; justify-content: center; gap: 5px; }
@@ -136,41 +134,71 @@ caption { display: none; }
 .th-mobile { display: inline; }
 .th-desktop { display: none; }
 
-/* MEDIA QUERY: CELULARES */
-@media (max-width: 480px) {
-    .table-card { padding: 10px 5px; }
-    thead th { font-size: 0.8rem; padding: 8px 2px; }
-    td { font-size: 0.9rem; padding: 10px 2px; }
-    td:first-child { font-size: 0.95rem; padding-right: 10px; width: 44%; }
-    td:nth-child(2), td:nth-child(3), td:nth-child(4) { width: auto; }
-    .descricao { font-size: 0.75rem; }
-    .quantidade-input-group { gap: 3px; }
-    input[type="number"] { width: 32px; height: 28px; font-size: 0.95rem; padding: 0; }
-    .qtd-btn-table { width: 22px; font-size: 1.2rem; }
-}
 
 /* =================================================================
-   MEDIA QUERY: DESKTOP (TUDO REDUZIDO EM 20% CONFORME SOLICITADO)
+   MEDIA QUERY: CELULARES - O AJUSTE DEFINITIVO PARA EMPILHAR
 ================================================================= */
-@media (min-width: 1024px) {
+@media (max-width: 600px) {
+    /* Mantém a tabela travada para evitar flutuações */
+    table { table-layout: fixed; width: 100%; } 
+    
+    th.col-icon, td.col-icon { width: 20px; padding: 0; }
+    th.col-sec, td.col-sec { width: 45px; padding: 0; }
+    
+    /* Preço: Tamanho blindado de 55px */
+    th.col-unid, td.col-unid { 
+        width: 55px; 
+        padding: 12px 0;
+        text-align: center;
+        line-height: 1.2;
+    }
+
+    /* A MÁGICA REAL: Empilha e diminui a fonte com a mesma delicadeza do (1.5 kg) */
+    td.col-unid .moeda {
+        display: block;
+        font-size: 0.75rem; /* Tamanho delicado, igual o peso */
+        color: var(--text-light); /* Cor suave para dar aquele charme */
+        margin-bottom: 1px;
+    }
+    
+    td.col-unid .valor {
+        display: block;
+        font-size: 0.85rem; /* Menor do que a fonte padrão, mantendo legibilidade */
+    }
+    
+    /* 90px de largura segura para os botões e input, sem aperto */
+    th.col-qtd, td.col-qtd { 
+        width: 90px; 
+        padding: 12px 0; 
+        text-align: center;
+    }
+    
+    /* O Nome do item pega o resto de tela */
+    th.col-item, td.col-item { width: auto; padding-right: 4px; } 
+    
+    /* Ajuste fino dos botões e do input */
+    .quantidade-input-group { gap: 2px; justify-content: center; width: 100%; }
+    input[type="number"] { width: 34px; height: 28px; padding: 0; margin: 0; }
+    .qtd-btn-table { width: 24px; }
+}
+
+
+@media (min-width: 601px) {
     .th-mobile { display: none; } .th-desktop { display: inline; }
     .container { max-width: 1200px; margin: 0 auto; }
-    
-    /* Largura do Card da Tabela ajustada para equilibrar a visão desktop */
     .table-card { padding: 25px 35px; max-width: 850px; margin: 0 auto; }
     
-    .categoria-title { font-size: 2.5rem; margin: 25px auto 15px auto; }
+    .categoria-title { font-size: 3rem; margin: 5px auto 25px auto; }
     
     thead th { font-size: 0.95rem; padding-bottom: 10px; }
     td { font-size: 0.9rem; padding: 12px 5px; }
-    td:first-child { font-size: 1.05rem; padding-right: 20px; } 
-    .descricao { font-size: 0.75rem; margin-top: 4px; }
+    td.col-item { font-size: 1.05rem; padding-right: 15px; } 
+    th.col-icon, td.col-icon { width: 5%; }
     
+    .descricao { font-size: 0.75rem; margin-top: 4px; }
     #categorias-horizontal a { font-size: 0.95rem; padding: 6px 18px; }
-
     input[type="number"] { width: 36px; height: 28px; font-size: 0.95rem; }
     .qtd-btn-table { font-size: 1.1rem; }
-
     footer { min-height: 80px; flex-direction: column; justify-content: center; align-items: center; background-size: 100% 100%; gap: 0; }
     .footer-logo { display: none; }
     .desktop-signature { display: flex; align-items: center; gap: 8px; opacity: 0.6; }
@@ -183,7 +211,7 @@ button { font-family: 'Basic Choice', cursive; cursor: pointer; border: none; tr
 button:active { transform: scale(0.98); }
 
 /* =================================================================
-   POPUPS: AGORA 100% EM BASIC CHOICE (MENORES E MAIS DELICADOS)
+   POPUPS E MODAIS
 ================================================================= */
 .popup, .modal { 
     display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
@@ -204,7 +232,7 @@ button:active { transform: scale(0.98); }
     max-height: 90vh; 
     overflow-y: auto; 
     box-shadow: 0 10px 30px rgba(0,0,0,0.2); 
-    font-family: 'Basic Choice', cursive; /* FONTE EXCLUSIVA AQUI */
+    font-family: 'Basic Choice', cursive;
     transform: translateY(20px); 
     transition: 0.3s; 
 }
@@ -222,113 +250,45 @@ button:active { transform: scale(0.98); }
 }
 .fechar:hover, .close-btn-wrapper:hover { color: #333; }
 
-/* Título dos Popups */
-.popup-conteudo h2 { 
-    color: var(--accent-orange); 
-    font-family: 'Basic Choice', cursive; 
-    font-size: 1.6rem; 
-    margin: 5px 0 15px 0; 
-    padding-bottom: 12px;
-    border-bottom: 1px solid rgba(224, 159, 65, 0.2);
-    text-transform: uppercase;
-}
+.popup-conteudo h2 { color: var(--accent-orange); font-family: 'Basic Choice', cursive; font-size: 1.6rem; margin: 5px 0 15px 0; padding-bottom: 12px; border-bottom: 1px solid rgba(224, 159, 65, 0.2); text-transform: uppercase; }
 
-/* ITENS DO RESUMO (TUDO EM BASIC CHOICE) */
 .resumo-itens { border-top: none; padding-top: 0; }
-.resumo-grupo-titulo { 
-    font-family: 'Basic Choice', cursive; 
-    color: var(--text-dark); 
-    font-size: 1.1rem; 
-    font-weight: normal; 
-    text-transform: uppercase; 
-    text-align: left; 
-    margin-top: 20px; 
-    margin-bottom: 8px; 
-}
-.resumo-item-line { 
-    display: flex; justify-content: space-between; align-items: center; 
-    padding: 8px 0; border-bottom: 1px dashed rgba(29, 40, 20, 0.2); text-align: left; 
-}
-
-.resumo-item-name { 
-    flex: 1; color: var(--text-dark); font-family: 'Basic Choice', cursive; 
-    font-size: 1rem; font-weight: normal; text-transform: uppercase; padding-right: 10px; 
-}
-.resumo-item-name small { 
-    display: block; font-family: 'Basic Choice', cursive; font-size: 0.9rem; 
-    color: var(--text-light); font-weight: normal; margin-top: 2px; text-transform: none; 
-}
+.resumo-grupo-titulo { font-family: 'Basic Choice', cursive; color: var(--text-dark); font-size: 1.1rem; font-weight: normal; text-transform: uppercase; text-align: left; margin-top: 20px; margin-bottom: 8px; }
+.resumo-item-line { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px dashed rgba(29, 40, 20, 0.2); text-align: left; }
+.resumo-item-name { flex: 1; color: var(--text-dark); font-family: 'Basic Choice', cursive; font-size: 1rem; font-weight: normal; text-transform: uppercase; padding-right: 10px; }
+.resumo-item-name small { display: block; font-family: 'Basic Choice', cursive; font-size: 0.9rem; color: var(--text-light); font-weight: normal; margin-top: 2px; text-transform: none; }
 
 .resumo-item-input-group { display: flex; align-items: center; gap: 5px; }
 .resumo-qtd-btn { background: none; border: none; color: var(--accent-orange); font-size: 1.3rem; font-weight: bold; cursor: pointer; padding: 0 5px; }
-.resumo-item-input-group input[type="number"] { 
-    width: 38px; height: 30px; border: 1px solid rgba(29, 40, 20, 0.2); 
-    border-radius: 6px; text-align: center; font-family: 'Basic Choice', cursive; 
-    font-size: 1rem; color: var(--text-dark); background: #fff; outline: none;
-}
+.resumo-item-input-group input[type="number"] { width: 38px; height: 30px; border: 1px solid rgba(29, 40, 20, 0.2); border-radius: 6px; text-align: center; font-family: 'Basic Choice', cursive; font-size: 1rem; color: var(--text-dark); background: #fff; outline: none; }
 .btn-excluir { background: none; border: none; color: #E60000; font-size: 1rem; cursor: pointer; margin-left: 6px; }
 
-/* CUPOM DE DESCONTO (BASIC CHOICE) */
-#cupom-container { 
-    border: 1px dashed rgba(29, 40, 20, 0.3); 
-    border-radius: 12px; 
-    padding: 20px 15px 12px 15px; 
-    position: relative; 
-    margin: 25px 0 15px 0; 
-    text-align: center;
-    background: transparent;
-}
-#cupom-container strong { 
-    position: absolute; top: -10px; left: 50%; transform: translateX(-50%); 
-    background: var(--card-bg); padding: 0 10px; color: var(--text-dark); 
-    font-family: 'Basic Choice', cursive; font-size: 1rem; font-weight: normal; 
-    text-transform: uppercase; white-space: nowrap; 
-}
+#cupom-container { border: 1px dashed rgba(29, 40, 20, 0.3); border-radius: 12px; padding: 20px 15px 12px 15px; position: relative; margin: 25px 0 15px 0; text-align: center; background: transparent; }
+#cupom-container strong { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: var(--card-bg); padding: 0 10px; color: var(--text-dark); font-family: 'Basic Choice', cursive; font-size: 1rem; font-weight: normal; text-transform: uppercase; white-space: nowrap; }
 #cupom-input-group { display: flex; gap: 8px; justify-content: center; }
-#cupom-input { 
-    flex: 1; min-width: 130px; border: 1px solid rgba(29, 40, 20, 0.2); border-radius: 30px; 
-    padding: 8px 12px; font-family: 'Basic Choice', cursive; font-size: 1rem; 
-    color: var(--text-dark); text-align: center; text-transform: uppercase; outline: none; 
-}
-#apply-cupom-btn { 
-    background: var(--accent-blue); color: #fff; border: none; border-radius: 12px; 
-    padding: 0 15px; font-family: 'Basic Choice', cursive; font-weight: normal; font-size: 1rem; cursor: pointer; 
-}
+#cupom-input { flex: 1; min-width: 130px; border: 1px solid rgba(29, 40, 20, 0.2); border-radius: 30px; padding: 8px 12px; font-family: 'Basic Choice', cursive; font-size: 1rem; color: var(--text-dark); text-align: center; text-transform: uppercase; outline: none; }
+#apply-cupom-btn { background: var(--accent-blue); color: #fff; border: none; border-radius: 12px; padding: 0 15px; font-family: 'Basic Choice', cursive; font-weight: normal; font-size: 1rem; cursor: pointer; }
 .cupom-error { color: var(--danger); font-size: 0.85rem; margin-top: 6px; font-family: 'Basic Choice', cursive;}
 .cupom-success { color: #28a745; font-size: 0.85rem; margin-top: 6px; font-family: 'Basic Choice', cursive;}
 
 .resumo-footer-area { border-top: 1px solid rgba(224, 159, 65, 0.2); padding-top: 15px; margin-top: 15px;}
-.resumo-total { 
-    text-align: right; font-family: 'Basic Choice', cursive !important; 
-    font-size: 1.4rem; font-weight: normal; color: var(--text-dark); 
-    margin-bottom: 15px; text-transform: uppercase; 
-}
+.resumo-total { text-align: right; font-family: 'Basic Choice', cursive !important; font-size: 1.4rem; font-weight: normal; color: var(--text-dark); margin-bottom: 15px; text-transform: uppercase; }
 
-/* FORMULÁRIO E BOTÕES DOS POPUPS */
-#form-pedido { text-align: left; display: flex; flex-direction: column; gap: 12px; margin-bottom: 15px;}
-.input-group { display: flex; flex-direction: column; gap: 5px; }
+#form-pedido { text-align: left; display: flex; flex-direction: column; gap: 12px; margin-bottom: 15px; width: 100%;}
+.input-group { display: flex; flex-direction: column; gap: 5px; width: 100%; max-width: 100%; overflow: hidden; }
 #form-pedido label { font-weight: normal; font-size: 0.9rem; color: var(--text-dark); font-family: 'Basic Choice', cursive; text-transform: uppercase; }
-#form-pedido input, #form-pedido select, #form-pedido textarea { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(29, 40, 20, 0.2); font-family: 'Basic Choice', cursive; font-size: 1rem; outline: none; background: #fff; color: var(--text-dark); }
+#form-pedido input, #form-pedido select, #form-pedido textarea { width: 100%; max-width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(29, 40, 20, 0.2); font-family: 'Basic Choice', cursive; font-size: 1rem; outline: none; background: #fff; color: var(--text-dark); }
 #form-pedido input::placeholder, #form-pedido textarea::placeholder { font-family: 'Basic Choice', cursive; color: #aaa; }
 #form-pedido input:focus, #form-pedido select:focus, #form-pedido textarea:focus { border-color: var(--accent-orange); }
 
 .popup-footer-actions { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid rgba(224, 159, 65, 0.2); padding-top: 15px;}
 .popup-footer-actions-top { display: flex; flex-direction: row; gap: 8px; width: 100%; }
 
-.btn-secondary { 
-    background-color: var(--accent-blue); color: #fff; border: none; 
-    padding: 10px; border-radius: 10px; font-family: 'Basic Choice', cursive; 
-    font-size: 1rem; cursor: pointer; flex: 1; text-transform: uppercase; 
-}
-.btn-primary-large, .btn-fazer-pedido { 
-    background-color: var(--accent-orange); color: #fff; font-size: 1.1rem; 
-    padding: 10px; border-radius: 10px; width: 100%; font-family: 'Basic Choice', cursive; 
-    border: none; cursor: pointer; text-transform: uppercase; 
-}
+.btn-secondary { background-color: var(--accent-blue); color: #fff; border: none; padding: 10px; border-radius: 10px; font-family: 'Basic Choice', cursive; font-size: 1rem; cursor: pointer; flex: 1; text-transform: uppercase; }
+.btn-primary-large, .btn-fazer-pedido { background-color: var(--accent-orange); color: #fff; font-size: 1.1rem; padding: 10px; border-radius: 10px; width: 100%; font-family: 'Basic Choice', cursive; border: none; cursor: pointer; text-transform: uppercase; }
 .btn-secondary:hover, .btn-primary-large:hover, .btn-fazer-pedido:hover { opacity: 0.85; }
 
-/* REDUÇÃO 20% EXTRA DOS POPUPS APENAS NO DESKTOP */
-@media (min-width: 1024px) {
+@media (min-width: 601px) {
     .popup-conteudo { padding: 30px 25px 20px 25px; }
     .popup-conteudo h2 { font-size: 1.4rem; }
     .resumo-grupo-titulo { font-size: 1rem; }
@@ -352,7 +312,6 @@ button:active { transform: scale(0.98); }
     .btn-primary-large, .btn-fazer-pedido { font-size: 1rem; padding: 8px; margin-top: 5px; }
 }
 
-/* CARRINHO FIXO */
 #fixed-summary { position: fixed; bottom: 20px; left: 5%; right: 5%; width: 90%; max-width: 540px; margin: 0 auto; background-color: var(--text-dark); color: #fff; padding: 12px 30px; border-radius: 50px; box-shadow: 0 5px 20px rgba(0,0,0,0.2); z-index: 80; display: none; cursor: pointer; border: none;}
 .summary-content { display: flex; justify-content: space-between; align-items: center; width: 100%; }
 #summary-text { flex: 1; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; }
@@ -364,10 +323,73 @@ button:active { transform: scale(0.98); }
 .modal-text p { font-size: 0.9rem; color: var(--text-light); margin-bottom: 15px; line-height: 1.6; font-family: 'Cocogoose', sans-serif;}
 .highlight { color: var(--accent-orange); font-weight: bold; margin-top: 20px; display: block; font-size: 1rem; font-family: 'Cocogoose', sans-serif;}
 
-.item-nome-clickable { transition: opacity 0.2s ease; }
-.item-nome-clickable:hover { opacity: 0.7; text-decoration: underline; }
 .modal-item-body { display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 20px; }
 .item-imagem-display { max-width: 100%; max-height: 50vh; object-fit: contain; border-radius: 8px; display: block; }
 .item-info { text-align: center; width: 100%; }
 #item-descricao-display { font-family: 'Basic Choice', cursive; font-size: 1rem; color: var(--text-dark); line-height: 1.6; text-transform: none; }
 .item-info h3 { margin: 0 0 10px 0; font-size: 1.8rem; font-family: 'Basic Choice', cursive; text-transform: uppercase; }
+
+/* ================= UX DE FOTOS E INFOS NA COLUNA CENTRALIZADA ================= */
+.foto-hint {
+    color: var(--accent-orange);
+    opacity: 0.65;
+    font-size: 0.95rem; /* Ícones 20% menores */
+    transition: all 0.2s ease;
+}
+
+.item-nome-clickable { transition: opacity 0.2s ease; }
+.item-nome-clickable.tem-foto:hover { opacity: 0.8; }
+.item-nome-clickable.tem-foto:hover .foto-hint { 
+    opacity: 1; 
+    transform: scale(1.15); 
+}
+
+/* --- FONTE APENAS DOS DADOS E DESCRIÇÃO (IGUAL AO POPUP) --- */
+td.col-sec,
+td.col-unid,
+td.col-qtd,
+.descricao,
+input[type="number"] {
+    font-family: var(--font-numbers) !important;
+}
+
+/* --- FONTE DOS CAMPOS DE DIGITAÇÃO E ITENS DO RESUMO --- */
+.resumo-item-name, 
+.resumo-item-name small,
+#form-pedido input, 
+#form-pedido select, 
+#form-pedido textarea,
+#cupom-input {
+    font-family: var(--font-numbers) !important;
+}
+
+#form-pedido input::placeholder, 
+#form-pedido textarea::placeholder,
+#cupom-input::placeholder {
+    font-family: var(--font-numbers) !important;
+}
+
+/* --- REMOVER CAPS LOCK FORÇADO NO RESUMO E FORMULÁRIOS --- */
+.resumo-item-name, 
+.resumo-item-name small,
+.descricao,
+#form-pedido input, 
+#form-pedido select, 
+#form-pedido textarea {
+    text-transform: none !important;
+}
+
+/* Garante que o placeholder (texto de dica) também respeite */
+#form-pedido input::placeholder, 
+#form-pedido textarea::placeholder {
+    text-transform: none !important;
+}
+
+/* REGRA GLOBAL: Peso/KG menor embaixo da unidade (Mobile e Desktop) */
+.peso-mobile {
+    display: block;
+    white-space: nowrap;
+    font-size: 0.75rem; /* Tamanho elegante para as duas versões */
+    margin-top: 2px;
+    color: var(--text-light);
+}

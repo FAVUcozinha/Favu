@@ -8,6 +8,20 @@ const app = initializeApp({
 });
 const db = getFirestore(app);
 
+// ==========================================
+// FORMATADOR DE TEXTO (QUEBRAS DE LINHA E MARKDOWN)
+// ==========================================
+window.formatText = function(text) {
+    if (!text) return '';
+    return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\*(.*?)\*/g, '<strong>$1</strong>')
+        .replace(/_(.*?)_/g, '<em>$1</em>')
+        .replace(/\n/g, '<br>');
+};
+
 document.addEventListener("DOMContentLoaded", async function () {
     
     // APLICAR TEMA (CORES)
@@ -45,10 +59,13 @@ document.addEventListener("DOMContentLoaded", async function () {
             gridLinks.innerHTML = ""; // Só limpa se houver dados no banco
             capaSnap.forEach(d => {
                 const i = d.data();
+                // Aplicando a formatação no texto de descrição
+                const descFormatada = window.formatText(i.desc);
+                
                 gridLinks.innerHTML += `
                     <a href="${i.link}" class="clean-card">
                         <div class="card-icon"><i class="${i.icon}"></i></div>
-                        <div class="card-info"><h3 class="font-display">${i.titulo}</h3><p class="font-body">${i.desc}</p></div>
+                        <div class="card-info"><h3 class="font-display">${i.titulo}</h3><p class="font-body">${descFormatada}</p></div>
                     </a>`;
             });
         }

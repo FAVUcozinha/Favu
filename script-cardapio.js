@@ -18,34 +18,67 @@ let bancoDeProdutos = {};
 window.totalPedidoAtivo = 0; 
 
 // =========================================================
-// PLANILHA GOOGLE SCRIPT URL
+// INTEGRAÇÃO SUPABASE (API REST)
 // =========================================================
-const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxg41fkz_lDRKUTcnukG-LmuasWR_W6C7QovJo7Vdll58snz9MknU9f5QZ2KWKOOSA/exec";
+const SUPABASE_URL = "https://qwvahbcmveykygqnqojk.supabase.co/rest/v1/pedidos"; 
+const SUPABASE_ANON_KEY = "sb_publishable_l28DfyACihd294wG9w4Z8w_KOIvxHML";
 
-function enviarPedidoParaPlanilha(dadosPedido) {
+async function enviarPedidoParaSupabase(dadosPedido) {
     try {
-        const params = new URLSearchParams();
-        const action = dadosPedido.action || 'create';
-        params.append('action', action);
-        
-        if (action === 'replacePedido' && dadosPedido.oldId) {
-            params.append('oldId', dadosPedido.oldId);
-        }
-        
-        for (const key in dadosPedido) {
-            if (key !== 'action' && key !== 'oldId') {
-                params.append(key, dadosPedido[key] || '');
-            }
-        }
-        
-        fetch(GOOGLE_SHEETS_URL, {
+        const payload = {
+            id_pedido: dadosPedido.ID_do_Pedido,
+            nome_cliente: dadosPedido.Nome_Cliente,
+            numero: dadosPedido.Numero,
+            data_entrega: dadosPedido.Data_Entrega,
+            horario_entrega: dadosPedido.Horario_Entrega,
+            resumo_itens: dadosPedido.Resumo_dos_Itens,
+            total_final: dadosPedido.Total_Final,
+            forma_pagamento: dadosPedido.Forma_de_Pagamento,
+            cupom: dadosPedido.Cupom,
+            status_pedido: dadosPedido.Status_do_Pedido,
+            status_pagamento: dadosPedido.Status_Pagamento,
+            observacoes: dadosPedido.Observacoes
+        };
+
+        const response = await fetch(SUPABASE_URL, {
             method: "POST",
-            mode: 'no-cors',
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: params.toString()
-        }).catch(err => console.error("Erro planilha:", err));
-    } catch (e) { console.error(e); }
+            headers: {
+                "apikey": SUPABASE_ANON_KEY,
+                "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+                "Content-Type": "application/json",
+                "Prefer": "return=minimal" // Retorna vazio se der sucesso
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            const erroSupabase = await response.json();
+            console.error("Erro detalhado do Supabase:", erroSupabase);
+            alert("Erro ao salvar no banco de dados! Motivo: " + (erroSupabase.message || erroSupabase.details));
+            return false;
+        }
+        return true;
+
+    } catch (err) { 
+        console.error("Erro na requisição para o Supabase:", err); 
+        alert("Erro de conexão ao salvar pedido.");
+        return false;
+    }
 }
+
+// ==========================================
+// FORMATADOR DE TEXTO (QUEBRAS DE LINHA E MARKDOWN)
+// ==========================================
+window.formatText = function(text) {
+    if (!text) return '';
+    return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\*(.*?)\*/g, '<strong>$1</strong>')
+        .replace(/_(.*?)_/g, '<em>$1</em>')
+        .replace(/\n/g, '<br>');
+};
 
 document.addEventListener("DOMContentLoaded", async function () {
     
@@ -72,7 +105,10 @@ document.addEventListener("DOMContentLoaded", async function () {
                     const popup = document.getElementById('popup-aviso');
                     if(popup) {
                         document.getElementById('aviso-titulo').textContent = a.titulo;
-                        document.getElementById('aviso-texto').innerHTML = a.texto.replace(/\n/g, '<br>');
+                        
+                        // AQUI: Aplica o formatText no aviso
+                        document.getElementById('aviso-texto').innerHTML = window.formatText(a.texto);
+                        
                         if(a.imagemUrl) {
                              document.getElementById('aviso-texto').innerHTML += `<img src="${a.imagemUrl}" style="max-width:100%; margin-top:15px; border-radius:10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">`;
                         }
@@ -87,6 +123,9 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     window.onclick = function(e) {
         if (e.target.classList.contains('modal') || e.target.classList.contains('popup')) {
+            if (e.target.id === 'popup-pedido' || e.target.id === 'popup-resumo') {
+                return;
+            }
             e.target.classList.remove('show');
             setTimeout(() => e.target.style.display = 'none', 300);
         }
@@ -147,14 +186,15 @@ document.addEventListener("DOMContentLoaded", async function () {
             if (config.tipoColuna && config.tipoColuna !== 'Nenhuma') {
                 const lblMobile = config.tipoColuna === 'Mínimo' ? 'MÍN.' : 'TAM.';
                 const lblDesktop = config.tipoColuna === 'Mínimo' ? 'Mínimo' : 'Tamanho';
-                thSecundaria = `<th><span class="th-mobile">${lblMobile}</span><span class="th-desktop">${lblDesktop}</span></th>`;
+                thSecundaria = `<th class="col-sec"><span class="th-mobile">${lblMobile}</span><span class="th-desktop">${lblDesktop}</span></th>`;
             }
 
             const cabecalho = `<tr>
-                <th>ITEM</th>
+                <th class="col-item">ITEM</th>
+                <th class="col-icon"></th>
                 ${thSecundaria}
-                <th><span class="th-mobile">UNID.</span><span class="th-desktop">Unidade</span></th>
-                <th><span class="th-mobile">QTD</span><span class="th-desktop">Quantidade</span></th>
+                <th class="col-unid"><span class="th-mobile">UNID.</span><span class="th-desktop">Unidade</span></th>
+                <th class="col-qtd"><span class="th-mobile">QTD</span><span class="th-desktop">Quantidade</span></th>
             </tr>`;
 
             const infoBoxHTML = (config.mensagemObs && config.mensagemObs.trim() !== '') ? `<div class="info-box"><p>${config.mensagemObs}</p></div>` : '';
@@ -192,7 +232,6 @@ document.addEventListener("DOMContentLoaded", async function () {
             const nomeB = (b.nome || '').trim().toLocaleLowerCase('pt-BR');
             if (nomeA !== nomeB) return nomeA.localeCompare(nomeB, 'pt-BR');
             
-            // NOVO: Agora ele analisa a descrição. Se for diferente (ex: Goiabada vs Morango), ele não junta!
             const descA = (a.descricaoItem || '').trim().toLocaleLowerCase('pt-BR');
             const descB = (b.descricaoItem || '').trim().toLocaleLowerCase('pt-BR');
             if (descA !== descB) return descA.localeCompare(descB, 'pt-BR');
@@ -205,10 +244,10 @@ document.addEventListener("DOMContentLoaded", async function () {
         const agruparPorNome = (configCategoria.tipoColuna === 'Tamanho');
         const contagemNomes = {};
         
-        // NOVO: A chave de agrupamento agora é Nome + Descrição.
         if (agruparPorNome) { 
             grupoOrdenado.forEach(item => { 
-                const chave = ((item.nome || 'Sem Nome').trim() + '|||' + (item.descricaoItem || '').trim());
+                // AQUI: Forçando tudo para minúsculo para a chave de agrupamento ser sempre idêntica
+                const chave = ((item.nome || 'Sem Nome').trim().toLowerCase() + '|||' + (item.descricaoItem || '').trim().toLowerCase());
                 contagemNomes[chave] = (contagemNomes[chave] || 0) + 1; 
             }); 
         }
@@ -217,7 +256,9 @@ document.addEventListener("DOMContentLoaded", async function () {
         for (let i = 0; i < grupoOrdenado.length; i++) {
             const item = grupoOrdenado[i]; const tr = document.createElement("tr"); tr.id = item.id; const itemId = item.id; 
             const itemNameClean = (item.nome || 'Sem Nome').trim();
-            const chaveAgrupamento = (itemNameClean + '|||' + (item.descricaoItem || '').trim());
+            
+            // AQUI TAMBÉM: Chave idêntica blindada contra maiúsculas/minúsculas
+            const chaveAgrupamento = (itemNameClean.toLowerCase() + '|||' + (item.descricaoItem || '').trim().toLowerCase());
 
             const precoFormatado = Number(item.preco).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             const isMiniCookie = itemId.includes('mini-cookie'); 
@@ -231,29 +272,69 @@ document.addEventListener("DOMContentLoaded", async function () {
                     <button type="button" class="qtd-btn-table" onclick="window.alterarQuantidadeTabela('${itemId}', 1, ${item.min || 1})">+</button>
                 </div>`;
 
+            const temFoto = item.imagemUrl && item.imagemUrl.trim() !== "";
+            const temDescPopup = item.descricaoPopup && item.descricaoPopup.trim() !== "";
+            const isClickable = temFoto || temDescPopup;
+
+            let iconeHint = '';
+            if (temFoto) {
+                iconeHint = `<i class="fas fa-camera foto-hint" title="Ver foto"></i>`;
+            } else if (temDescPopup) {
+                iconeHint = `<i class="fas fa-info-circle foto-hint" title="Mais informações"></i>`;
+            }
+
+            const cssClickable = isClickable ? 'item-nome-clickable tem-foto' : '';
+            const inlineClickable = isClickable ? `data-item-id="${itemId}" style="cursor: pointer;"` : ``;
+
             const celulaNomeHTML = `
-                <div class="item-nome item-nome-clickable" data-item-id="${itemId}" style="cursor: pointer;">${itemNameClean}</div>
-                ${item.descricaoItem ? `<div class="descricao">${item.descricaoItem}</div>` : ''}
+                <div class="item-nome-texto" style="line-height: 1.2;">${window.formatText(itemNameClean)}</div>
+                ${item.descricaoItem ? `<div class="descricao" style="text-align: left;">${window.formatText(item.descricaoItem)}</div>` : ''}
             `;
             
             let tdSecundaria = '';
             if (configCategoria.tipoColuna && configCategoria.tipoColuna !== 'Nenhuma') {
-                const exibicaoColuna2 = configCategoria.tipoColuna === 'Mínimo' ? (item.min || 1) : (item.tamanho || '-');
-                tdSecundaria = `<td>${exibicaoColuna2}</td>`;
+                let exibicaoColuna2 = configCategoria.tipoColuna === 'Mínimo' ? (item.min || 1) : (item.tamanho || '-');
+                
+                // Isola o texto do peso em uma classe para o mobile
+                if (typeof exibicaoColuna2 === 'string' && exibicaoColuna2.includes(' (')) {
+                    exibicaoColuna2 = exibicaoColuna2.replace(' (', ' <span class="peso-mobile">(') + '</span>';
+                }
+                
+                tdSecundaria = `<td class="col-sec">${exibicaoColuna2}</td>`;
             }
 
-            const celulasRestantesHTML = `${tdSecundaria}<td>R$ ${precoFormatado}</td><td><div class="quantidade-container">${inputHtml}${erroHtml}</div></td>`;
+            const celulasRestantesHTML = `${tdSecundaria}<td class="col-unid"><span class="moeda">R$</span> <span class="valor">${precoFormatado}</span></td><td class="col-qtd"><div class="quantidade-container">${inputHtml}${erroHtml}</div></td>`;
 
             if (agruparPorNome) {
                 if (chaveAgrupamento !== chaveAtual) {
                     chaveAtual = chaveAgrupamento; const rows = contagemNomes[chaveAgrupamento];
-                    tr.innerHTML = `<td rowspan="${rows}" class="item-group-cell">${celulaNomeHTML}</td>${celulasRestantesHTML}`;
-                } else { tr.innerHTML = `<td style="display:none;"></td>${celulasRestantesHTML}`; }
+                    tr.innerHTML = `
+                        <td rowspan="${rows}" class="item-group-cell col-item ${cssClickable}" ${inlineClickable}>
+                            ${celulaNomeHTML}
+                        </td>
+                        <td rowspan="${rows}" class="item-group-cell col-icon ${cssClickable}" ${inlineClickable}>
+                            ${iconeHint}
+                        </td>
+                        ${celulasRestantesHTML}
+                    `;
+                } else { 
+                    tr.innerHTML = `<td style="display:none;"></td><td style="display:none;"></td>${celulasRestantesHTML}`; 
+                }
                 
-                const nextChave = i < grupoOrdenado.length - 1 ? ((grupoOrdenado[i+1].nome || 'Sem Nome').trim() + '|||' + (grupoOrdenado[i+1].descricaoItem || '').trim()) : null;
+                // AQUI: Blindando o verificador de final de linha também
+                const nextChave = i < grupoOrdenado.length - 1 ? ((grupoOrdenado[i+1].nome || 'Sem Nome').trim().toLowerCase() + '|||' + (grupoOrdenado[i+1].descricaoItem || '').trim().toLowerCase()) : null;
                 if (i === grupoOrdenado.length - 1 || nextChave !== chaveAtual) { tr.classList.add('group-separator'); }
             } else {
-                tr.innerHTML = `<td>${celulaNomeHTML}</td>${celulasRestantesHTML}`; tr.classList.add('group-separator');
+                tr.innerHTML = `
+                    <td class="col-item ${cssClickable}" ${inlineClickable}>
+                        ${celulaNomeHTML}
+                    </td>
+                    <td class="col-icon ${cssClickable}" ${inlineClickable}>
+                        ${iconeHint}
+                    </td>
+                    ${celulasRestantesHTML}
+                `; 
+                tr.classList.add('group-separator');
             }
             tbodyBase.appendChild(tr);
         }
@@ -267,14 +348,34 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
 
     window.abrirImagemPopupDb = function(itemId) {
-        const itemInfo = bancoDeProdutos[itemId]; if(!itemInfo) return;
+        const itemInfo = bancoDeProdutos[itemId]; 
+        if(!itemInfo) return;
+
+        const temFoto = itemInfo.imagemUrl && itemInfo.imagemUrl.trim() !== "";
+        const temDescPopup = itemInfo.descricaoPopup && itemInfo.descricaoPopup.trim() !== "";
+        
+        if(!temFoto && !temDescPopup) return;
+
         const modal = document.getElementById('popup-item-imagem');
         document.getElementById('item-nome-display').textContent = itemInfo.nome;
-        document.getElementById('item-descricao-display').textContent = itemInfo.descricaoPopup || itemInfo.descricaoItem || '';
+        
+        // AQUI: Aplica o formatText E usar .innerHTML para as tags funcionarem visualmente
+        document.getElementById('item-descricao-display').innerHTML = window.formatText(itemInfo.descricaoPopup || itemInfo.descricaoItem || '');
+        
         const img = document.getElementById('item-imagem-display');
-        if(itemInfo.imagemUrl && itemInfo.imagemUrl !== "") { img.src = itemInfo.imagemUrl; img.style.display = 'block'; } else { img.style.display = 'none'; }
-        modal.style.display = 'flex'; modal.classList.add('show'); document.body.style.overflow = 'hidden';
+        if(temFoto) { 
+            img.src = itemInfo.imagemUrl; 
+            img.style.display = 'block'; 
+        } else { 
+            img.src = '';
+            img.style.display = 'none'; 
+        }
+        
+        modal.style.display = 'flex'; 
+        modal.classList.add('show'); 
+        document.body.style.overflow = 'hidden';
     }
+    
     window.fecharImagemPopup = function() {
         const modal = document.getElementById('popup-item-imagem'); modal.classList.remove('show');
         setTimeout(() => { modal.style.display = 'none'; }, 300); document.body.style.overflow = 'auto';
@@ -400,7 +501,7 @@ document.addEventListener("DOMContentLoaded", async function () {
             gruposResumo[grupo].forEach(item => {
                 resumoItensPopup.innerHTML += `
                     <div class="resumo-item-line">
-                        <div class="resumo-item-name">${item.descricaoResumo} <small>R$ ${(item.quantidade * item.preco).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</small></div>
+                        <div class="resumo-item-name">${window.formatText(item.descricaoResumo)} <small>R$ ${(item.quantidade * item.preco).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</small></div>
                         <div class="resumo-item-input-group"><button type="button" class="resumo-qtd-btn" onclick="window.alterarQuantidadeResumo('${item.itemId}', -1)">-</button><input type="number" value="${item.quantidade}" data-item-id="${item.itemId}" readonly><button type="button" class="resumo-qtd-btn" onclick="window.alterarQuantidadeResumo('${item.itemId}', 1)">+</button></div>
                         <button class="btn-excluir" onclick="window.excluirItem('${item.itemId}')"><i class="fas fa-trash"></i></button>
                     </div>`;
@@ -420,7 +521,8 @@ document.addEventListener("DOMContentLoaded", async function () {
         }
     }
 
-    window.confirmarPedido = function() {
+    // AQUI OCORRE A MÁGICA: Transformamos em Async!
+    window.confirmarPedido = async function() {
         const btn = document.querySelector('.btn-primary-large');
         const txtOriginal = btn.textContent;
         btn.textContent = "Processando...";
@@ -477,7 +579,10 @@ document.addEventListener("DOMContentLoaded", async function () {
         let totalLiquido = total - cupomAplicado.desconto;
         if(totalLiquido < 0) totalLiquido = 0;
 
-        txt += `- *Informações:*\nNome: ${nm}\nNúmero: ${validarEFormatarTelefone(tel)}\nData: ${dt}\nHorário: ${hr.substring(0,5)}\nPagamento: ${pag}\n`;
+        // INVERSÃO DA DATA PARA O PADRÃO BRASILEIRO NO WHATSAPP E SUPABASE
+        const dataFormatada = dt.split('-').reverse().join('/');
+
+        txt += `- *Informações:*\nNome: ${nm}\nNúmero: ${validarEFormatarTelefone(tel)}\nData: ${dataFormatada}\nHorário: ${hr.substring(0,5)}\nPagamento: ${pag}\n`;
         if(obs) txt += `Observações: ${obs}\n`;
         if(cupomAplicado.codigo) txt += `Cupom: ${cupomAplicado.codigo} (-R$ ${cupomAplicado.desconto.toFixed(2)})\n`;
         txt += `*Total Final: R$ ${totalLiquido.toLocaleString('pt-BR',{minimumFractionDigits:2})}*\n`;
@@ -486,17 +591,26 @@ document.addEventListener("DOMContentLoaded", async function () {
             ID_do_Pedido: idPedido,
             Nome_Cliente: nm,
             Numero: validarEFormatarTelefone(tel),
-            Data_Entrega: dt.split("-").reverse().join("/"),
+            Data_Entrega: dataFormatada,
             Horario_Entrega: hr.substring(0,5),
             Resumo_dos_Itens: itensParaPlanilha.trim(),
             Total_Final: `R$ ${totalLiquido.toLocaleString('pt-BR',{minimumFractionDigits:2})}`,
             Forma_de_Pagamento: pag,
             Cupom: cupomAplicado.codigo || "",
-            Observacoes: obs || "",
+            Status_do_Pedido: "Pedido Recebido",
             Status_Pagamento: "Pendente",
-            Status_do_Pedido: "Pedido Recebido"
+            Observacoes: obs || ""
         };
-        enviarPedidoParaPlanilha(dadosPedido);
+        
+        // AGUARDA (await) o envio para o Supabase!
+        const sucesso = await enviarPedidoParaSupabase(dadosPedido);
+
+        // Se deu erro, ele não abre o WhatsApp e não limpa o carrinho
+        if (!sucesso) {
+            btn.textContent = txtOriginal; 
+            btn.disabled = false;
+            return;
+        }
 
         window.open(`https://wa.me/558195256641?text=${encodeURIComponent(txt)}`, '_blank');
         
