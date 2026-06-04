@@ -90,12 +90,10 @@ footer { flex-shrink: 0; margin-top: auto; background-image: url('images/roda.pn
 /* ================== TABELA: 5 COLUNAS ================== */
 .table-card { background: var(--card-bg); border-radius: var(--border-radius); padding: 15px 10px; box-shadow: var(--shadow); border: 1px solid rgba(255,255,255,0.5); width: 100%; overflow: hidden; }
 
-/* Simetria perfeita do Desktop (mantida) */
 table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 
 thead th { font-family: 'Basic Choice', cursive; color: #1D2814; font-size: 1rem; padding-bottom: 12px; text-align: center; border-bottom: 2px solid rgba(29, 40, 20, 0.2); text-transform: uppercase; font-weight: normal;}
 
-/* Larguras originais em porcentagem (Desktop) */
 th.col-item, td.col-item { text-align: left; padding-left: 5px; width: 35%; word-wrap: break-word; }
 th.col-icon, td.col-icon { width: 6%; text-align: center; vertical-align: middle; }
 th.col-sec, td.col-sec { width: 19.6%; text-align: center; }
@@ -134,67 +132,29 @@ caption { display: none; }
 .th-mobile { display: inline; }
 .th-desktop { display: none; }
 
-
-/* =================================================================
-   MEDIA QUERY: CELULARES - O AJUSTE DEFINITIVO PARA EMPILHAR
-================================================================= */
 @media (max-width: 600px) {
-    /* Mantém a tabela travada para evitar flutuações */
     table { table-layout: fixed; width: 100%; } 
-    
     th.col-icon, td.col-icon { width: 20px; padding: 0; }
     th.col-sec, td.col-sec { width: 45px; padding: 0; }
-    
-    /* Preço: Tamanho blindado de 55px */
-    th.col-unid, td.col-unid { 
-        width: 55px; 
-        padding: 12px 0;
-        text-align: center;
-        line-height: 1.2;
-    }
-
-    /* A MÁGICA REAL: Empilha e diminui a fonte com a mesma delicadeza do (1.5 kg) */
-    td.col-unid .moeda {
-        display: block;
-        font-size: 0.75rem; /* Tamanho delicado, igual o peso */
-        color: var(--text-light); /* Cor suave para dar aquele charme */
-        margin-bottom: 1px;
-    }
-    
-    td.col-unid .valor {
-        display: block;
-        font-size: 0.85rem; /* Menor do que a fonte padrão, mantendo legibilidade */
-    }
-    
-    /* 90px de largura segura para os botões e input, sem aperto */
-    th.col-qtd, td.col-qtd { 
-        width: 90px; 
-        padding: 12px 0; 
-        text-align: center;
-    }
-    
-    /* O Nome do item pega o resto de tela */
+    th.col-unid, td.col-unid { width: 55px; padding: 12px 0; text-align: center; line-height: 1.2; }
+    td.col-unid .moeda { display: block; font-size: 0.75rem; color: var(--text-light); margin-bottom: 1px; }
+    td.col-unid .valor { display: block; font-size: 0.85rem; }
+    th.col-qtd, td.col-qtd { width: 90px; padding: 12px 0; text-align: center; }
     th.col-item, td.col-item { width: auto; padding-right: 4px; } 
-    
-    /* Ajuste fino dos botões e do input */
     .quantidade-input-group { gap: 2px; justify-content: center; width: 100%; }
     input[type="number"] { width: 34px; height: 28px; padding: 0; margin: 0; }
     .qtd-btn-table { width: 24px; }
 }
 
-
 @media (min-width: 601px) {
     .th-mobile { display: none; } .th-desktop { display: inline; }
     .container { max-width: 1200px; margin: 0 auto; }
     .table-card { padding: 25px 35px; max-width: 850px; margin: 0 auto; }
-    
     .categoria-title { font-size: 3rem; margin: 5px auto 25px auto; }
-    
     thead th { font-size: 0.95rem; padding-bottom: 10px; }
     td { font-size: 0.9rem; padding: 12px 5px; }
     td.col-item { font-size: 1.05rem; padding-right: 15px; } 
     th.col-icon, td.col-icon { width: 5%; }
-    
     .descricao { font-size: 0.75rem; margin-top: 4px; }
     #categorias-horizontal a { font-size: 0.95rem; padding: 6px 18px; }
     input[type="number"] { width: 36px; height: 28px; font-size: 0.95rem; }
@@ -210,46 +170,15 @@ caption { display: none; }
 button { font-family: 'Basic Choice', cursive; cursor: pointer; border: none; transition: 0.2s; }
 button:active { transform: scale(0.98); }
 
-/* =================================================================
-   POPUPS E MODAIS
-================================================================= */
-.popup, .modal { 
-    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-    background-color: rgba(29, 40, 20, 0.6); z-index: 6000; 
-    justify-content: center; align-items: center; backdrop-filter: blur(4px); 
-    opacity: 0; transition: 0.3s; 
-}
+.popup, .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(29, 40, 20, 0.6); z-index: 6000; justify-content: center; align-items: center; backdrop-filter: blur(4px); opacity: 0; transition: 0.3s; }
 .popup.show, .modal.show { display: flex; opacity: 1; }
-
-.popup-conteudo, .modal-content { 
-    background-color: var(--card-bg); 
-    padding: 30px 25px 25px 25px; 
-    border-radius: 20px; 
-    width: 90%; 
-    max-width: 440px; 
-    text-align: center; 
-    position: relative; 
-    max-height: 90vh; 
-    overflow-y: auto; 
-    box-shadow: 0 10px 30px rgba(0,0,0,0.2); 
-    font-family: 'Basic Choice', cursive;
-    transform: translateY(20px); 
-    transition: 0.3s; 
-}
+.popup-conteudo, .modal-content { background-color: var(--card-bg); padding: 30px 25px 25px 25px; border-radius: 20px; width: 90%; max-width: 440px; text-align: center; position: relative; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.2); font-family: 'Basic Choice', cursive; transform: translateY(20px); transition: 0.3s; }
 .popup.show .popup-conteudo, .modal.show .modal-content { transform: translateY(0); }
-
 .popup-conteudo::-webkit-scrollbar { width: 6px; }
 .popup-conteudo::-webkit-scrollbar-track { background: #EAEAEA; border-radius: 10px; margin: 15px 0; }
 .popup-conteudo::-webkit-scrollbar-thumb { background: #C4C4C4; border-radius: 10px; }
-
-.fechar, .close-btn-wrapper { 
-    position: absolute; top: 15px; right: 20px; 
-    font-size: 1.4rem; color: #999; cursor: pointer; 
-    line-height: 1; font-family: sans-serif;
-    z-index: 100;
-}
+.fechar, .close-btn-wrapper { position: absolute; top: 15px; right: 20px; font-size: 1.4rem; color: #999; cursor: pointer; line-height: 1; font-family: sans-serif; z-index: 100; }
 .fechar:hover, .close-btn-wrapper:hover { color: #333; }
-
 .popup-conteudo h2 { color: var(--accent-orange); font-family: 'Basic Choice', cursive; font-size: 1.6rem; margin: 5px 0 15px 0; padding-bottom: 12px; border-bottom: 1px solid rgba(224, 159, 65, 0.2); text-transform: uppercase; }
 
 .resumo-itens { border-top: none; padding-top: 0; }
@@ -257,7 +186,6 @@ button:active { transform: scale(0.98); }
 .resumo-item-line { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px dashed rgba(29, 40, 20, 0.2); text-align: left; }
 .resumo-item-name { flex: 1; color: var(--text-dark); font-family: 'Basic Choice', cursive; font-size: 1rem; font-weight: normal; text-transform: uppercase; padding-right: 10px; }
 .resumo-item-name small { display: block; font-family: 'Basic Choice', cursive; font-size: 0.9rem; color: var(--text-light); font-weight: normal; margin-top: 2px; text-transform: none; }
-
 .resumo-item-input-group { display: flex; align-items: center; gap: 5px; }
 .resumo-qtd-btn { background: none; border: none; color: var(--accent-orange); font-size: 1.3rem; font-weight: bold; cursor: pointer; padding: 0 5px; }
 .resumo-item-input-group input[type="number"] { width: 38px; height: 30px; border: 1px solid rgba(29, 40, 20, 0.2); border-radius: 6px; text-align: center; font-family: 'Basic Choice', cursive; font-size: 1rem; color: var(--text-dark); background: #fff; outline: none; }
@@ -297,17 +225,13 @@ button:active { transform: scale(0.98); }
     .resumo-item-input-group input[type="number"] { width: 34px; height: 28px; font-size: 0.9rem; }
     .resumo-qtd-btn { font-size: 1.2rem; }
     .btn-excluir { font-size: 0.95rem; }
-    
     #cupom-container { padding: 15px; margin: 20px 0 10px 0; }
     #cupom-container strong { font-size: 0.9rem; top: -10px; }
     #cupom-input { font-size: 0.9rem; padding: 8px 10px; }
     #apply-cupom-btn { font-size: 0.9rem; padding: 0 15px; }
-    
     .resumo-total { font-size: 1.2rem; margin-bottom: 10px; }
-    
     #form-pedido label { font-size: 0.8rem; }
     #form-pedido input, #form-pedido select, #form-pedido textarea { font-size: 0.9rem; padding: 8px 10px; }
-    
     .btn-secondary { font-size: 0.9rem; padding: 8px; }
     .btn-primary-large, .btn-fazer-pedido { font-size: 1rem; padding: 8px; margin-top: 5px; }
 }
@@ -329,27 +253,18 @@ button:active { transform: scale(0.98); }
 #item-descricao-display { font-family: 'Basic Choice', cursive; font-size: 1rem; color: var(--text-dark); line-height: 1.6; text-transform: none; }
 .item-info h3 { margin: 0 0 10px 0; font-size: 1.8rem; font-family: 'Basic Choice', cursive; text-transform: uppercase; }
 
-/* ================= UX DE FOTOS E INFOS NA COLUNA CENTRALIZADA ================= */
-.foto-hint {
-    color: var(--accent-orange);
-    opacity: 0.65;
-    font-size: 0.95rem; /* Ícones 20% menores */
-    transition: all 0.2s ease;
-}
-
+.foto-hint { color: var(--accent-orange); opacity: 0.65; font-size: 0.95rem; transition: all 0.2s ease; }
 .item-nome-clickable { transition: opacity 0.2s ease; }
 .item-nome-clickable.tem-foto:hover { opacity: 0.8; }
-.item-nome-clickable.tem-foto:hover .foto-hint { 
-    opacity: 1; 
-    transform: scale(1.15); 
-}
+.item-nome-clickable.tem-foto:hover .foto-hint { opacity: 1; transform: scale(1.15); }
 
-/* --- FONTE APENAS DOS DADOS E DESCRIÇÃO (IGUAL AO POPUP) --- */
+/* --- ALTERADO: Inclusão de .info-box p para adotar a fonte limpa Arial --- */
 td.col-sec,
 td.col-unid,
 td.col-qtd,
 .descricao,
-input[type="number"] {
+input[type="number"],
+.info-box p {
     font-family: var(--font-numbers) !important;
 }
 
@@ -369,7 +284,7 @@ input[type="number"] {
     font-family: var(--font-numbers) !important;
 }
 
-/* --- REMOVER CAPS LOCK FORÇADO NO RESUMO E FORMULÁRIOS --- */
+/* --- REMOVER CAPS LOCK FORÇADO --- */
 .resumo-item-name, 
 .resumo-item-name small,
 .descricao,
@@ -379,17 +294,9 @@ input[type="number"] {
     text-transform: none !important;
 }
 
-/* Garante que o placeholder (texto de dica) também respeite */
 #form-pedido input::placeholder, 
 #form-pedido textarea::placeholder {
     text-transform: none !important;
 }
 
-/* REGRA GLOBAL: Peso/KG menor embaixo da unidade (Mobile e Desktop) */
-.peso-mobile {
-    display: block;
-    white-space: nowrap;
-    font-size: 0.75rem; /* Tamanho elegante para as duas versões */
-    margin-top: 2px;
-    color: var(--text-light);
-}
+.peso-mobile { display: block; white-space: nowrap; font-size: 0.75rem; margin-top: 2px; color: var(--text-light); }
