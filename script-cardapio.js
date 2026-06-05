@@ -250,7 +250,6 @@ document.addEventListener("DOMContentLoaded", async function () {
             const isIndividualMinCheck = (configCategoria.minIndividual && item.min > 1) || isMiniCookie;
             let erroHtml = isIndividualMinCheck ? `<div class="erro-item-unico">Mín ${item.min} Unid.</div>` : '';
 
-            // MODIFICADO: Removido o atributo readonly para permitir escrita manual
             const inputHtml = `
                 <div class="quantidade-input-group">
                     <button type="button" class="qtd-btn-table" onclick="window.alterarQuantidadeTabela('${itemId}', -1, ${item.min || 1})">-</button>
@@ -321,13 +320,15 @@ document.addEventListener("DOMContentLoaded", async function () {
             tbodyBase.appendChild(tr);
         }
 
-        // MODIFICADO: Atualizado listeners para capturar digitação manual em tempo real de forma segura
         tbodyBase.querySelectorAll('.quantidade-input').forEach(input => {
             input.addEventListener("input", function() {
                 let q = parseInt(this.value);
                 if (isNaN(q) || q < 0) q = 0;
                 
-                const grupo = this.getAttribute('data-grupo');
+                // AJUSTADO: Correção de encoding para a escuta de inputs
+                let grupo = this.getAttribute('data-grupo') || "";
+                if (grupo.includes("Namorados")) grupo = "❤️ Namorados ❤️";
+
                 const min = parseInt(this.getAttribute('data-min')) || 1;
                 const erroElemento = this.closest('.quantidade-container')?.querySelector('.erro-item-unico');
                 const configGrupo = configCategorias[grupo] || {minIndividual: false};
@@ -428,7 +429,6 @@ document.addEventListener("DOMContentLoaded", async function () {
     const btnCarrinho = document.getElementById("fixed-summary");
     if(btnCarrinho) { btnCarrinho.addEventListener('click', function(e) { e.preventDefault(); e.stopPropagation(); window.abrirResumoPopup(); }); }
     
-    // AJUSTADO: Controle dinâmico de selects para a campanha de Namorados
     window.abrirPopup = function() { 
         window.fecharResumoPopup(); 
         const p = document.getElementById("popup-pedido"); 
@@ -443,19 +443,19 @@ document.addEventListener("DOMContentLoaded", async function () {
             
             let temNamorados = false;
             document.querySelectorAll(".quantidade-input").forEach(i => {
-                if ((parseInt(i.value) || 0) > 0 && i.getAttribute("data-grupo") === "❤️ Namorados ❤️") {
+                let grp = i.getAttribute("data-grupo") || "";
+                // AJUSTADO: Validação resiliente para ativação da campanha
+                if ((parseInt(i.value) || 0) > 0 && grp.includes("Namorados")) {
                     temNamorados = true;
                 }
             });
 
-            // Estrutura de horários configurada por data
             const horariosCampanha = {
                 "2026-06-12": ["16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00"],
                 "2026-06-13": ["13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00"]
             };
 
             if (temNamorados) {
-                // 1º PASSO: Transformar o campo de data em um SELECT com as opções válidas
                 const selectData = document.createElement("select");
                 selectData.id = "data";
                 selectData.name = "data";
@@ -467,17 +467,14 @@ document.addEventListener("DOMContentLoaded", async function () {
                 `;
                 dateInput.parentNode.replaceChild(selectData, dateInput);
 
-                // 2º PASSO: Transformar o campo de horário em um SELECT vazio por padrão
                 const selectHorario = document.createElement("select");
                 selectHorario.id = "horario";
                 selectHorario.name = "horario";
                 selectHorario.required = true;
                 timeInput.parentNode.replaceChild(selectHorario, timeInput);
 
-                // Oculta o container de horário até que a data seja escolhida
                 if (timeGroup) timeGroup.style.display = "none";
 
-                // Listener para popular os horários de meia em meia hora baseados na data
                 selectData.onchange = function() {
                     const dataSelecionada = this.value;
                     selectHorario.innerHTML = '<option value="" disabled selected>Selecione o horário...</option>';
@@ -492,7 +489,6 @@ document.addEventListener("DOMContentLoaded", async function () {
                     }
                 };
             } else {
-                // Caso NÃO tenha namorados, garante que os campos voltem a ser Inputs normais
                 if (dateInput.tagName === "SELECT") {
                     const inputData = document.createElement("input");
                     inputData.type = "date";
@@ -510,7 +506,6 @@ document.addEventListener("DOMContentLoaded", async function () {
                     timeInput.parentNode.replaceChild(inputHorario, timeInput);
                 }
 
-                // readquire referências atualizadas dos inputs recriados
                 const finalDateInput = document.getElementById("data");
                 const finalTimeInput = document.getElementById("horario");
                 const finalTimeGroup = finalTimeInput.closest('.input-group');
@@ -555,7 +550,13 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     window.alterarQuantidadeTabela = function(itemId, delta, minimo) {
         const input = document.querySelector(`.quantidade-input[data-item-id="${itemId}"]`); if (!input) return;
-        let novaQtd = parseInt(input.value) || 0; const grupo = input.getAttribute('data-grupo'); const min = minimo || parseInt(input.getAttribute('data-min')) || 1;
+        let novaQtd = parseInt(input.value) || 0; 
+        
+        // AJUSTADO: Correção de encoding para alteração de quantidade via botões
+        let grupo = input.getAttribute('data-grupo') || "";
+        if (grupo.includes("Namorados")) grupo = "❤️ Namorados ❤️";
+
+        const min = minimo || parseInt(input.getAttribute('data-min')) || 1;
         const erroElemento = input.closest('.quantidade-container')?.querySelector('.erro-item-unico');
         if (delta > 0 && novaQtd === 0) novaQtd = min; else novaQtd += delta;
         if (novaQtd < 0) novaQtd = 0; input.value = novaQtd;
@@ -577,12 +578,19 @@ document.addEventListener("DOMContentLoaded", async function () {
 
         document.querySelectorAll(".quantidade-input").forEach(input => {
             const q = parseInt(input.value) || 0;
-            const g = input.getAttribute("data-grupo"); 
+            
+            // AJUSTADO: Correção de encoding para soma de totais por grupo
+            let g = input.getAttribute("data-grupo") || ""; 
+            if (g.includes("Namorados")) g = "❤️ Namorados ❤️";
+
             if (!totaisPorGrupo[g]) totaisPorGrupo[g] = 0; 
             totaisPorGrupo[g] += q;
 
             if(q > 0) {
-                const grp = input.getAttribute("data-grupo"); const p = parseFloat(input.getAttribute("data-preco")) || 0;
+                let grp = input.getAttribute("data-grupo") || "";
+                if (grp.includes("Namorados")) grp = "❤️ Namorados ❤️";
+
+                const p = parseFloat(input.getAttribute("data-preco")) || 0;
                 const minIndividualItem = parseInt(input.getAttribute("data-min")) || 1;
                 const configGrupo = configCategorias[grp] || { minIndividual: false };
 
@@ -633,7 +641,6 @@ document.addEventListener("DOMContentLoaded", async function () {
             gruposResumo[grupo].forEach(item => {
                 let avisoMinimoHTML = item.comErro ? `<div class="erro-item-unico" style="display:block; text-align:center; margin-top:4px; text-transform: uppercase;">Mín ${item.minimoExigido} Unid.</div>` : '';
 
-                // MODIFICADO: Removido o atributo readonly do input de quantidade no resumo também
                 resumoItensPopup.innerHTML += `
                     <div class="resumo-item-line" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px dashed rgba(29, 40, 20, 0.2);">
                         <div class="resumo-item-name" style="flex: 1; text-align: left; padding-right: 10px;">
@@ -665,7 +672,11 @@ document.addEventListener("DOMContentLoaded", async function () {
 
         document.querySelectorAll(".quantidade-input").forEach(input => {
             const q = parseInt(input.value) || 0;
-            const grp = input.getAttribute("data-grupo");
+            
+            // AJUSTADO: Correção de encoding para barreira final de erros por grupo
+            let grp = input.getAttribute("data-grupo") || "";
+            if (grp.includes("Namorados")) grp = "❤️ Namorados ❤️";
+
             const config = configCategorias[grp];
             if (q > 0 && config && config.minTotal > 0 && totaisPorGrupo[grp] < config.minTotal) {
                 temErroMinimo = true;
@@ -720,10 +731,14 @@ document.addEventListener("DOMContentLoaded", async function () {
         document.querySelectorAll(".quantidade-input").forEach(i => {
             const q = parseInt(i.value) || 0;
             if (q > 0) { 
-                const grp = i.getAttribute("data-grupo"); 
-                if (grp === "❤️ Namorados ❤️") {
+                
+                // AJUSTADO: Correção estrutural de encoding na varredura final
+                let grp = i.getAttribute("data-grupo") || ""; 
+                if (grp.includes("Namorados")) {
+                    grp = "❤️ Namorados ❤️";
                     temNamorados = true;
                 }
+
                 const minIndividualItem = parseInt(i.getAttribute("data-min")) || 1;
                 const configGrupo = configCategorias[grp] || { minIndividual: false };
 
@@ -749,6 +764,15 @@ document.addEventListener("DOMContentLoaded", async function () {
             btn.textContent = txtOriginal; btn.disabled = false; 
             return; 
         }
+
+        // CONSOLIDADO: Inserção correta dos itens no bloco do WhatsApp
+        for (const grp in gResumo) {
+            txt += `*${grp}*\n`;
+            gResumo[grp].forEach(item => {
+                txt += `• ${item.q}x ${item.desc}\n`;
+            });
+            txt += `\n`;
+        }
         
         const nm = document.getElementById("nome").value;
         const tel = document.getElementById("telefone").value;
@@ -763,7 +787,6 @@ document.addEventListener("DOMContentLoaded", async function () {
             return; 
         }
 
-        // AJUSTADO: Validação secundária à prova de falhas para o horário dos Namorados
         if (temNamorados) {
             if (dt === "2026-06-12" && (hr < "16:00" || hr > "19:00")) {
                 alert("Para o dia 12/06, o horário de entrega deve ser entre 16:00 e 19:00.");
