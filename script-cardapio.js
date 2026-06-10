@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, getDocs, getDoc, doc, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, getDocs, getDoc, doc, query, where, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD5JlV7R2w629uiescD4AiixNAr-Qt0qI0",
@@ -16,42 +16,6 @@ const db = getFirestore(app);
 let configCategorias = {};
 let bancoDeProdutos = {}; 
 window.totalPedidoAtivo = 0; 
-
-// =========================================================
-// PLANILHA GOOGLE SCRIPT URL
-// =========================================================
-const GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxg41fkz_lDRKUTcnukG-LmuasWR_W6C7QovJo7Vdll58snz9MknU9f5QZ2KWKOOSA/exec";
-
-async function enviarPedidoParaPlanilha(dadosPedido) {
-    try {
-        const params = new URLSearchParams();
-        const action = dadosPedido.action || 'create';
-        params.append('action', action);
-        
-        if (action === 'replacePedido' && dadosPedido.oldId) {
-            params.append('oldId', dadosPedido.oldId);
-        }
-        
-        for (const key in dadosPedido) {
-            if (key !== 'action' && key !== 'oldId') {
-                params.append(key, dadosPedido[key] || '');
-            }
-        }
-        
-        await fetch(GOOGLE_SHEETS_URL, {
-            method: "POST",
-            mode: 'no-cors', 
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: params.toString()
-        });
-        
-        return true; 
-    } catch (err) { 
-        console.error("Erro planilha:", err); 
-        alert("Erro de conexão ao salvar pedido na planilha.");
-        return false;
-    }
-}
 
 // ==========================================
 // FORMATADOR DE TEXTO (QUEBRAS DE LINHA E MARKDOWN)
@@ -325,7 +289,6 @@ document.addEventListener("DOMContentLoaded", async function () {
                 let q = parseInt(this.value);
                 if (isNaN(q) || q < 0) q = 0;
                 
-                // AJUSTADO: Correção de encoding para a escuta de inputs
                 let grupo = this.getAttribute('data-grupo') || "";
                 if (grupo.includes("Namorados")) grupo = "❤️ Namorados ❤️";
 
@@ -444,7 +407,6 @@ document.addEventListener("DOMContentLoaded", async function () {
             let temNamorados = false;
             document.querySelectorAll(".quantidade-input").forEach(i => {
                 let grp = i.getAttribute("data-grupo") || "";
-                // AJUSTADO: Validação resiliente para ativação da campanha
                 if ((parseInt(i.value) || 0) > 0 && grp.includes("Namorados")) {
                     temNamorados = true;
                 }
@@ -521,7 +483,59 @@ document.addEventListener("DOMContentLoaded", async function () {
     window.editarPedido = function() { window.fecharPopup(); setTimeout(() => window.abrirResumoPopup(), 300); }
 
     let cupomAplicado = { codigo: null, desconto: 0, mensagem: '' };
-    const CUPONS_GERADOS = { 'FAVU10': { descontoTipo: 'percentual', valor: 0.10, aplicaEm: 'total', expiraEm: '2026-12-31', usoUnico: false, usado: false } };
+    
+    window.aplicarCupom = async function() {
+        const cupomInput = document.getElementById("cupom-input").value.trim().toUpperCase();
+        const cupomMessage = document.getElementById("cupom-message");
+        if (!cupomInput) { cupomAplicado = { codigo: null, desconto: 0, mensagem: '' }; cupomMessage.innerHTML = ''; atualizarTotal(); return; }
+
+        try {
+            const docRef = doc(db, "cupons", cupomInput);
+            const docSnap = await getDoc(docRef);
+
+            if (docSnap.exists()) {
+                const dadosCupom = docSnap.data();
+                
+                if (dadosCupom.ativo === false) {
+                    cupomMessage.innerHTML = '<span class="cupom-error">Cupom inativo.</span>';
+                    cupomAplicado = { codigo: null, desconto: 0, mensagem: '' };
+                } else if (dadosCupom.dataValidade && new Date() > new Date(dadosCupom.dataValidade)) {
+                    cupomMessage.innerHTML = '<span class="cupom-error">Cupom expirado.</span>';
+                    cupomAplicado = { codigo: null, desconto: 0, mensagem: '' };
+                } else if (dadosCupom.quantidadeDisponivel !== undefined && dadosCupom.quantidadeDisponivel <= 0) {
+                    cupomMessage.innerHTML = '<span class="cupom-error">Cupom esgotado.</span>';
+                    cupomAplicado = { codigo: null, desconto: 0, mensagem: '' };
+                } else if (window.totalPedidoAtivo < (dadosCupom.valorMinimo || 0)) {
+                    cupomMessage.innerHTML = `<span class="cupom-error">Mínimo de R$ ${dadosCupom.valorMinimo.toFixed(2)} para usar este cupom.</span>`;
+                    cupomAplicado = { codigo: null, desconto: 0, mensagem: '' };
+                } else {
+                    let valorDesconto = 0;
+                    if (dadosCupom.tipo === 'percentual') {
+                        valorDesconto = window.totalPedidoAtivo * (dadosCupom.valor / 100);
+                    } else if (dadosCupom.tipo === 'fixo') {
+                        valorDesconto = dadosCupom.valor;
+                    }
+
+                    if (valorDesconto > window.totalPedidoAtivo) valorDesconto = window.totalPedidoAtivo;
+
+                    cupomAplicado = {
+                        codigo: cupomInput,
+                        desconto: valorDesconto,
+                        mensagem: `Desconto de R$ ${valorDesconto.toFixed(2).replace('.', ',')} aplicado!`
+                    };
+                    cupomMessage.innerHTML = `<span class="cupom-success">${cupomAplicado.mensagem}</span>`;
+                }
+            } else {
+                cupomMessage.innerHTML = '<span class="cupom-error">Cupom inválido.</span>';
+                cupomAplicado = { codigo: null, desconto: 0, mensagem: '' };
+            }
+        } catch (error) {
+            cupomMessage.innerHTML = '<span class="cupom-error">Erro ao validar cupom.</span>';
+            cupomAplicado = { codigo: null, desconto: 0, mensagem: '' };
+        }
+        
+        atualizarTotal();
+    }
 
     function gerarIdPedido() { return `PED-${new Date().toISOString().slice(0,10).replace(/-/g, "")}${new Date().toTimeString().slice(0,8).replace(/:/g, "")}`; }
     function validarEFormatarTelefone(telefone) { const n = telefone.replace(/\D/g, ''); return n.length >= 10 ? '55' + n : '5581' + n; }
@@ -552,7 +566,6 @@ document.addEventListener("DOMContentLoaded", async function () {
         const input = document.querySelector(`.quantidade-input[data-item-id="${itemId}"]`); if (!input) return;
         let novaQtd = parseInt(input.value) || 0; 
         
-        // AJUSTADO: Correção de encoding para alteração de quantidade via botões
         let grupo = input.getAttribute('data-grupo') || "";
         if (grupo.includes("Namorados")) grupo = "❤️ Namorados ❤️";
 
@@ -564,8 +577,6 @@ document.addEventListener("DOMContentLoaded", async function () {
         if (configGrupo.minIndividual && novaQtd > 0 && novaQtd < min) { if (erroElemento) { erroElemento.textContent = `Mín ${min} Unid.`; erroElemento.style.display = 'block'; } } else { if (erroElemento) erroElemento.style.display = 'none'; }
         atualizarTotal();
     };
-
-    window.openAgendarPopup = function() { window.fecharResumoPopup(); const p = document.getElementById("popup-pedido"); if(p) { p.style.display = "flex"; setTimeout(() => p.classList.add('show'), 10); document.body.style.overflow = 'hidden'; } }
 
     function atualizarTotal() {
         let totalBruto = 0; let totalItens = 0;
@@ -579,7 +590,6 @@ document.addEventListener("DOMContentLoaded", async function () {
         document.querySelectorAll(".quantidade-input").forEach(input => {
             const q = parseInt(input.value) || 0;
             
-            // AJUSTADO: Correção de encoding para soma de totais por grupo
             let g = input.getAttribute("data-grupo") || ""; 
             if (g.includes("Namorados")) g = "❤️ Namorados ❤️";
 
@@ -672,8 +682,6 @@ document.addEventListener("DOMContentLoaded", async function () {
 
         document.querySelectorAll(".quantidade-input").forEach(input => {
             const q = parseInt(input.value) || 0;
-            
-            // AJUSTADO: Correção de encoding para barreira final de erros por grupo
             let grp = input.getAttribute("data-grupo") || "";
             if (grp.includes("Namorados")) grp = "❤️ Namorados ❤️";
 
@@ -705,6 +713,9 @@ document.addEventListener("DOMContentLoaded", async function () {
         }
     }
 
+    // =========================================================================
+    // CONFIRMAÇÃO DO PEDIDO & SALVAMENTO NO FIRESTORE
+    // =========================================================================
     window.confirmarPedido = async function() {
         const btn = document.querySelector('.btn-primary-large');
         const txtOriginal = btn.textContent;
@@ -731,8 +742,6 @@ document.addEventListener("DOMContentLoaded", async function () {
         document.querySelectorAll(".quantidade-input").forEach(i => {
             const q = parseInt(i.value) || 0;
             if (q > 0) { 
-                
-                // AJUSTADO: Correção estrutural de encoding na varredura final
                 let grp = i.getAttribute("data-grupo") || ""; 
                 if (grp.includes("Namorados")) {
                     grp = "❤️ Namorados ❤️";
@@ -755,7 +764,7 @@ document.addEventListener("DOMContentLoaded", async function () {
                 if(!gResumo[grp]) gResumo[grp] = []; 
                 gResumo[grp].push({ q, p, desc }); 
                 
-                itensParaPlanilha += `${q}x ${desc} (${grp})\n`;
+                itensParaPlanilha += `${q} un. - ${desc}\n`;
             }
         });
         
@@ -765,7 +774,6 @@ document.addEventListener("DOMContentLoaded", async function () {
             return; 
         }
 
-        // CONSOLIDADO: Inserção correta dos itens no bloco do WhatsApp
         for (const grp in gResumo) {
             txt += `*${grp}*\n`;
             gResumo[grp].forEach(item => {
@@ -810,27 +818,34 @@ document.addEventListener("DOMContentLoaded", async function () {
         if(cupomAplicado.codigo) txt += `Cupom: ${cupomAplicado.codigo} (-R$ ${cupomAplicado.desconto.toFixed(2)})\n`;
         txt += `*Total Final: R$ ${totalLiquido.toLocaleString('pt-BR',{minimumFractionDigits:2})}*\n`;
 
+        // =====================================================================
+        // NOVA LÓGICA: SALVANDO O PEDIDO NO FIREBASE AO INVÉS DA PLANILHA
+        // =====================================================================
         const dadosPedido = {
             ID_do_Pedido: idPedido,
+            origem: 'site', 
+            Status_do_Pedido: 'Pedido Recebido',
             Nome_Cliente: nm,
             Numero: validarEFormatarTelefone(tel),
             Data_Entrega: dataFormatada,
             Horario_Entrega: hr.substring(0,5),
-            Resumo_dos_Itens: itensParaPlanilha.trim(),
-            Total_Final: `R$ ${totalLiquido.toLocaleString('pt-BR',{minimumFractionDigits:2})}`,
+            Total_Final: totalLiquido.toLocaleString('pt-BR',{minimumFractionDigits:2}),
             Forma_de_Pagamento: pag,
-            Cupom: cupomAplicado.codigo || "",
+            Status_Pagamento: 'Pagamento pendente', 
+            Cupom: cupomAplicado.codigo ? `${cupomAplicado.codigo} (-R$ ${cupomAplicado.desconto.toFixed(2).replace('.', ',')})` : "",
             Observacoes: obs || "",
-            Status_Pagamento: "Pendente",
-            Status_do_Pedido: "Pedido Recebido"
+            Resumo_dos_Itens: itensParaPlanilha.trim(),
+            createdAt: Date.now()
         };
         
-        const sucesso = await enviarPedidoParaPlanilha(dadosPedido);
-
-        if (!sucesso) {
+        try {
+            await setDoc(doc(db, "pedidos", idPedido), dadosPedido);
+        } catch (error) {
+            console.error("Erro ao salvar pedido no Firestore:", error);
+            alert("Erro de conexão ao salvar pedido.");
             btn.textContent = txtOriginal; 
             btn.disabled = false;
-            return; 
+            return;
         }
 
         window.open(`https://wa.me/558195256641?text=${encodeURIComponent(txt)}`, '_blank');
