@@ -848,7 +848,7 @@ document.addEventListener("DOMContentLoaded", async function () {
             return;
         }
 
-        window.open(`https://wa.me/558195256641?text=${encodeURIComponent(txt)}`, '_blank');
+        window.location.href = `https://wa.me/558195256641?text=${encodeURIComponent(txt)}`;
         
         document.querySelectorAll(".quantidade-input").forEach(i => i.value = "0"); 
         atualizarTotal(); 
