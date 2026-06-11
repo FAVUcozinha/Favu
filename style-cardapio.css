@@ -167,16 +167,47 @@ caption { display: none; }
     .copy { margin-top: 0; line-height: 1.2; font-size: 0.7rem;}
 }
 
+/* ==========================================
+   UX: EFEITO TÁTIL E BRILHO NOS CAMPOS
+   ========================================== */
 button { font-family: 'Basic Choice', cursive; cursor: pointer; border: none; transition: 0.2s; }
-button:active { transform: scale(0.98); }
+
+/* Clique macio em TODOS os botões e links de categoria */
+button:active, .btn-secondary:active, .btn-primary-large:active, .btn-fazer-pedido:active, #categorias-horizontal a:active, .resumo-qtd-btn:active { 
+    transform: scale(0.95) !important; 
+    transition: 0.1s; 
+}
+
+/* Brilho elegante (Glow) ao digitar no formulário e cupom */
+input:focus, textarea:focus, select:focus, #cupom-input:focus { 
+    border-color: var(--accent-orange) !important; 
+    box-shadow: 0 0 0 4px rgba(224, 159, 65, 0.15) !important;
+    transition: all 0.2s ease-in-out;
+}
 
 .popup, .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(29, 40, 20, 0.6); z-index: 6000; justify-content: center; align-items: center; backdrop-filter: blur(4px); opacity: 0; transition: 0.3s; }
 .popup.show, .modal.show { display: flex; opacity: 1; }
 .popup-conteudo, .modal-content { background-color: var(--card-bg); padding: 30px 25px 25px 25px; border-radius: 20px; width: 90%; max-width: 440px; text-align: center; position: relative; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.2); font-family: 'Basic Choice', cursive; transform: translateY(20px); transition: 0.3s; }
-.popup.show .popup-conteudo, .modal.show .modal-content { transform: translateY(0); }
-.popup-conteudo::-webkit-scrollbar { width: 6px; }
-.popup-conteudo::-webkit-scrollbar-track { background: #EAEAEA; border-radius: 10px; margin: 15px 0; }
-.popup-conteudo::-webkit-scrollbar-thumb { background: #C4C4C4; border-radius: 10px; }
+.popup.show .popup-conteudo, .modal.show .modal-content { transform: translateY(0); }/* ==========================================
+
+UX: SCROLLBAR (BARRA FININHA E ELEGANTE)
+   ========================================== */
+::-webkit-scrollbar, .popup-conteudo::-webkit-scrollbar, .modal-body-scroll::-webkit-scrollbar { 
+    width: 6px; 
+    height: 6px; 
+}
+::-webkit-scrollbar-track, .popup-conteudo::-webkit-scrollbar-track, .modal-body-scroll::-webkit-scrollbar-track { 
+    background: transparent; 
+    margin: 15px 0; 
+}
+::-webkit-scrollbar-thumb, .popup-conteudo::-webkit-scrollbar-thumb, .modal-body-scroll::-webkit-scrollbar-thumb { 
+    background: rgba(224, 159, 65, 0.4); /* Laranja suave */
+    border-radius: 10px; 
+}
+::-webkit-scrollbar-thumb:hover, .popup-conteudo::-webkit-scrollbar-thumb:hover { 
+    background: var(--accent-orange); 
+}
+
 .fechar, .close-btn-wrapper { position: absolute; top: 15px; right: 20px; font-size: 1.4rem; color: #999; cursor: pointer; line-height: 1; font-family: sans-serif; z-index: 100; }
 .fechar:hover, .close-btn-wrapper:hover { color: #333; }
 .popup-conteudo h2 { color: var(--accent-orange); font-family: 'Basic Choice', cursive; font-size: 1.6rem; margin: 5px 0 15px 0; padding-bottom: 12px; border-bottom: 1px solid rgba(224, 159, 65, 0.2); text-transform: uppercase; }
