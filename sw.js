@@ -1,4 +1,4 @@
-const CACHE_NAME = 'favu-app-v7';
+const CACHE_NAME = 'favu-app-v8';
 const urlsToCache = [
   './',
   './index.html',
@@ -10,17 +10,31 @@ const urlsToCache = [
   './script-cardapio.js',
   './admin.js',
   './manifest.json',
-  './images/favu.png',
-  './images/topo.png',
-  './images/roda.png',
-  './images/logoroda.png',
-  './images/BS.png'
+  './images/favu.png'
 ];
 
 self.addEventListener('install', event => {
+  self.skipWaiting(); 
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache)));
 });
 
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames.map(cacheName => {
+          if (cacheName !== CACHE_NAME) {
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    })
+  );
+});
+
+// ESTRATÉGIA: Rede Primeiro, Cache como backup (Network First)
 self.addEventListener('fetch', event => {
-  event.respondWith(caches.match(event.request).then(res => res || fetch(event.request)));
+  event.respondWith(
+    fetch(event.request).catch(() => caches.match(event.request))
+  );
 });
