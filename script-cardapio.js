@@ -86,14 +86,20 @@ document.addEventListener("DOMContentLoaded", async function () {
     async function carregarMenu() {
         try {
             const catSnapshot = await getDocs(collection(db, "categorias"));
+            const categoriasAtivas = []; // Guarda apenas o nome das categorias ativas
+            
             catSnapshot.forEach(doc => {
                 const c = doc.data();
-                configCategorias[c.nome] = { 
-                    idGrupo: `grupo-${c.nome.toLowerCase().replace(/\s/g, '-')}`, 
-                    idTabela: `tabela-${c.nome.toLowerCase().replace(/\s/g, '-')}`, 
-                    minTotal: c.minTotal || 0, minIndividual: c.minIndividual || false,
-                    tipoColuna: c.tipoColuna || 'Tamanho', mensagemObs: c.mensagemObs || ''
-                };
+                // 1º AJUSTE: Ignora completamente as categorias ocultas
+                if (c.ativo !== false) { 
+                    categoriasAtivas.push(c.nome);
+                    configCategorias[c.nome] = { 
+                        idGrupo: `grupo-${c.nome.toLowerCase().replace(/\s/g, '-')}`, 
+                        idTabela: `tabela-${c.nome.toLowerCase().replace(/\s/g, '-')}`, 
+                        minTotal: c.minTotal || 0, minIndividual: c.minIndividual || false,
+                        tipoColuna: c.tipoColuna || 'Tamanho', mensagemObs: c.mensagemObs || ''
+                    };
+                }
             });
 
             const q = query(collection(db, "produtos"), where("ativo", "==", true));
@@ -102,19 +108,24 @@ document.addEventListener("DOMContentLoaded", async function () {
 
             querySnapshot.forEach((doc) => {
                 const item = { idFirebase: doc.id, ...doc.data() };
+                const nomeCategoria = item.categoria || 'Geral';
+                
+                // 1º AJUSTE: Se a categoria do produto estiver oculta, não exibe o produto!
+                if (!categoriasAtivas.includes(nomeCategoria)) return; 
+
                 item.id = (item.nome.toLowerCase() + (item.tamanho ? '-' + item.tamanho.toLowerCase() : '')).replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').trim('-');
                 bancoDeProdutos[item.id] = item; 
 
-                if (!configCategorias[item.categoria]) {
-                    configCategorias[item.categoria] = { 
-                        idGrupo: `grupo-${item.categoria.toLowerCase().replace(/\s/g, '-')}`, 
-                        idTabela: `tabela-${item.categoria.toLowerCase().replace(/\s/g, '-')}`, 
+                if (!configCategorias[nomeCategoria]) {
+                    configCategorias[nomeCategoria] = { 
+                        idGrupo: `grupo-${nomeCategoria.toLowerCase().replace(/\s/g, '-')}`, 
+                        idTabela: `tabela-${nomeCategoria.toLowerCase().replace(/\s/g, '-')}`, 
                         minTotal: 0, minIndividual: false, tipoColuna: 'Tamanho', mensagemObs: '' 
                     };
                 }
 
-                if (!itensAgrupados[item.categoria]) itensAgrupados[item.categoria] = [];
-                itensAgrupados[item.categoria].push(item);
+                if (!itensAgrupados[nomeCategoria]) itensAgrupados[nomeCategoria] = [];
+                itensAgrupados[nomeCategoria].push(item);
             });
 
             renderizarCardapio(itensAgrupados);
@@ -130,48 +141,78 @@ document.addEventListener("DOMContentLoaded", async function () {
 
         const sortedEntries = Object.entries(itensAgrupados).sort((a, b) => a[0].localeCompare(b[0]));
 
+        // Construtor dinâmico de tabelas
+        function gerarEstruturaTabela(idTabela, nomeCat, tipoColuna) {
+            let thSecundaria = '';
+            if (tipoColuna && tipoColuna !== 'Nenhuma') {
+                const lblMobile = tipoColuna === 'Mínimo' ? 'MÍN.' : 'TAM.';
+                const lblDesktop = tipoColuna === 'Mínimo' ? 'Mínimo' : 'Tamanho';
+                thSecundaria = `<th class="col-sec"><span class="th-mobile">${lblMobile}</span><span class="th-desktop">${lblDesktop}</span></th>`;
+            }
+            return `<div class="table-card" style="margin-bottom: 20px;">
+                <table id="${idTabela}">
+                    <caption>${nomeCat}</caption>
+                    <thead><tr>
+                        <th class="col-item">ITEM</th>
+                        <th class="col-icon"></th>
+                        ${thSecundaria}
+                        <th class="col-unid"><span class="th-mobile">UNID.</span><span class="th-desktop">Unidade</span></th>
+                        <th class="col-qtd"><span class="th-mobile">QTD</span><span class="th-desktop">Quantidade</span></th>
+                    </tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>`;
+        }
+
+        // PARTE A: Criar a base (HTML) das categorias
         for (const [nomeCategoria, itens] of sortedEntries) {
             const config = configCategorias[nomeCategoria];
             navHorizontal.innerHTML += `<a href="#${config.idGrupo}" class="categoria-btn ${primeiraCategoria ? 'active-link' : ''}" data-target="${config.idGrupo}">${nomeCategoria}</a>`;
 
-            let thSecundaria = '';
-            if (config.tipoColuna && config.tipoColuna !== 'Nenhuma') {
-                const lblMobile = config.tipoColuna === 'Mínimo' ? 'MÍN.' : 'TAM.';
-                const lblDesktop = config.tipoColuna === 'Mínimo' ? 'Mínimo' : 'Tamanho';
-                thSecundaria = `<th class="col-sec"><span class="th-mobile">${lblMobile}</span><span class="th-desktop">${lblDesktop}</span></th>`;
+            const infoBoxHTML = (config.mensagemObs && config.mensagemObs.trim() !== '') ? `<div class="info-box"><p>${window.formatText(config.mensagemObs)}</p></div>` : '';
+            
+            let htmlGrupo = `
+                <div class="categoria-group ${primeiraCategoria ? 'active-group' : ''}" id="${config.idGrupo}">
+                    <h2 class="categoria-title">${nomeCategoria}</h2>`;
+
+            // SEGREGAÇÃO "Tamanho/Minimo" (Agora sem os títulos <h3>)
+            if (config.tipoColuna === 'Tamanho/Minimo') {
+                const itensTam = itens.filter(i => i.tamanho && i.tamanho.trim() !== '');
+                const itensMin = itens.filter(i => !i.tamanho || i.tamanho.trim() === '');
+                
+                if (itensTam.length > 0) {
+                    htmlGrupo += gerarEstruturaTabela(config.idTabela + '-tam', nomeCategoria, 'Tamanho');
+                }
+                if (itensMin.length > 0) {
+                    htmlGrupo += gerarEstruturaTabela(config.idTabela + '-min', nomeCategoria, 'Mínimo');
+                }
+            } else {
+                htmlGrupo += gerarEstruturaTabela(config.idTabela, nomeCategoria, config.tipoColuna);
             }
 
-            const cabecalho = `<tr>
-                <th class="col-item">ITEM</th>
-                <th class="col-icon"></th>
-                ${thSecundaria}
-                <th class="col-unid"><span class="th-mobile">UNID.</span><span class="th-desktop">Unidade</span></th>
-                <th class="col-qtd"><span class="th-mobile">QTD</span><span class="th-desktop">Quantidade</span></th>
-            </tr>`;
-
-            const infoBoxHTML = (config.mensagemObs && config.mensagemObs.trim() !== '') ? `<div class="info-box"><p>${window.formatText(config.mensagemObs)}</p></div>` : '';
-
-            mainContent.innerHTML += `
-                <div class="categoria-group ${primeiraCategoria ? 'active-group' : ''}" id="${config.idGrupo}">
-                    <h2 class="categoria-title">${nomeCategoria}</h2>
-                    <div class="table-card">
-                        <table id="${config.idTabela}">
-                            <caption>${nomeCategoria}</caption>
-                            <thead>${cabecalho}</thead>
-                            <tbody></tbody>
-                        </table>
-                        ${infoBoxHTML}
-                        <div id="erro-${nomeCategoria.toLowerCase().replace(/\s/g, '-')}" class="erro-categoria"></div>
-                    </div>
-                </div>
-            `;
+            htmlGrupo += `${infoBoxHTML}<div id="erro-${nomeCategoria.toLowerCase().replace(/\s/g, '-')}" class="erro-categoria"></div></div>`;
+            mainContent.innerHTML += htmlGrupo;
             primeiraCategoria = false;
         }
 
+        // PARTE B: Preencher as tabelas com os itens
         for (const [nomeCategoria, itens] of sortedEntries) {
-            criarTabelaGrupo(itens, configCategorias[nomeCategoria].idTabela, nomeCategoria, configCategorias[nomeCategoria]);
+            const config = configCategorias[nomeCategoria];
+            
+            if (config.tipoColuna === 'Tamanho/Minimo') {
+                const itensTam = itens.filter(i => i.tamanho && i.tamanho.trim() !== '');
+                const itensMin = itens.filter(i => !i.tamanho || i.tamanho.trim() === '');
+                
+                if (itensTam.length > 0) criarTabelaGrupo(itensTam, config.idTabela + '-tam', nomeCategoria, { ...config, tipoColuna: 'Tamanho' });
+                if (itensMin.length > 0) criarTabelaGrupo(itensMin, config.idTabela + '-min', nomeCategoria, { ...config, tipoColuna: 'Mínimo' });
+            } else {
+                criarTabelaGrupo(itens, config.idTabela, nomeCategoria, config);
+            }
         }
-        configurarEventosMenu(); configurarEventosDrag(); atualizarTotal(); 
+        
+        configurarEventosMenu(); 
+        configurarEventosDrag(); 
+        atualizarTotal(); 
     }
 
     function criarTabelaGrupo(grupo, idTabela, nomeGrupo, configCategoria) {
