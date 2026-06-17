@@ -16,10 +16,8 @@ const db = getFirestore(app);
 let configCategorias = {};
 let bancoDeProdutos = {}; 
 window.totalPedidoAtivo = 0; 
+window.regrasAgenda = {}; // Agenda Global
 
-// ==========================================
-// FORMATADOR DE TEXTO (QUEBRAS DE LINHA E MARKDOWN)
-// ==========================================
 window.formatText = function(text) {
     if (!text) return '';
     return String(text)
@@ -31,8 +29,66 @@ window.formatText = function(text) {
         .replace(/\n/g, '<br>');
 };
 
+// ==============================================================
+// MOTOR DE INTERVALOS (Gera horários de 30 em 30 min)
+// ==============================================================
+window.gerarHorarios = function(texto) {
+    if (!texto || texto.trim() === '') return [];
+    
+    // Quebra por vírgula (ex: "8h às 12h, 15h às 18h")
+    const blocos = texto.split(',').map(b => b.trim());
+    let resultado = [];
+
+    function parseHoraMinutos(str) {
+        str = str.toLowerCase().replace(/[^0-9:]/g, ''); // "08:30" ou "8"
+        if (str === '') return null;
+        let h = 0, m = 0;
+        if (str.includes(':')) {
+            const p = str.split(':');
+            h = parseInt(p[0]); m = parseInt(p[1] || 0);
+        } else {
+            h = parseInt(str);
+        }
+        return (h * 60) + m;
+    }
+
+    function formataHoraMinutos(minutosTotais) {
+        const h = Math.floor(minutosTotais / 60);
+        const m = minutosTotais % 60;
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+
+    blocos.forEach(bloco => {
+        // Separa onde tem "às", "as" ou "-" para achar intervalos
+        const partes = bloco.split(/\s+(?:às|as|-)\s+/i);
+        
+        if (partes.length === 2) {
+            // É UM INTERVALO (ex: "8h às 12h")
+            let minInicio = parseHoraMinutos(partes[0]);
+            let minFim = parseHoraMinutos(partes[1]);
+            
+            if (minInicio !== null && minFim !== null) {
+                // Loop de 30 em 30 minutos!
+                for (let minAtual = minInicio; minAtual <= minFim; minAtual += 30) {
+                    resultado.push(formataHoraMinutos(minAtual));
+                }
+            }
+        } else {
+            // É SÓ UMA HORA PONTUAL (ex: "18h")
+            let pontual = parseHoraMinutos(bloco);
+            if (pontual !== null) {
+                resultado.push(formataHoraMinutos(pontual));
+            }
+        }
+    });
+
+    // Remove duplicatas e coloca em ordem do menor pro maior horário
+    return [...new Set(resultado)].sort();
+};
+
 document.addEventListener("DOMContentLoaded", async function () {
     
+    // Tema Cores
     try {
         const temaDoc = await getDoc(doc(db, "config", "tema"));
         if (temaDoc.exists()) {
@@ -44,6 +100,27 @@ document.addEventListener("DOMContentLoaded", async function () {
             if(t.acc) { root.style.setProperty('--accent-orange', t.acc); root.style.setProperty('--accent-rust', t.acc); }
         }
     } catch(e) {}
+
+    // Agenda de Horários Globais e Exceções
+    window.configGeralAgenda = {}; 
+    window.regrasAgenda = {};
+    
+    async function carregarAgenda() {
+        try {
+            // 1. Puxa a Regra Geral (Dias da semana padrão: Dom a Sáb)
+            const docGeral = await getDoc(doc(db, "config", "agenda_geral"));
+            if (docGeral.exists()) {
+                window.configGeralAgenda = docGeral.data();
+            }
+
+            // 2. Puxa as Exceções (Dias específicos fechados ou com horário diferente)
+            const docExcecoes = await getDoc(doc(db, "config", "agenda_excecoes"));
+            if (docExcecoes.exists()) {
+                window.regrasAgenda = docExcecoes.data(); 
+            }
+        } catch(e) { console.error("Erro ao carregar agenda", e); }
+    }
+    await carregarAgenda();
 
     async function carregarAvisos() {
         try {
@@ -57,7 +134,6 @@ document.addEventListener("DOMContentLoaded", async function () {
                     if(popup) {
                         document.getElementById('aviso-titulo').textContent = a.titulo;
                         document.getElementById('aviso-texto').innerHTML = window.formatText(a.texto);
-                        
                         if(a.imagemUrl) {
                              document.getElementById('aviso-texto').innerHTML += `<img src="${a.imagemUrl}" style="max-width:100%; margin-top:15px; border-radius:10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">`;
                         }
@@ -72,9 +148,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     window.onclick = function(e) {
         if (e.target.classList.contains('modal') || e.target.classList.contains('popup')) {
-            if (e.target.id === 'popup-pedido' || e.target.id === 'popup-resumo') {
-                return;
-            }
+            if (e.target.id === 'popup-pedido' || e.target.id === 'popup-resumo') return;
             e.target.classList.remove('show');
             setTimeout(() => {
                 e.target.style.display = 'none';
@@ -86,12 +160,20 @@ document.addEventListener("DOMContentLoaded", async function () {
     async function carregarMenu() {
         try {
             const catSnapshot = await getDocs(collection(db, "categorias"));
-            const categoriasAtivas = []; // Guarda apenas o nome das categorias ativas
+            const categoriasAtivas = []; 
             
             catSnapshot.forEach(doc => {
                 const c = doc.data();
-                // 1º AJUSTE: Ignora completamente as categorias ocultas
-                if (c.ativo !== false) { 
+                let estaVisivel = c.ativo !== false;
+                
+                if (estaVisivel && c.agendarVisibilidade && c.inicio && c.fim) {
+                    const agora = Date.now();
+                    if (agora < c.inicio || agora > c.fim) {
+                        estaVisivel = false;
+                    }
+                }
+
+                if (estaVisivel) { 
                     categoriasAtivas.push(c.nome);
                     configCategorias[c.nome] = { 
                         idGrupo: `grupo-${c.nome.toLowerCase().replace(/\s/g, '-')}`, 
@@ -110,7 +192,6 @@ document.addEventListener("DOMContentLoaded", async function () {
                 const item = { idFirebase: doc.id, ...doc.data() };
                 const nomeCategoria = item.categoria || 'Geral';
                 
-                // 1º AJUSTE: Se a categoria do produto estiver oculta, não exibe o produto!
                 if (!categoriasAtivas.includes(nomeCategoria)) return; 
 
                 item.id = (item.nome.toLowerCase() + (item.tamanho ? '-' + item.tamanho.toLowerCase() : '')).replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').trim('-');
@@ -141,7 +222,6 @@ document.addEventListener("DOMContentLoaded", async function () {
 
         const sortedEntries = Object.entries(itensAgrupados).sort((a, b) => a[0].localeCompare(b[0]));
 
-        // Construtor dinâmico de tabelas
         function gerarEstruturaTabela(idTabela, nomeCat, tipoColuna) {
             let thSecundaria = '';
             if (tipoColuna && tipoColuna !== 'Nenhuma') {
@@ -164,7 +244,6 @@ document.addEventListener("DOMContentLoaded", async function () {
             </div>`;
         }
 
-        // PARTE A: Criar a base (HTML) das categorias
         for (const [nomeCategoria, itens] of sortedEntries) {
             const config = configCategorias[nomeCategoria];
             navHorizontal.innerHTML += `<a href="#${config.idGrupo}" class="categoria-btn ${primeiraCategoria ? 'active-link' : ''}" data-target="${config.idGrupo}">${nomeCategoria}</a>`;
@@ -175,7 +254,6 @@ document.addEventListener("DOMContentLoaded", async function () {
                 <div class="categoria-group ${primeiraCategoria ? 'active-group' : ''}" id="${config.idGrupo}">
                     <h2 class="categoria-title">${nomeCategoria}</h2>`;
 
-            // SEGREGAÇÃO "Tamanho/Minimo" (Agora sem os títulos <h3>)
             if (config.tipoColuna === 'Tamanho/Minimo') {
                 const itensTam = itens.filter(i => i.tamanho && i.tamanho.trim() !== '');
                 const itensMin = itens.filter(i => !i.tamanho || i.tamanho.trim() === '');
@@ -195,7 +273,6 @@ document.addEventListener("DOMContentLoaded", async function () {
             primeiraCategoria = false;
         }
 
-        // PARTE B: Preencher as tabelas com os itens
         for (const [nomeCategoria, itens] of sortedEntries) {
             const config = configCategorias[nomeCategoria];
             
@@ -210,9 +287,7 @@ document.addEventListener("DOMContentLoaded", async function () {
             }
         }
         
-        configurarEventosMenu(); 
-        configurarEventosDrag(); 
-        atualizarTotal(); 
+        configurarEventosMenu(); configurarEventosDrag(); atualizarTotal(); 
     }
 
     function criarTabelaGrupo(grupo, idTabela, nomeGrupo, configCategoria) {
@@ -251,8 +326,7 @@ document.addEventListener("DOMContentLoaded", async function () {
             const chaveAgrupamento = (itemNameClean.toLowerCase() + '|||' + (item.descricaoItem || '').trim().toLowerCase());
 
             const precoFormatado = Number(item.preco).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            const isMiniCookie = itemId.includes('mini-cookie'); 
-            const isIndividualMinCheck = (configCategoria.minIndividual && item.min > 1) || isMiniCookie;
+            const isIndividualMinCheck = (configCategoria.minIndividual && item.min > 1);
             let erroHtml = isIndividualMinCheck ? `<div class="erro-item-unico">Mín ${item.min} Unid.</div>` : '';
 
             const inputHtml = `
@@ -331,7 +405,6 @@ document.addEventListener("DOMContentLoaded", async function () {
                 if (isNaN(q) || q < 0) q = 0;
                 
                 let grupo = this.getAttribute('data-grupo') || "";
-                if (grupo.includes("Namorados")) grupo = "❤️ Namorados ❤️";
 
                 const min = parseInt(this.getAttribute('data-min')) || 1;
                 const erroElemento = this.closest('.quantidade-container')?.querySelector('.erro-item-unico');
@@ -441,83 +514,103 @@ document.addEventListener("DOMContentLoaded", async function () {
             setTimeout(() => p.classList.add('show'), 10); 
             document.body.style.overflow = 'hidden'; 
 
-            const dateInput = document.getElementById("data");
-            const timeInput = document.getElementById("horario");
-            const timeGroup = timeInput.closest('.input-group');
+            const inputData = document.getElementById("data");
+            const inputHorario = document.getElementById("horario");
+            const containerHorario = inputHorario.parentNode;
+
+            // Bloqueia dias do passado nativamente no calendário
+            const hoje = new Date().toISOString().split('T')[0];
+            inputData.setAttribute('min', hoje);
+
+            // Limpa os campos sempre que abrir o popup novo
+            inputData.value = '';
+            inputHorario.value = '';
+            inputHorario.style.display = 'block';
+            inputHorario.disabled = false;
             
-            let temNamorados = false;
-            document.querySelectorAll(".quantidade-input").forEach(i => {
-                let grp = i.getAttribute("data-grupo") || "";
-                if ((parseInt(i.value) || 0) > 0 && grp.includes("Namorados")) {
-                    temNamorados = true;
+            let selectHorario = document.getElementById("horario-select");
+            if (selectHorario) {
+                selectHorario.style.display = 'none';
+                selectHorario.disabled = true;
+            }
+
+            inputData.onchange = function() {
+                const dataEscolhida = this.value; 
+                const partesData = dataEscolhida.split('-');
+                const diaDaSemana = new Date(partesData[0], partesData[1] - 1, partesData[2]).getDay();
+
+                const regraExcecao = window.regrasAgenda ? window.regrasAgenda[dataEscolhida] : null;
+                const regraGeralDoDia = window.configGeralAgenda ? window.configGeralAgenda[diaDaSemana] : null;
+
+                let selectHorario = document.getElementById("horario-select");
+                if (!selectHorario) {
+                    selectHorario = document.createElement("select");
+                    selectHorario.id = "horario-select";
+                    selectHorario.className = inputHorario.className; 
+                    selectHorario.style.padding = "12px";
+                    selectHorario.style.borderRadius = "8px";
+                    selectHorario.style.border = "1px solid rgba(224, 159, 65, 0.3)";
+                    selectHorario.style.width = "100%";
+                    selectHorario.style.fontFamily = "var(--font-numbers)";
+                    selectHorario.style.display = "none";
+                    containerHorario.appendChild(selectHorario);
                 }
-            });
 
-            const horariosCampanha = {
-                "2026-06-12": ["16:00", "16:30", "17:00", "17:30", "18:00", "18:30", "19:00"],
-                "2026-06-13": ["13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00"]
-            };
-
-            if (temNamorados) {
-                const selectData = document.createElement("select");
-                selectData.id = "data";
-                selectData.name = "data";
-                selectData.required = true;
-                selectData.innerHTML = `
-                    <option value="" disabled selected>Selecione a data de entrega...</option>
-                    <option value="2026-06-12">12/06/2026</option>
-                    <option value="2026-06-13">13/06/2026</option>
-                `;
-                dateInput.parentNode.replaceChild(selectData, dateInput);
-
-                const selectHorario = document.createElement("select");
-                selectHorario.id = "horario";
-                selectHorario.name = "horario";
-                selectHorario.required = true;
-                timeInput.parentNode.replaceChild(selectHorario, timeInput);
-
-                if (timeGroup) timeGroup.style.display = "none";
-
-                selectData.onchange = function() {
-                    const dataSelecionada = this.value;
-                    selectHorario.innerHTML = '<option value="" disabled selected>Selecione o horário...</option>';
-                    
-                    if (horariosCampanha[dataSelecionada]) {
-                        horariosCampanha[dataSelecionada].forEach(hora => {
-                            selectHorario.innerHTML += `<option value="${hora}">${hora.replace(':', 'h')}</option>`;
-                        });
-                        if (timeGroup) timeGroup.style.display = "flex";
-                    } else {
-                        if (timeGroup) timeGroup.style.display = "none";
+                const avisoFechado = document.getElementById("aviso-data-fechada");
+                
+                const resetarDataInvalida = (mensagem) => {
+                    this.value = ''; inputHorario.value = '';
+    
+                    // Oculta a caixa inteira do Horário (incluindo o título "Horário de Entrega")
+                    containerHorario.style.display = 'none'; 
+    
+                    // Mostra o alerta visual na tela
+                    if(avisoFechado) {
+                        avisoFechado.innerHTML = `<i class="fa-solid fa-ban"></i> ${mensagem}`;
+                        avisoFechado.style.display = 'block';
                     }
                 };
-            } else {
-                if (dateInput.tagName === "SELECT") {
-                    const inputData = document.createElement("input");
-                    inputData.type = "date";
-                    inputData.id = "data";
-                    inputData.name = "data";
-                    inputData.required = true;
-                    dateInput.parentNode.replaceChild(inputData, dateInput);
-                }
-                if (timeInput.tagName === "SELECT") {
-                    const inputHorario = document.createElement("input");
-                    inputHorario.type = "time";
-                    inputHorario.id = "horario";
-                    inputHorario.name = "horario";
-                    inputHorario.required = true;
-                    timeInput.parentNode.replaceChild(inputHorario, timeInput);
+
+                // Esconde a caixa de aviso e REEXIBE a caixa de horário sempre que a data for válida
+                if(avisoFechado) avisoFechado.style.display = 'none';
+                containerHorario.style.display = 'flex'; // Traz o campo de volta para telas válidas
+
+                // 1. DATA FECHADA MANUALMENTE (Puxa a mensagem customizada que você digitou)
+                if (regraExcecao && regraExcecao.indisponivel) {
+                    const msg = regraExcecao.mensagem && regraExcecao.mensagem.trim() !== '' 
+                                ? regraExcecao.mensagem 
+                                : "⛔ FECHADO (Data Indisponível)";
+                    return resetarDataInvalida(msg);
                 }
 
-                const finalDateInput = document.getElementById("data");
-                const finalTimeInput = document.getElementById("horario");
-                const finalTimeGroup = finalTimeInput.closest('.input-group');
+                // 2. DIA DA SEMANA FECHADO NA REGRA GERAL
+                if (!regraGeralDoDia || regraGeralDoDia.ativo === false) {
+                    if (!regraExcecao || !regraExcecao.horarios || regraExcecao.horarios.trim() === '') {
+                        return resetarDataInvalida("⛔ Não operamos neste dia da semana.");
+                    }
+                }
 
-                finalDateInput.removeAttribute("min");
-                finalDateInput.removeAttribute("max");
-                if (finalTimeGroup) finalTimeGroup.style.display = "flex";
-                finalDateInput.onchange = null;
-            }
+                // 3. GERA OS HORÁRIOS USANDO O NOVO MOTOR (Aceita intervalos "8h às 20h" ou separações normais)
+                let arrayHorariosFinal = [];
+                if (regraExcecao && regraExcecao.horarios && regraExcecao.horarios.trim() !== '') {
+                    arrayHorariosFinal = window.gerarHorarios(regraExcecao.horarios);
+                } else if (regraGeralDoDia && regraGeralDoDia.horarios && regraGeralDoDia.horarios.trim() !== '') {
+                    arrayHorariosFinal = window.gerarHorarios(regraGeralDoDia.horarios);
+                }
+
+                if (arrayHorariosFinal.length > 0) {
+                    inputHorario.style.display = 'none'; inputHorario.disabled = true; 
+                    selectHorario.style.display = 'block'; selectHorario.disabled = false; 
+                    selectHorario.innerHTML = '<option value="" disabled selected>Escolha o horário...</option>';
+                    arrayHorariosFinal.forEach(hora => {
+                        let textoExibicao = hora.includes(':') ? hora.replace(':', 'h') : hora;
+                        selectHorario.innerHTML += `<option value="${hora}">${textoExibicao}</option>`;
+                    });
+                } else {
+                    selectHorario.style.display = 'none'; selectHorario.disabled = true; 
+                    inputHorario.style.display = 'block'; inputHorario.disabled = false; 
+                }
+            };
         } 
     };
     
@@ -608,7 +701,6 @@ document.addEventListener("DOMContentLoaded", async function () {
         let novaQtd = parseInt(input.value) || 0; 
         
         let grupo = input.getAttribute('data-grupo') || "";
-        if (grupo.includes("Namorados")) grupo = "❤️ Namorados ❤️";
 
         const min = minimo || parseInt(input.getAttribute('data-min')) || 1;
         const erroElemento = input.closest('.quantidade-container')?.querySelector('.erro-item-unico');
@@ -630,23 +722,18 @@ document.addEventListener("DOMContentLoaded", async function () {
 
         document.querySelectorAll(".quantidade-input").forEach(input => {
             const q = parseInt(input.value) || 0;
-            
             let g = input.getAttribute("data-grupo") || ""; 
-            if (g.includes("Namorados")) g = "❤️ Namorados ❤️";
 
             if (!totaisPorGrupo[g]) totaisPorGrupo[g] = 0; 
             totaisPorGrupo[g] += q;
 
             if(q > 0) {
-                let grp = input.getAttribute("data-grupo") || "";
-                if (grp.includes("Namorados")) grp = "❤️ Namorados ❤️";
-
                 const p = parseFloat(input.getAttribute("data-preco")) || 0;
                 const minIndividualItem = parseInt(input.getAttribute("data-min")) || 1;
-                const configGrupo = configCategorias[grp] || { minIndividual: false };
+                const configGrupo = configCategorias[g] || { minIndividual: false };
 
                 totalBruto += (q * p); totalItens += q;
-                if (!gruposResumo[grp]) gruposResumo[grp] = [];
+                if (!gruposResumo[g]) gruposResumo[g] = [];
                 
                 let erroItemResumo = false;
                 if (configGrupo.minIndividual && q < minIndividualItem) {
@@ -654,7 +741,7 @@ document.addEventListener("DOMContentLoaded", async function () {
                     erroItemResumo = true;
                 }
 
-                gruposResumo[grp].push({ 
+                gruposResumo[g].push({ 
                     input, 
                     quantidade: q, 
                     preco: p, 
@@ -724,7 +811,6 @@ document.addEventListener("DOMContentLoaded", async function () {
         document.querySelectorAll(".quantidade-input").forEach(input => {
             const q = parseInt(input.value) || 0;
             let grp = input.getAttribute("data-grupo") || "";
-            if (grp.includes("Namorados")) grp = "❤️ Namorados ❤️";
 
             const config = configCategorias[grp];
             if (q > 0 && config && config.minTotal > 0 && totaisPorGrupo[grp] < config.minTotal) {
@@ -754,9 +840,6 @@ document.addEventListener("DOMContentLoaded", async function () {
         }
     }
 
-    // =========================================================================
-    // CONFIRMAÇÃO DO PEDIDO & SALVAMENTO NO FIRESTORE
-    // =========================================================================
     window.confirmarPedido = async function() {
         const btn = document.querySelector('.btn-primary-large');
         const txtOriginal = btn.textContent;
@@ -778,16 +861,11 @@ document.addEventListener("DOMContentLoaded", async function () {
         let temItens = false; 
         let itensParaPlanilha = ""; 
         let blocoSeguroTravado = false;
-        let temNamorados = false;
 
         document.querySelectorAll(".quantidade-input").forEach(i => {
             const q = parseInt(i.value) || 0;
             if (q > 0) { 
                 let grp = i.getAttribute("data-grupo") || ""; 
-                if (grp.includes("Namorados")) {
-                    grp = "❤️ Namorados ❤️";
-                    temNamorados = true;
-                }
 
                 const minIndividualItem = parseInt(i.getAttribute("data-min")) || 1;
                 const configGrupo = configCategorias[grp] || { minIndividual: false };
@@ -826,7 +904,9 @@ document.addEventListener("DOMContentLoaded", async function () {
         const nm = document.getElementById("nome").value;
         const tel = document.getElementById("telefone").value;
         const dt = document.getElementById("data").value;
-        const hr = document.getElementById("horario").value;
+        const hrInput = document.getElementById("horario");
+        const selectHorario = document.getElementById("horario-select");
+        const hr = (selectHorario && !selectHorario.disabled && selectHorario.style.display !== 'none') ? selectHorario.value : hrInput.value;
         const pag = document.getElementById("pagamento").value;
         const obs = document.getElementById("observacoes").value;
 
@@ -836,17 +916,11 @@ document.addEventListener("DOMContentLoaded", async function () {
             return; 
         }
 
-        if (temNamorados) {
-            if (dt === "2026-06-12" && (hr < "16:00" || hr > "19:00")) {
-                alert("Para o dia 12/06, o horário de entrega deve ser entre 16:00 e 19:00.");
-                btn.textContent = txtOriginal; btn.disabled = false;
-                return;
-            }
-            if (dt === "2026-06-13" && (hr < "13:00" || hr > "16:00")) {
-                alert("Para o dia 13/06, o horário de entrega deve ser entre 13:00 e 16:00.");
-                btn.textContent = txtOriginal; btn.disabled = false;
-                return;
-            }
+        if (window.regrasAgenda && window.regrasAgenda[dt] && window.regrasAgenda[dt].indisponivel) {
+            alert("A data selecionada está indisponível para entregas. Por favor, escolha outro dia.");
+            btn.textContent = txtOriginal; 
+            btn.disabled = false; 
+            return;
         }
         
         let totalLiquido = total - cupomAplicado.desconto;
@@ -859,9 +933,6 @@ document.addEventListener("DOMContentLoaded", async function () {
         if(cupomAplicado.codigo) txt += `Cupom: ${cupomAplicado.codigo} (-R$ ${cupomAplicado.desconto.toFixed(2)})\n`;
         txt += `*Total Final: R$ ${totalLiquido.toLocaleString('pt-BR',{minimumFractionDigits:2})}*\n`;
 
-        // =====================================================================
-        // NOVA LÓGICA: SALVANDO O PEDIDO NO FIREBASE AO INVÉS DA PLANILHA
-        // =====================================================================
         const dadosPedido = {
             ID_do_Pedido: idPedido,
             origem: 'site', 
@@ -900,5 +971,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         btn.textContent = txtOriginal; 
         btn.disabled = false;
     }
+    
+    // Inicia o cardápio!
     carregarMenu();
 });
