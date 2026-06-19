@@ -126,7 +126,7 @@ input[type="number"][type="number"] { -moz-appearance: textfield; }
 .erro-item-unico, .erro-categoria { color: var(--danger); font-size: 0.8rem; margin-top: 5px; display: none; font-family: 'Basic Choice', cursive; }
 .erro-categoria { text-align: center; margin-bottom: 15px; background: rgba(255,255,255,0.8); padding: 5px; border-radius: 8px; }
 .info-box { background: rgba(224, 159, 65, 0.1); border-top: 2px solid rgba(224, 159, 65, 0.2); padding: 15px; margin-top: 15px; text-align: center; font-family: 'Basic Choice', cursive; border-radius: 12px; }
-.info-box p { color: var(--text-dark); font-size: 0.95rem; margin: 0; line-height: 1.4; }
+.info-box p, .info-box-content { color: var(--text-dark); font-size: 0.95rem; margin: 0; line-height: 1.4; }
 caption { display: none; }
 
 .th-mobile { display: inline; }
@@ -295,7 +295,8 @@ td.col-unid,
 td.col-qtd,
 .descricao,
 input[type="number"],
-.info-box p {
+.info-box p,
+.info-box-content {
     font-family: var(--font-numbers) !important;
 }
 

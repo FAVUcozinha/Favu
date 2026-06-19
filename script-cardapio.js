@@ -18,15 +18,86 @@ let bancoDeProdutos = {};
 window.totalPedidoAtivo = 0; 
 window.regrasAgenda = {}; // Agenda Global
 
+// ==========================================
+// FORMATADOR DE TEXTO RICO SEGURO
+// Interpreta o HTML salvo pelo admin (negrito, itálico, sublinhado
+// e alinhamentos) sem exibir as tags como texto na tela do cliente.
+// ==========================================
 window.formatText = function(text) {
     if (!text) return '';
-    return String(text)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/\*(.*?)\*/g, '<strong>$1</strong>')
-        .replace(/_(.*?)_/g, '<em>$1</em>')
-        .replace(/\n/g, '<br>');
+
+    const container = document.createElement('div');
+    container.innerHTML = String(text).replace(/\n/g, '<br>');
+
+    const allowedTags = ['B', 'STRONG', 'I', 'EM', 'U', 'BR', 'DIV', 'P', 'SPAN'];
+    const dangerousTags = ['SCRIPT', 'STYLE', 'IFRAME', 'OBJECT', 'EMBED', 'SVG', 'MATH', 'LINK', 'META'];
+    const allowedAlignments = ['left', 'right', 'center', 'justify'];
+    const walk = document.createTreeWalker(container, NodeFilter.SHOW_ELEMENT, null);
+    const nodes = [];
+
+    while (walk.nextNode()) nodes.push(walk.currentNode);
+
+    nodes.forEach(node => {
+        if (dangerousTags.includes(node.tagName)) {
+            node.remove();
+            return;
+        }
+
+        if (!allowedTags.includes(node.tagName)) {
+            node.replaceWith(...Array.from(node.childNodes));
+            return;
+        }
+
+        let textAlign = '';
+        const styleAttr = node.getAttribute('style') || '';
+        const styleMatch = styleAttr.match(/text-align\s*:\s*(left|right|center|justify)/i);
+        const alignAttr = (node.getAttribute('align') || '').toLowerCase();
+
+        if (styleMatch) textAlign = styleMatch[1].toLowerCase();
+        if (!textAlign && allowedAlignments.includes(alignAttr)) textAlign = alignAttr;
+
+        Array.from(node.attributes).forEach(attr => node.removeAttribute(attr.name));
+
+        if (allowedAlignments.includes(textAlign)) {
+            node.style.textAlign = textAlign;
+        }
+    });
+
+    const textWalk = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
+    const textNodes = [];
+    while (textWalk.nextNode()) textNodes.push(textWalk.currentNode);
+
+    textNodes.forEach(textNode => {
+        const value = textNode.nodeValue || '';
+        if (!/[\*_]/.test(value)) return;
+
+        const parts = value.split(/(\*(?!\s)[^*]+?\*|_(?!\s)[^_]+?_)/g);
+        const fragment = document.createDocumentFragment();
+        let changed = false;
+
+        parts.forEach(part => {
+            if (/^\*(?!\s)([^*]+?)\*$/.test(part)) {
+                const strong = document.createElement('strong');
+                strong.textContent = part.slice(1, -1);
+                fragment.appendChild(strong);
+                changed = true;
+            } else if (/^_(?!\s)([^_]+?)_$/.test(part)) {
+                const em = document.createElement('em');
+                em.textContent = part.slice(1, -1);
+                fragment.appendChild(em);
+                changed = true;
+            } else if (part) {
+                fragment.appendChild(document.createTextNode(part));
+            }
+        });
+
+        if (changed) textNode.replaceWith(fragment);
+    });
+
+    return container.innerHTML
+        .replace(/<div><br><\/div>/gi, '<br>')
+        .replace(/<p><br><\/p>/gi, '<br>')
+        .trim();
 };
 
 // ==============================================================
@@ -248,7 +319,7 @@ document.addEventListener("DOMContentLoaded", async function () {
             const config = configCategorias[nomeCategoria];
             navHorizontal.innerHTML += `<a href="#${config.idGrupo}" class="categoria-btn ${primeiraCategoria ? 'active-link' : ''}" data-target="${config.idGrupo}">${nomeCategoria}</a>`;
 
-            const infoBoxHTML = (config.mensagemObs && config.mensagemObs.trim() !== '') ? `<div class="info-box"><p>${window.formatText(config.mensagemObs)}</p></div>` : '';
+            const infoBoxHTML = (config.mensagemObs && config.mensagemObs.trim() !== '') ? `<div class="info-box"><div class="info-box-content">${window.formatText(config.mensagemObs)}</div></div>` : '';
             
             let htmlGrupo = `
                 <div class="categoria-group ${primeiraCategoria ? 'active-group' : ''}" id="${config.idGrupo}">
