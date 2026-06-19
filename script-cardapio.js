@@ -258,7 +258,9 @@ document.addEventListener("DOMContentLoaded", async function () {
             const textoEl = document.getElementById('aviso-texto');
 
             if (popup && tituloEl && textoEl) {
-                tituloEl.textContent = aviso?.titulo || '';
+                const titulo = (aviso?.titulo || '').trim();
+                tituloEl.textContent = titulo;
+                tituloEl.style.display = titulo ? 'block' : 'none';
                 textoEl.innerHTML = renderAvisoPopupContent(aviso);
                 popup.style.display = 'flex';
                 setTimeout(() => popup.classList.add('show'), 50);

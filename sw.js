@@ -1,4 +1,4 @@
-const CACHE_NAME = 'favu-app-v10-aviso-img-pos';
+const CACHE_NAME = 'favu-app-v11-titulo-opcional';
 const urlsToCache = [
   './',
   './index.html',
