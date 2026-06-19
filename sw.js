@@ -1,4 +1,4 @@
-const CACHE_NAME = 'favu-app-v11-titulo-opcional';
+const CACHE_NAME = 'favu-clientes-v15-horario-espaco';
 const urlsToCache = [
   './',
   './index.html',

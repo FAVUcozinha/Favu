@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" href="images/favu.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="style-cardapio.css?v=20260619-titulo-opcional-1">
+    <link rel="stylesheet" href="style-cardapio.css?v=20260619-qtd-visual-1">
 </head>
 <body>
     <nav id="side-menu" class="side-menu">
@@ -91,8 +91,8 @@
                         </div>
                     </div>
                     
-                    <div class="input-group">
-                        <label for="horario">Horário de Entrega:</label>
+                    <div class="input-group" id="horario-entrega-container" style="display: none; margin-top: 12px;">
+                        <label for="horario" style="display: block; margin-bottom: 6px;">Horário de Entrega:</label>
                         <input type="time" id="horario" name="horario" required>
                     </div>
                     
@@ -183,6 +183,6 @@
         </div>
     </div>
 
-    <script type="module" src="script-cardapio.js?v=20260619-titulo-opcional-1"></script>
+    <script type="module" src="script-cardapio.js?v=20260619-horario-espaco-1"></script>
 </body>
 </html>

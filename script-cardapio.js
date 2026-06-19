@@ -319,7 +319,11 @@ document.addEventListener("DOMContentLoaded", async function () {
                 
                 if (!categoriasAtivas.includes(nomeCategoria)) return; 
 
-                item.id = (item.nome.toLowerCase() + (item.tamanho ? '-' + item.tamanho.toLowerCase() : '')).replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').trim('-');
+                // ID único do produto no cardápio.
+                // Antes o ID era gerado por nome + tamanho. Quando existiam produtos com o mesmo
+                // nome/tamanho, o botão atualizava outro input com o mesmo data-item-id: o item entrava
+                // no resumo, mas a caixinha visual clicada continuava zerada.
+                item.id = doc.id;
                 bancoDeProdutos[item.id] = item; 
 
                 if (!configCategorias[nomeCategoria]) {
@@ -336,6 +340,22 @@ document.addEventListener("DOMContentLoaded", async function () {
 
             renderizarCardapio(itensAgrupados);
         } catch (error) { console.error(error); }
+    }
+
+    function normalizarChaveProduto(value) {
+        return String(value || '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .toLowerCase();
+    }
+
+    function getProdutoCompartilhadoKey(item) {
+        const nome = normalizarChaveProduto(item?.nome || item?.descricaoResumo || '');
+        const tamanho = normalizarChaveProduto(item?.tamanho || '');
+        const preco = Number(item?.preco || 0).toFixed(2);
+        return encodeURIComponent(`${nome}||${tamanho}||${preco}`);
     }
 
     function renderizarCardapio(itensAgrupados) {
@@ -446,7 +466,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
         let chaveAtual = null;
         for (let i = 0; i < groupoOrdenado.length; i++) {
-            const item = groupoOrdenado[i]; const tr = document.createElement("tr"); tr.id = item.id; const itemId = item.id; 
+            const item = groupoOrdenado[i]; const tr = document.createElement("tr"); tr.id = item.id; const itemId = item.id; const itemKey = getProdutoCompartilhadoKey(item); 
             const itemNameClean = (item.nome || 'Sem Nome').trim();
             const chaveAgrupamento = (itemNameClean.toLowerCase() + '|||' + (item.descricaoItem || '').trim().toLowerCase());
 
@@ -456,9 +476,9 @@ document.addEventListener("DOMContentLoaded", async function () {
 
             const inputHtml = `
                 <div class="quantidade-input-group">
-                    <button type="button" class="qtd-btn-table" onclick="window.alterarQuantidadeTabela('${itemId}', -1, ${item.min || 1})">-</button>
-                    <input type="number" value="0" min="0" data-min="${item.min || 1}" data-preco="${item.preco}" data-resumo="${item.descricaoResumo || item.nome}" data-grupo="${nomeGrupo}" data-item-id="${itemId}" class="quantidade-input">
-                    <button type="button" class="qtd-btn-table" onclick="window.alterarQuantidadeTabela('${itemId}', 1, ${item.min || 1})">+</button>
+                    <button type="button" class="qtd-btn-table" onclick="window.alterarQuantidadeTabela('${itemKey}', -1, ${item.min || 1})">-</button>
+                    <input type="number" value="0" min="0" data-min="${item.min || 1}" data-preco="${item.preco}" data-resumo="${item.descricaoResumo || item.nome}" data-grupo="${nomeGrupo}" data-item-id="${itemId}" data-produto-key="${itemKey}" class="quantidade-input">
+                    <button type="button" class="qtd-btn-table" onclick="window.alterarQuantidadeTabela('${itemKey}', 1, ${item.min || 1})">+</button>
                 </div>`;
 
             const temFoto = item.imagemUrl && item.imagemUrl.trim() !== "";
@@ -528,25 +548,18 @@ document.addEventListener("DOMContentLoaded", async function () {
             input.addEventListener("input", function() {
                 let q = parseInt(this.value);
                 if (isNaN(q) || q < 0) q = 0;
-                
-                let grupo = this.getAttribute('data-grupo') || "";
 
-                const min = parseInt(this.getAttribute('data-min')) || 1;
-                const erroElemento = this.closest('.quantidade-container')?.querySelector('.erro-item-unico');
-                const configGrupo = configCategorias[grupo] || {minIndividual: false};
-                
-                if (configGrupo.minIndividual && q > 0 && q < min) {
-                    if (erroElemento) { erroElemento.textContent = `Mín ${min} Unid.`; erroElemento.style.display = 'block'; }
-                } else {
-                    if (erroElemento) erroElemento.style.display = 'none';
-                }
-                
+                const produtoKey = this.getAttribute('data-produto-key') || this.getAttribute('data-item-id');
+                sincronizarQuantidadeVisual(produtoKey, q, this);
+
                 atualizarTotal();
                 if (cupomAplicado.codigo) window.aplicarCupom();
             });
             input.addEventListener("blur", function() {
-                const q = parseInt(this.value) || 0; 
-                this.value = (this.value === "" || q <= 0) ? "0" : q.toString(); 
+                const q = parseInt(this.value) || 0;
+                const quantidadeFinal = (this.value === "" || q <= 0) ? 0 : q;
+                const produtoKey = this.getAttribute('data-produto-key') || this.getAttribute('data-item-id');
+                sincronizarQuantidadeVisual(produtoKey, quantidadeFinal, this);
                 atualizarTotal();
             });
         });
@@ -641,7 +654,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
             const inputData = document.getElementById("data");
             const inputHorario = document.getElementById("horario");
-            const containerHorario = inputHorario.parentNode;
+            const containerHorario = document.getElementById("horario-entrega-container") || inputHorario.parentNode;
 
             // Bloqueia dias do passado nativamente no calendário
             const hoje = new Date().toISOString().split('T')[0];
@@ -651,21 +664,21 @@ document.addEventListener("DOMContentLoaded", async function () {
             inputData.value = '';
             inputHorario.value = '';
             inputHorario.style.display = 'block';
-            inputHorario.disabled = false;
+            inputHorario.disabled = true;
+            containerHorario.style.display = 'none';
+
+            const avisoFechadoInicial = document.getElementById("aviso-data-fechada");
+            if (avisoFechadoInicial) avisoFechadoInicial.style.display = 'none';
             
             let selectHorario = document.getElementById("horario-select");
             if (selectHorario) {
+                selectHorario.value = '';
                 selectHorario.style.display = 'none';
                 selectHorario.disabled = true;
             }
 
             inputData.onchange = function() {
                 const dataEscolhida = this.value; 
-                const partesData = dataEscolhida.split('-');
-                const diaDaSemana = new Date(partesData[0], partesData[1] - 1, partesData[2]).getDay();
-
-                const regraExcecao = window.regrasAgenda ? window.regrasAgenda[dataEscolhida] : null;
-                const regraGeralDoDia = window.configGeralAgenda ? window.configGeralAgenda[diaDaSemana] : null;
 
                 let selectHorario = document.getElementById("horario-select");
                 if (!selectHorario) {
@@ -681,10 +694,34 @@ document.addEventListener("DOMContentLoaded", async function () {
                     containerHorario.appendChild(selectHorario);
                 }
 
+                inputHorario.value = '';
+                inputHorario.disabled = true;
+                selectHorario.value = '';
+                selectHorario.disabled = true;
+                selectHorario.style.display = 'none';
+
                 const avisoFechado = document.getElementById("aviso-data-fechada");
-                
+
+                if (!dataEscolhida) {
+                    containerHorario.style.display = 'none';
+                    if (avisoFechado) avisoFechado.style.display = 'none';
+                    return;
+                }
+
+                const partesData = dataEscolhida.split('-');
+                const diaDaSemana = new Date(partesData[0], partesData[1] - 1, partesData[2]).getDay();
+
+                const regraExcecao = window.regrasAgenda ? window.regrasAgenda[dataEscolhida] : null;
+                const regraGeralDoDia = window.configGeralAgenda ? window.configGeralAgenda[diaDaSemana] : null;
+
                 const resetarDataInvalida = (mensagem) => {
-                    this.value = ''; inputHorario.value = '';
+                    this.value = '';
+                    inputHorario.value = '';
+                    inputHorario.disabled = true;
+                    inputHorario.style.display = 'block';
+                    selectHorario.value = '';
+                    selectHorario.disabled = true;
+                    selectHorario.style.display = 'none';
     
                     // Oculta a caixa inteira do Horário (incluindo o título "Horário de Entrega")
                     containerHorario.style.display = 'none'; 
@@ -696,9 +733,9 @@ document.addEventListener("DOMContentLoaded", async function () {
                     }
                 };
 
-                // Esconde a caixa de aviso e REEXIBE a caixa de horário sempre que a data for válida
+                // Esconde a caixa de aviso e REEXIBE a caixa de horário somente após a data ser escolhida e validada
                 if(avisoFechado) avisoFechado.style.display = 'none';
-                containerHorario.style.display = 'flex'; // Traz o campo de volta para telas válidas
+                containerHorario.style.display = 'block';
 
                 // 1. DATA FECHADA MANUALMENTE (Puxa a mensagem customizada que você digitou)
                 if (regraExcecao && regraExcecao.indisponivel) {
@@ -799,40 +836,94 @@ document.addEventListener("DOMContentLoaded", async function () {
     function gerarIdPedido() { return `PED-${new Date().toISOString().slice(0,10).replace(/-/g, "")}${new Date().toTimeString().slice(0,8).replace(/:/g, "")}`; }
     function validarEFormatarTelefone(telefone) { const n = telefone.replace(/\D/g, ''); return n.length >= 10 ? '55' + n : '5581' + n; }
 
+    function escaparSeletorCss(value) {
+        const texto = String(value || '');
+        if (window.CSS && typeof window.CSS.escape === 'function') return window.CSS.escape(texto);
+        return texto.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    }
+
+    function getInputsQuantidadeProduto(produtoKey) {
+        const key = escaparSeletorCss(produtoKey);
+        return Array.from(document.querySelectorAll(`.quantidade-input[data-produto-key="${key}"], .quantidade-input[data-item-id="${key}"]`));
+    }
+
+    function getInputQuantidadePrincipal(produtoKey) {
+        return getInputsQuantidadeProduto(produtoKey)[0] || null;
+    }
+
+    function atualizarErroQuantidadeInput(input, quantidade) {
+        if (!input) return;
+
+        const grupo = input.getAttribute('data-grupo') || "";
+        const min = parseInt(input.getAttribute('data-min')) || 1;
+        const erroElemento = input.closest('.quantidade-container')?.querySelector('.erro-item-unico');
+        const configGrupo = configCategorias[grupo] || { minIndividual: false };
+
+        if (configGrupo.minIndividual && quantidade > 0 && quantidade < min) {
+            if (erroElemento) {
+                erroElemento.textContent = `Mín ${min} Unid.`;
+                erroElemento.style.display = 'block';
+            }
+        } else if (erroElemento) {
+            erroElemento.style.display = 'none';
+        }
+    }
+
+    function sincronizarQuantidadeVisual(produtoKey, quantidade, inputOrigem = null) {
+        const q = Math.max(0, parseInt(quantidade) || 0);
+        const inputs = getInputsQuantidadeProduto(produtoKey);
+
+        inputs.forEach(input => {
+            input.value = q.toString();
+            atualizarErroQuantidadeInput(input, q);
+        });
+
+        if (inputOrigem) {
+            const grupoOrigem = inputOrigem.getAttribute('data-grupo') || '';
+            inputs.forEach(input => {
+                if (grupoOrigem) input.dataset.grupoOrigemResumo = grupoOrigem;
+            });
+        }
+    }
+
     window.excluirItem = function(itemId) {
-        const input = document.querySelector(`.quantidade-input[data-item-id="${itemId}"]`);
-        if (input) { input.value = "0"; input.dispatchEvent(new Event('input')); }
+        const input = getInputQuantidadePrincipal(itemId);
+        if (input) {
+            sincronizarQuantidadeVisual(itemId, 0, input);
+            atualizarTotal();
+        }
         if (cupomAplicado.codigo) window.aplicarCupom();
     }
 
     window.alterarQuantidadeResumo = function(itemId, delta) {
-        const input = document.querySelector(`#popup-resumo-itens input[data-item-id="${itemId}"]`); if (!input) return;
-        input.value = Math.max(0, (parseInt(input.value) || 0) + delta); window.atualizarQuantidadeDireta(input);
+        const key = escaparSeletorCss(itemId);
+        const input = document.querySelector(`#popup-resumo-itens input[data-produto-key="${key}"], #popup-resumo-itens input[data-item-id="${key}"]`);
+        if (!input) return;
+        input.value = Math.max(0, (parseInt(input.value) || 0) + delta);
+        window.atualizarQuantidadeDireta(input);
     }
-    
+
     window.atualizarQuantidadeDireta = function(inputElement) {
-        const itemId = inputElement.getAttribute('data-item-id'); const inputNoMain = document.querySelector(`.quantidade-input[data-item-id="${itemId}"]`);
+        const itemId = inputElement.getAttribute('data-produto-key') || inputElement.getAttribute('data-item-id');
+        const inputNoMain = getInputQuantidadePrincipal(itemId);
         if (inputNoMain) { 
-            let q = parseInt(inputElement.value.replace(/[^0-9]/g, ''));
+            let q = parseInt(String(inputElement.value).replace(/[^0-9]/g, ''));
             if (isNaN(q) || q < 0) q = 0;
-            inputNoMain.value = q; 
+            sincronizarQuantidadeVisual(itemId, q, inputNoMain);
             atualizarTotal(); 
             if (cupomAplicado.codigo) window.aplicarCupom(); 
         }
     }
 
     window.alterarQuantidadeTabela = function(itemId, delta, minimo) {
-        const input = document.querySelector(`.quantidade-input[data-item-id="${itemId}"]`); if (!input) return;
+        const input = getInputQuantidadePrincipal(itemId); if (!input) return;
         let novaQtd = parseInt(input.value) || 0; 
-        
-        let grupo = input.getAttribute('data-grupo') || "";
 
         const min = minimo || parseInt(input.getAttribute('data-min')) || 1;
-        const erroElemento = input.closest('.quantidade-container')?.querySelector('.erro-item-unico');
         if (delta > 0 && novaQtd === 0) novaQtd = min; else novaQtd += delta;
-        if (novaQtd < 0) novaQtd = 0; input.value = novaQtd;
-        const configGrupo = configCategorias[grupo] || {minIndividual: false};
-        if (configGrupo.minIndividual && novaQtd > 0 && novaQtd < min) { if (erroElemento) { erroElemento.textContent = `Mín ${min} Unid.`; erroElemento.style.display = 'block'; } } else { if (erroElemento) erroElemento.style.display = 'none'; }
+        if (novaQtd < 0) novaQtd = 0;
+
+        sincronizarQuantidadeVisual(itemId, novaQtd, input);
         atualizarTotal();
     };
 
@@ -845,9 +936,15 @@ document.addEventListener("DOMContentLoaded", async function () {
         
         let temErroMinimo = false;
 
+        const produtosResumoProcessados = new Set();
+
         document.querySelectorAll(".quantidade-input").forEach(input => {
+            const produtoKey = input.getAttribute("data-produto-key") || input.getAttribute("data-item-id");
+            if (produtosResumoProcessados.has(produtoKey)) return;
+            produtosResumoProcessados.add(produtoKey);
+
             const q = parseInt(input.value) || 0;
-            let g = input.getAttribute("data-grupo") || ""; 
+            let g = input.dataset.grupoOrigemResumo || input.getAttribute("data-grupo") || ""; 
 
             if (!totaisPorGrupo[g]) totaisPorGrupo[g] = 0; 
             totaisPorGrupo[g] += q;
@@ -871,7 +968,7 @@ document.addEventListener("DOMContentLoaded", async function () {
                     quantidade: q, 
                     preco: p, 
                     descricaoResumo: input.getAttribute("data-resumo"), 
-                    itemId: input.getAttribute("data-item-id"),
+                    itemId: produtoKey,
                     minimoExigido: minIndividualItem,
                     comErro: erroItemResumo
                 });
@@ -913,7 +1010,7 @@ document.addEventListener("DOMContentLoaded", async function () {
                             <div style="display: flex; align-items: center; gap: 8px;">
                                 <div class="resumo-item-input-group" style="display: flex; align-items: center; gap: 5px;">
                                     <button type="button" class="resumo-qtd-btn" onclick="window.alterarQuantidadeResumo('${item.itemId}', -1)">-</button>
-                                    <input type="number" value="${item.quantidade}" min="0" data-item-id="${item.itemId}" oninput="window.atualizarQuantidadeDireta(this)" style="width: 38px; height: 30px; text-align: center; border: 1px solid rgba(29, 40, 20, 0.2); border-radius: 6px;">
+                                    <input type="number" value="${item.quantidade}" min="0" data-item-id="${item.itemId}" data-produto-key="${item.itemId}" oninput="window.atualizarQuantidadeDireta(this)" style="width: 38px; height: 30px; text-align: center; border: 1px solid rgba(29, 40, 20, 0.2); border-radius: 6px;">
                                     <button type="button" class="resumo-qtd-btn" onclick="window.alterarQuantidadeResumo('${item.itemId}', 1)">+</button>
                                 </div>
                                 <button class="btn-excluir" onclick="window.excluirItem('${item.itemId}')" style="background: none; border: none; color: #E60000; cursor: pointer;"><i class="fas fa-trash"></i></button>
@@ -933,9 +1030,15 @@ document.addEventListener("DOMContentLoaded", async function () {
             }
         }
 
+        const produtosMinimoProcessados = new Set();
+
         document.querySelectorAll(".quantidade-input").forEach(input => {
+            const produtoKey = input.getAttribute("data-produto-key") || input.getAttribute("data-item-id");
+            if (produtosMinimoProcessados.has(produtoKey)) return;
+            produtosMinimoProcessados.add(produtoKey);
+
             const q = parseInt(input.value) || 0;
-            let grp = input.getAttribute("data-grupo") || "";
+            let grp = input.dataset.grupoOrigemResumo || input.getAttribute("data-grupo") || "";
 
             const config = configCategorias[grp];
             if (q > 0 && config && config.minTotal > 0 && totaisPorGrupo[grp] < config.minTotal) {
@@ -987,10 +1090,16 @@ document.addEventListener("DOMContentLoaded", async function () {
         let itensParaPlanilha = ""; 
         let blocoSeguroTravado = false;
 
+        const produtosPedidoProcessados = new Set();
+
         document.querySelectorAll(".quantidade-input").forEach(i => {
+            const produtoKey = i.getAttribute("data-produto-key") || i.getAttribute("data-item-id");
+            if (produtosPedidoProcessados.has(produtoKey)) return;
+            produtosPedidoProcessados.add(produtoKey);
+
             const q = parseInt(i.value) || 0;
             if (q > 0) { 
-                let grp = i.getAttribute("data-grupo") || ""; 
+                let grp = i.dataset.grupoOrigemResumo || i.getAttribute("data-grupo") || ""; 
 
                 const minIndividualItem = parseInt(i.getAttribute("data-min")) || 1;
                 const configGrupo = configCategorias[grp] || { minIndividual: false };
