@@ -1,29 +1,33 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="FAVU - Cozinha Afetiva">
     <link rel="icon" type="image/png" href="images/favu.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="style-cardapio.css">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
     <nav id="side-menu" class="side-menu">
         <button id="close-menu-btn" class="close-menu-btn">&times;</button>
         <div class="side-menu-content">
             <div class="menu-logo-container">
                 <img src="images/favu.png" alt="Logo FAVU" class="menu-logo-img">
             </div>
-            <ul class="nav-links">
+
+            <ul class="nav-links" id="dynamic-nav-links">
                 <li><a href="#" id="menu-quem-somos" class="menu-link">QUEM SOMOS</a></li>
-                <li><a href="index.html" id="menu-inicial-link" class="menu-link">MENU INICIAL</a></li>
+                <li><a href="cardapio.html" class="menu-link">CARDÁPIO</a></li>
             </ul>
+
             <div class="menu-socials">
                 <a href="https://www.instagram.com/favucozinha/" target="_blank" class="menu-social-link">
-                    <i class="fab fa-instagram"></i> Nos siga no Instagram
+                    <i class="fab fa-instagram icon-insta"></i> Nos siga no Instagram
                 </a>
                 <a href="http://wa.me/558195256641" target="_blank" class="menu-social-link">
-                    <i class="fab fa-whatsapp"></i> Falar com o Favu
+                    <i class="fab fa-whatsapp icon-whats"></i> Falar com o Favu
                 </a>
             </div>
         </div>
@@ -31,113 +35,67 @@
 
     <header id="header">
         <div class="header-container-full">
-            <button id="mobile-menu-btn" class="menu-btn"><i class="fa-solid fa-bars"></i></button>
+            <button id="mobile-menu-btn" class="menu-btn">
+                <i class="fa-solid fa-bars"></i>
+            </button>
         </div>
     </header>
 
-    <nav id="categorias-nav" class="categorias-nav">
-        <div class="categorias-nav-wrapper">
-            <div id="categorias-horizontal" class="categorias-draggable"></div>
+    <section class="hero">
+        <div class="container">
+            <div class="hero-image-wrapper">
+                <img src="images/favu.png" alt="FAVU Logo Principal" class="hero-logo-big">
+            </div>
         </div>
-    </nav>
+    </section>
 
-    <div class="container">
-        <main class="menu-content" id="menu-principal"></main>
-        
-        <div id="popup-resumo" class="popup">
-            <div class="popup-conteudo">
-                <span class="fechar" onclick="window.fecharResumoPopup()">&times;</span>
-                <h2 class="font-display">RESUMO DO PEDIDO</h2>
-                
-                <div id="popup-resumo-itens" class="resumo-itens"></div>
-                
-                <div id="cupom-container">
-                    <strong>CUPOM DE DESCONTO</strong>
-                    <div id="cupom-input-group">
-                        <input type="text" id="cupom-input" placeholder="CÓDIGO">
-                        <button id="apply-cupom-btn" onclick="window.aplicarCupom()">APLICAR</button>
+    <section class="links-section">
+        <div class="container">
+            <div class="grid-links" id="dynamic-grid-links">
+                <div class="clean-card" onclick="openAboutModal()">
+                    <div class="card-icon"><i class="fas fa-heart"></i></div>
+                    <div class="card-info">
+                        <h3 class="font-display">Quem Somos</h3>
+                        <p class="font-body">Nossa história e essência.</p>
                     </div>
-                    <div id="cupom-message" class="cupom-message"></div>
                 </div>
-                
-                <div class="resumo-footer-area">
-                    <div id="popup-resumo-total" class="resumo-total"></div>
-                    <div id="fazer-pedido-button-container"></div>
-                </div>
+                <a href="cardapio.html" class="clean-card">
+                    <div class="card-icon"><i class="fas fa-utensils"></i></div>
+                    <div class="card-info">
+                        <h3 class="font-display">Cardápio</h3>
+                        <p class="font-body">Confira nosso catálogo.</p>
+                    </div>
+                </a>
+                <a href="http://wa.me/558195256641" target="_blank" class="clean-card">
+                    <div class="card-icon"><i class="fab fa-whatsapp"></i></div>
+                    <div class="card-info">
+                        <h3 class="font-display">Chama o Favu</h3>
+                        <p class="font-body">Fale com a gente.</p>
+                    </div>
+                </a>
+                <a href="https://www.instagram.com/favucozinha/" target="_blank" class="clean-card">
+                    <div class="card-icon"><i class="fab fa-instagram"></i></div>
+                    <div class="card-info">
+                        <h3 class="font-display">Instagram</h3>
+                        <p class="font-body">Acompanha a gente.</p>
+                    </div>
+                </a>
             </div>
         </div>
-        
-        <div id="popup-pedido" class="popup">
-            <div class="popup-conteudo">
-                <span class="fechar" onclick="window.fecharPopup()">&times;</span>
-                <h2 class="font-display">INFORMAÇÕES DO PEDIDO</h2>
-                
-                <form id="form-pedido">
-                    <div class="input-group">
-                        <label for="nome">Nome:</label>
-                        <input type="text" id="nome" name="nome" placeholder="Nome Completo" required>
-                    </div>
-                    
-                    <div class="input-group">
-                        <label for="telefone">Número (WhatsApp):</label>
-                        <input type="tel" id="telefone" name="telefone" placeholder="(DDD) 9XXXX-XXXX" required>
-                    </div>
-                    
-                    <div class="input-group">
-                        <label for="data">Data de Entrega:</label>
-                        <input type="date" id="data" name="data" required>
-                        <div id="aviso-data-fechada" style="display: none; color: var(--danger, #E60000); font-weight: bold; font-size: 0.85rem; margin-top: 5px; font-family: var(--font-numbers); background: rgba(230,0,0,0.05); padding: 8px; border-radius: 6px; border: 1px solid rgba(230,0,0,0.2);">
-                            <i class="fa-solid fa-ban"></i> ⛔ FECHADO para encomendas nesta data.
-                        </div>
-                    </div>
-                    
-                    <div class="input-group">
-                        <label for="horario">Horário de Entrega:</label>
-                        <input type="time" id="horario" name="horario" required>
-                    </div>
-                    
-                    <div class="input-group">
-                        <label for="pagamento">Forma de pagamento:</label>
-                        <select id="pagamento" name="pagamento" required>
-                            <option value="" disabled selected>Selecione...</option>
-                            <option value="Pix">Pix</option>
-                            <option value="Dinheiro">Dinheiro</option>
-                            <option value="Cartão">Cartão</option>
-                        </select>
-                    </div>
-                    
-                    <div class="input-group">
-                        <label for="observacoes">Observações:</label>
-                        <textarea id="observacoes" name="Observacoes" placeholder="EX: Retirar Itens, Alergias, Etc." rows="2"></textarea>
-                    </div>
-                </form>
+    </section>
 
-                <div class="popup-footer-actions">
-                    <div class="popup-footer-actions-top">
-                        <button type="button" class="btn-secondary" onclick="window.editarPedido()">EDITAR PEDIDO</button>
-                        <button type="button" class="btn-secondary" onclick="window.fecharPopup()">ADICIONAR ITENS</button>
-                    </div>
-                    <button type="button" class="btn-primary-large" onclick="window.confirmarPedido()">CONFIRMAR PEDIDO</button>
-                </div>
-            </div>
+    <section class="gallery-section">
+        <div class="slideshow-wrapper" id="slideshow-draggable">
+            <div class="slideshow-track" id="slideshow-track"></div>
         </div>
-        
-        <button type="button" id="fixed-summary">
-            <div class="summary-content">
-                <div id="summary-text">
-                    <span id="summary-total">R$: 0,00</span>
-                    <span id="summary-item-count">/ 0 itens</span>
-                </div>
-                <div id="summary-button"><i class="fas fa-shopping-cart"></i></div>
-            </div>
-        </button>
-    </div>
+    </section>
 
     <footer>
-        <div class="footer-container-center">
+        <div class="container footer-container-center">
             <img src="images/logoroda.png" alt="FAVU Rodapé" class="footer-logo">
             <div class="desktop-signature">
-                <img src="images/BS.png" alt="Icone"><span>FAVU Cozinha Afetiva</span>
+                <img src="images/BS.png" alt="Icone">
+                <span>FAVU Cozinha Afetiva</span>
             </div>
             <p class="copy">&copy; 2026 Todos os direitos reservados.</p>
         </div>
@@ -145,7 +103,9 @@
 
     <div id="aboutModal" class="modal">
         <div class="modal-content">
-            <div class="close-btn-wrapper" onclick="window.closeAboutModal()"><i class="fa-solid fa-xmark close-btn-icon"></i></div>
+            <div class="close-btn-wrapper" onclick="closeAboutModal()">
+                <i class="fa-solid fa-xmark close-btn-icon"></i>
+            </div>
             <div class="modal-body-scroll">
                 <div class="modal-body">
                     <img src="images/BS.png" alt="História FAVU" class="modal-img">
@@ -160,29 +120,6 @@
         </div>
     </div>
 
-    <div id="popup-item-imagem" class="modal">
-        <div class="modal-content modal-item-imagem">
-            <div class="close-btn-wrapper" onclick="window.fecharImagemPopup()"><i class="fa-solid fa-xmark close-btn-icon"></i></div>
-            <div class="modal-body-scroll">
-                <div class="modal-body modal-item-body">
-                    <img id="item-imagem-display" src="" alt="Imagem do Item" class="item-imagem-display">
-                    <div class="item-info">
-                        <h3 id="item-nome-display" class="font-display"></h3>
-                        <p id="item-descricao-display" style="font-family: 'Segoe UI', sans-serif; font-size: 1rem; line-height: 1.5; color: var(--text-dark);"></p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="popup-aviso" class="modal">
-        <div class="modal-content" style="padding: 40px 20px; border: 3px solid var(--accent-orange); background: var(--card-bg);">
-            <span class="close-btn-wrapper" onclick="document.getElementById('popup-aviso').classList.remove('show'); setTimeout(() => document.getElementById('popup-aviso').style.display='none', 300);"><i class="fa-solid fa-xmark close-btn-icon"></i></span>
-            <h2 id="aviso-titulo" class="font-display" style="color: var(--accent-orange); font-size: 2.2rem; margin-bottom: 15px; margin-top: 0;"></h2>
-            <div id="aviso-texto" style="font-family: 'Segoe UI', Arial, sans-serif; color: var(--text-dark); font-size: 1.05rem; line-height: 1.6;"></div>
-        </div>
-    </div>
-
-    <script type="module" src="script-cardapio.js"></script>
+    <script type="module" src="script.js"></script>
 </body>
 </html>

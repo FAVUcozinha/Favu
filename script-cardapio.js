@@ -29,71 +29,6 @@ window.formatText = function(text) {
         .replace(/\n/g, '<br>');
 };
 
-function sanitizeRichText(html) {
-    const raw = (html || '').toString();
-    const container = document.createElement('div');
-    container.innerHTML = raw;
-
-    const allowedTags = ['B', 'STRONG', 'I', 'EM', 'U', 'BR', 'DIV', 'P', 'SPAN'];
-    const allowedAlignments = ['left', 'right', 'center', 'justify'];
-    const walk = document.createTreeWalker(container, NodeFilter.SHOW_ELEMENT, null);
-    const nodes = [];
-    while (walk.nextNode()) nodes.push(walk.currentNode);
-
-    nodes.forEach(node => {
-        if (!allowedTags.includes(node.tagName)) {
-            node.replaceWith(...Array.from(node.childNodes));
-            return;
-        }
-
-        let textAlign = '';
-        const styleAttr = node.getAttribute('style') || '';
-        const styleMatch = styleAttr.match(/text-align\s*:\s*(left|right|center|justify)/i);
-        const alignAttr = (node.getAttribute('align') || '').toLowerCase();
-        if (styleMatch) textAlign = styleMatch[1].toLowerCase();
-        if (!textAlign && allowedAlignments.includes(alignAttr)) textAlign = alignAttr;
-
-        Array.from(node.attributes).forEach(attr => node.removeAttribute(attr.name));
-        if (allowedAlignments.includes(textAlign)) node.style.textAlign = textAlign;
-    });
-
-    return container.innerHTML
-        .replace(/<div><br><\/div>/gi, '<br>')
-        .replace(/<p><br><\/p>/gi, '<br>')
-        .trim();
-}
-
-window.renderStoredRichText = function(value) {
-    if (!value) return '';
-    const raw = value.toString().trim();
-    if (!raw) return '';
-    const hasHtml = /<\/?[a-z][\s\S]*>/i.test(raw);
-    return sanitizeRichText(hasHtml ? raw : window.formatText(raw));
-};
-
-function escapeAttr(value) {
-    return (value || '').toString()
-        .replace(/&/g, '&amp;')
-        .replace(/"/g, '&quot;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
-}
-
-function isDateWindowVisible(item, agora = Date.now()) {
-    if (!item || item.ativo === false) return false;
-    const inicio = Number(item.inicio) || 0;
-    const fim = Number(item.fim) || 0;
-    if (inicio && agora < inicio) return false;
-    if (fim && agora > fim) return false;
-    return true;
-}
-
-function buildAvisoImageHtml(imagemUrl) {
-    if (!imagemUrl) return '';
-    return `<img class="aviso-popup-img" src="${escapeAttr(imagemUrl)}" alt="Imagem do comunicado">`;
-}
-
-
 // ==============================================================
 // MOTOR DE INTERVALOS (Gera horários de 30 em 30 min)
 // ==============================================================
@@ -194,16 +129,14 @@ document.addEventListener("DOMContentLoaded", async function () {
             
             avisosSnap.forEach(doc => {
                 const a = doc.data();
-                if (isDateWindowVisible(a, agora)) {
+                if (a.ativo && agora >= a.inicio && agora <= a.fim) {
                     const popup = document.getElementById('popup-aviso');
                     if(popup) {
-                        const posImagem = a.posicaoImagem || 'top';
-                        const textoHtml = window.renderStoredRichText(a.texto) || '';
-                        const imagemHtml = buildAvisoImageHtml(a.imagemUrl);
-                        document.getElementById('aviso-titulo').textContent = a.titulo || '';
-                        document.getElementById('aviso-texto').innerHTML = posImagem === 'bottom'
-                            ? `${textoHtml}${imagemHtml}`
-                            : `${imagemHtml}${textoHtml}`;
+                        document.getElementById('aviso-titulo').textContent = a.titulo;
+                        document.getElementById('aviso-texto').innerHTML = window.formatText(a.texto);
+                        if(a.imagemUrl) {
+                             document.getElementById('aviso-texto').innerHTML += `<img src="${a.imagemUrl}" style="max-width:100%; margin-top:15px; border-radius:10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">`;
+                        }
                         popup.style.display = 'flex';
                         setTimeout(() => popup.classList.add('show'), 50);
                     }
@@ -231,7 +164,14 @@ document.addEventListener("DOMContentLoaded", async function () {
             
             catSnapshot.forEach(doc => {
                 const c = doc.data();
-                let estaVisivel = isDateWindowVisible(c);
+                let estaVisivel = c.ativo !== false;
+                
+                if (estaVisivel && c.agendarVisibilidade && c.inicio && c.fim) {
+                    const agora = Date.now();
+                    if (agora < c.inicio || agora > c.fim) {
+                        estaVisivel = false;
+                    }
+                }
 
                 if (estaVisivel) { 
                     categoriasAtivas.push(c.nome);
@@ -239,8 +179,7 @@ document.addEventListener("DOMContentLoaded", async function () {
                         idGrupo: `grupo-${c.nome.toLowerCase().replace(/\s/g, '-')}`, 
                         idTabela: `tabela-${c.nome.toLowerCase().replace(/\s/g, '-')}`, 
                         minTotal: c.minTotal || 0, minIndividual: c.minIndividual || false,
-                        tipoColuna: c.tipoColuna || 'Tamanho', mensagemObs: c.mensagemObs || '',
-                        ordem: Number.isFinite(Number(c.ordem)) ? Number(c.ordem) : null
+                        tipoColuna: c.tipoColuna || 'Tamanho', mensagemObs: c.mensagemObs || ''
                     };
                 }
             });
@@ -281,16 +220,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         navHorizontal.innerHTML = ''; mainContent.innerHTML = ''; 
         let primeiraCategoria = true;
 
-        const sortedEntries = Object.entries(itensAgrupados).sort((a, b) => {
-            const ordemA = configCategorias[a[0]]?.ordem;
-            const ordemB = configCategorias[b[0]]?.ordem;
-            const hasA = ordemA !== null && ordemA !== undefined && Number.isFinite(Number(ordemA));
-            const hasB = ordemB !== null && ordemB !== undefined && Number.isFinite(Number(ordemB));
-            if (hasA && hasB && Number(ordemA) !== Number(ordemB)) return Number(ordemA) - Number(ordemB);
-            if (hasA && !hasB) return -1;
-            if (!hasA && hasB) return 1;
-            return a[0].localeCompare(b[0], 'pt-BR', { sensitivity: 'base' });
-        });
+        const sortedEntries = Object.entries(itensAgrupados).sort((a, b) => a[0].localeCompare(b[0]));
 
         function gerarEstruturaTabela(idTabela, nomeCat, tipoColuna) {
             let thSecundaria = '';
@@ -318,7 +248,7 @@ document.addEventListener("DOMContentLoaded", async function () {
             const config = configCategorias[nomeCategoria];
             navHorizontal.innerHTML += `<a href="#${config.idGrupo}" class="categoria-btn ${primeiraCategoria ? 'active-link' : ''}" data-target="${config.idGrupo}">${nomeCategoria}</a>`;
 
-            const infoBoxHTML = (config.mensagemObs && config.mensagemObs.trim() !== '') ? `<div class="info-box"><div class="info-box-content">${window.renderStoredRichText(config.mensagemObs)}</div></div>` : '';
+            const infoBoxHTML = (config.mensagemObs && config.mensagemObs.trim() !== '') ? `<div class="info-box"><p>${window.formatText(config.mensagemObs)}</p></div>` : '';
             
             let htmlGrupo = `
                 <div class="categoria-group ${primeiraCategoria ? 'active-group' : ''}" id="${config.idGrupo}">
