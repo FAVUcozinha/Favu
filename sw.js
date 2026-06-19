@@ -1,4 +1,4 @@
-const CACHE_NAME = 'favu-clientes-v15-horario-espaco';
+const CACHE_NAME = 'favu-clientes-v20-data-icon-gap';
 const urlsToCache = [
   './',
   './index.html',

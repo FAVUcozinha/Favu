@@ -201,7 +201,7 @@ input:focus, textarea:focus, select:focus, #cupom-input:focus {
 
 .popup, .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(29, 40, 20, 0.6); z-index: 6000; justify-content: center; align-items: center; backdrop-filter: blur(4px); opacity: 0; transition: 0.3s; }
 .popup.show, .modal.show { display: flex; opacity: 1; }
-.popup-conteudo, .modal-content { background-color: var(--card-bg); padding: 30px 25px 25px 25px; border-radius: 20px; width: 90%; max-width: 440px; text-align: center; position: relative; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.2); font-family: 'Basic Choice', cursive; transform: translateY(20px); transition: 0.3s; }
+.popup-conteudo, .modal-content { background-color: var(--card-bg); padding: 30px 25px 25px 25px; border-radius: 20px; width: min(92vw, 440px); max-width: 440px; text-align: center; position: relative; max-height: 90vh; overflow-y: auto; overflow-x: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2); font-family: 'Basic Choice', cursive; transform: translateY(20px); transition: 0.3s; }
 .popup.show .popup-conteudo, .modal.show .modal-content { transform: translateY(0); }/* ==========================================
 
 UX: SCROLLBAR (BARRA FININHA E ELEGANTE)
@@ -247,10 +247,10 @@ UX: SCROLLBAR (BARRA FININHA E ELEGANTE)
 .resumo-footer-area { border-top: 1px solid rgba(224, 159, 65, 0.2); padding-top: 15px; margin-top: 15px;}
 .resumo-total { text-align: right; font-family: 'Basic Choice', cursive !important; font-size: 1.4rem; font-weight: normal; color: var(--text-dark); margin-bottom: 15px; text-transform: uppercase; }
 
-#form-pedido { text-align: left; display: flex; flex-direction: column; gap: 12px; margin-bottom: 15px; width: 100%;}
-.input-group { display: flex; flex-direction: column; gap: 5px; width: 100%; max-width: 100%; overflow: hidden; }
+#form-pedido { text-align: left; display: flex; flex-direction: column; gap: 12px; margin-bottom: 15px; width: 100%; min-width: 0; }
+.input-group { display: flex; flex-direction: column; gap: 5px; width: 100%; max-width: 100%; min-width: 0; overflow: visible; }
 #form-pedido label { font-weight: normal; font-size: 0.9rem; color: var(--text-dark); font-family: 'Basic Choice', cursive; text-transform: uppercase; }
-#form-pedido input, #form-pedido select, #form-pedido textarea { width: 100%; max-width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(29, 40, 20, 0.2); font-family: 'Basic Choice', cursive; font-size: 1rem; outline: none; background: #fff; color: var(--text-dark); }
+#form-pedido input, #form-pedido select, #form-pedido textarea { display: block; width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(29, 40, 20, 0.2); font-family: 'Basic Choice', cursive; font-size: 1rem; outline: none; background: #fff; color: var(--text-dark); }
 #form-pedido input::placeholder, #form-pedido textarea::placeholder { font-family: 'Basic Choice', cursive; color: #aaa; }
 #form-pedido input:focus, #form-pedido select:focus, #form-pedido textarea:focus { border-color: var(--accent-orange); }
 
@@ -346,3 +346,44 @@ input[type="number"],
 }
 
 .peso-mobile { display: block; white-space: nowrap; font-size: 0.75rem; margin-top: 2px; color: var(--text-light); }
+
+#form-pedido input[type="date"],
+#form-pedido input[type="time"],
+#form-pedido select {
+    padding-right: 38px;
+    background-clip: padding-box;
+}
+
+#form-pedido textarea {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important;
+}
+
+@supports (-webkit-touch-callout: none) {
+    #form-pedido input[type="date"],
+    #form-pedido input[type="time"],
+    #form-pedido select,
+    #form-pedido textarea,
+    #form-pedido input[type="text"],
+    #form-pedido input[type="tel"] {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+    }
+}
+
+
+/* Ajuste fino: mantém o calendário no canto direito e padroniza o respiro do campo de horário */
+#form-pedido input[type="date"] {
+    padding-right: 12px !important;
+}
+
+#form-pedido input[type="date"]::-webkit-calendar-picker-indicator {
+    margin-right: 0 !important;
+    padding: 0 !important;
+}
+
+#horario-entrega-container {
+    margin-top: -6px !important;
+}
