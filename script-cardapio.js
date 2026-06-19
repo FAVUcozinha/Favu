@@ -26,12 +26,23 @@ window.regrasAgenda = {}; // Agenda Global
 window.formatText = function(text) {
     if (!text) return '';
 
+    // O admin salva texto rico em HTML. Em alguns casos antigos, esse HTML
+    // pode ter sido salvo escapado como &lt;div&gt;. Quando isso acontecer,
+    // decodificamos uma vez para que o cliente renderize a formatação.
+    let rawText = String(text);
+    if (/&lt;\/?(b|strong|i|em|u|br|div|p|span)(\s|&gt;|>)/i.test(rawText)) {
+        const decoder = document.createElement('textarea');
+        decoder.innerHTML = rawText;
+        rawText = decoder.value;
+    }
+
     const container = document.createElement('div');
-    container.innerHTML = String(text).replace(/\n/g, '<br>');
+    container.innerHTML = rawText.replace(/\n/g, '<br>');
 
     const allowedTags = ['B', 'STRONG', 'I', 'EM', 'U', 'BR', 'DIV', 'P', 'SPAN'];
     const dangerousTags = ['SCRIPT', 'STYLE', 'IFRAME', 'OBJECT', 'EMBED', 'SVG', 'MATH', 'LINK', 'META'];
     const allowedAlignments = ['left', 'right', 'center', 'justify'];
+    const inlineTags = ['B', 'STRONG', 'I', 'EM', 'U', 'SPAN'];
     const walk = document.createTreeWalker(container, NodeFilter.SHOW_ELEMENT, null);
     const nodes = [];
 
@@ -60,6 +71,12 @@ window.formatText = function(text) {
 
         if (allowedAlignments.includes(textAlign)) {
             node.style.textAlign = textAlign;
+
+            // Se o navegador/admin gravar alinhamento em span/strong/em/u,
+            // transformamos em bloco para que o alinhamento realmente apareça.
+            if (inlineTags.includes(node.tagName)) {
+                node.style.display = 'block';
+            }
         }
     });
 
@@ -193,27 +210,62 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
     await carregarAgenda();
 
+    function renderAvisoPopupContent(aviso) {
+        const texto = window.formatText(aviso?.texto || '');
+        const posicaoImagem = (aviso?.posicaoImagem || 'top').toLowerCase() === 'bottom' ? 'bottom' : 'top';
+        const imagemHtml = aviso?.imagemUrl
+            ? `<div class="aviso-popup-image aviso-popup-image-${posicaoImagem}"><img src="${aviso.imagemUrl}" alt="Imagem do comunicado"></div>`
+            : '';
+
+        return `
+            <div class="aviso-popup-body aviso-popup-img-${posicaoImagem}">
+                ${posicaoImagem === 'top' ? imagemHtml : ''}
+                <div class="aviso-popup-text">${texto}</div>
+                ${posicaoImagem === 'bottom' ? imagemHtml : ''}
+            </div>
+        `;
+    }
+
     async function carregarAvisos() {
         try {
             const avisosSnap = await getDocs(collection(db, "avisos"));
-            const agora = Date.now(); 
-            
-            avisosSnap.forEach(doc => {
-                const a = doc.data();
-                if (a.ativo && agora >= a.inicio && agora <= a.fim) {
-                    const popup = document.getElementById('popup-aviso');
-                    if(popup) {
-                        document.getElementById('aviso-titulo').textContent = a.titulo;
-                        document.getElementById('aviso-texto').innerHTML = window.formatText(a.texto);
-                        if(a.imagemUrl) {
-                             document.getElementById('aviso-texto').innerHTML += `<img src="${a.imagemUrl}" style="max-width:100%; margin-top:15px; border-radius:10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">`;
-                        }
-                        popup.style.display = 'flex';
-                        setTimeout(() => popup.classList.add('show'), 50);
-                    }
+            const agora = Date.now();
+            const avisosAtivos = [];
+
+            avisosSnap.forEach(docItem => {
+                const a = docItem.data();
+                const inicio = Number(a?.inicio) || 0;
+                const fim = Number(a?.fim) || 0;
+                const ativo = a?.ativo !== false;
+                const dentroDoPeriodo = (!inicio || agora >= inicio) && (!fim || agora <= fim);
+
+                if (ativo && dentroDoPeriodo) {
+                    avisosAtivos.push(a);
                 }
             });
-        } catch (e) {}
+
+            if (!avisosAtivos.length) return;
+
+            avisosAtivos.sort((a, b) => {
+                const ordemA = Number.isFinite(Number(a?.ordem)) ? Number(a.ordem) : Number(a?.inicio) || 0;
+                const ordemB = Number.isFinite(Number(b?.ordem)) ? Number(b.ordem) : Number(b?.inicio) || 0;
+                return ordemA - ordemB;
+            });
+
+            const aviso = avisosAtivos[0];
+            const popup = document.getElementById('popup-aviso');
+            const tituloEl = document.getElementById('aviso-titulo');
+            const textoEl = document.getElementById('aviso-texto');
+
+            if (popup && tituloEl && textoEl) {
+                tituloEl.textContent = aviso?.titulo || '';
+                textoEl.innerHTML = renderAvisoPopupContent(aviso);
+                popup.style.display = 'flex';
+                setTimeout(() => popup.classList.add('show'), 50);
+            }
+        } catch (e) {
+            console.error('Erro ao carregar avisos:', e);
+        }
     }
     carregarAvisos();
 
