@@ -3,186 +3,2815 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/png" href="images/favu.png">
+    <title>Admin FAVU | Comando</title>
+    
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#1D2814">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="images/favu.png">
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="style-cardapio.css">
+    <style>
+        html { font-size: 90%; } 
+        :root {
+            --favu-beige: #F4E6CB; --favu-card: #FFF5EB; --favu-green: #1D2814; 
+            --favu-rust: #E09F41; --favu-moss: #46493A; --font-numbers: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            --shadow-soft: 0 4px 15px rgba(0,0,0,0.05); --radius-lg: 20px;
+        }
+        @font-face { font-family: 'Basic Choice'; src: url('fonts/Basic Choice 2.ttf') format('truetype'); font-display: swap; }
+        @font-face { font-family: 'Cocogoose'; src: url('fonts/Cocogoose-Pro-Darkmode-trial.ttf') format('truetype'); font-display: swap; }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background-color: var(--favu-beige); color: var(--favu-green); font-family: 'Cocogoose', sans-serif; padding: 0; margin: 0; overflow-y: auto;}
+        .admin-wrapper { max-width: 1500px; margin: 0 auto; padding: 20px 15px; }
+        .font-display { font-family: 'Basic Choice', cursive !important; font-weight: normal; }
+        
+        input, select, textarea { font-family: var(--font-numbers); width: 100%; padding: 12px; border-radius: 8px; border: 1px solid rgba(224, 159, 65, 0.3); outline: none; background: white; font-size: 0.95rem; transition: 0.2s;}
+        input:focus, textarea:focus, select:focus { border-color: var(--favu-rust); }
+        input:disabled { background-color: #f0f0f0; color: #999; cursor: not-allowed; border-color: #ddd;}
+        input[type="color"] { padding: 5px; cursor: pointer; height: 50px; }
+        label { font-family: 'Basic Choice', cursive; font-size: 1.1rem; margin-bottom: 5px; display: block; color: var(--favu-moss); }
+        textarea { resize: vertical; } 
+
+        .btn { font-family: 'Basic Choice', cursive; padding: 12px 20px; border: none; border-radius: 10px; cursor: pointer; transition: 0.3s; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 1.1rem; }
+        .btn-primary { background: var(--favu-rust); color: white; }
+        .btn-secondary { background: var(--favu-green); color: white; }
+        .btn-danger { background: #E60000; color: white; }
+        .btn-outline { background: transparent; border: 2px solid var(--favu-rust); color: var(--favu-rust); }
+        .btn:hover { filter: brightness(1.1); transform: translateY(-2px); }
+
+        .btn-action { width: 36px; height: 36px; border-radius: 8px; border: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 1rem; transition: 0.2s; color: white; }
+        .btn-action.edit { background: var(--favu-moss); }
+        .btn-action.toggle { background: transparent; border: 2px solid var(--favu-moss); color: var(--favu-moss); }
+        .btn-action.del { background: #E60000; }
+        .btn-action:hover { filter: brightness(1.2); transform: scale(1.05); }
+
+        .bulk-checkbox { width: 18px; height: 18px; cursor: pointer; accent-color: var(--favu-rust); }
+        .bulk-actions-bar { display: none; background: rgba(224, 159, 65, 0.1); padding: 12px 20px; border-radius: 12px; margin-bottom: 15px; align-items: center; justify-content: space-between; border: 1px dashed var(--favu-rust); flex-wrap: wrap; gap: 10px; animation: fadeIn 0.3s; }
+        .bulk-actions-bar.active { display: flex; }
+        .bulk-actions-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+
+        input[type="file"] { display: none; }
+        .custom-file-upload { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 15px; border-radius: 8px; background: rgba(224, 159, 65, 0.1); border: 1px dashed var(--favu-rust); color: var(--favu-rust); font-family: 'Basic Choice', cursive; cursor: pointer; transition: 0.2s; width: 100%; font-size: 1rem; text-align: center; }
+        .custom-file-upload:hover { background: rgba(224, 159, 65, 0.2); }
+        .file-name-display { font-family: var(--font-numbers); font-size: 0.8rem; color: #666; margin-top: 5px; display: block; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .bulk-file-upload { display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(224, 159, 65, 0.05); border: 1px dashed var(--favu-rust); color: var(--favu-rust); border-radius: 8px; height: 100%; min-height: 55px; cursor: pointer; transition: 0.2s; padding: 5px; text-align: center;}
+        .bulk-file-upload:hover { background: rgba(224, 159, 65, 0.15); }
+        .bulk-file-upload.has-file { background: rgba(40,167,69,0.1); border-color: #28a745; color: #28a745; }
+
+        header { background-image: url('images/topo.png'); background-repeat: repeat-x; background-position: center top; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.1); padding: 10px 15px; display: flex; align-items: center; justify-content: space-between; background-color: var(--favu-beige); }
+        .menu-btn { background-color: white; width: 45px; height: 40px; border-radius: 10px; border: none; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: #1D2814; cursor: pointer; box-shadow: var(--shadow-soft); transition: 0.2s; }
+        .header-logo { max-width: 100px; filter: drop-shadow(0 2px 5px rgba(224, 159, 65, 0.3)); margin: 0 auto; display: block; }
+        #menu-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1999; backdrop-filter: blur(2px); animation: fadeIn 0.3s; }
+        
+        .side-menu { position: fixed; top: 0; left: -100%; width: 280px; height: 100vh; background-color: var(--favu-beige); z-index: 2000; transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 4px 0 20px rgba(0,0,0,0.3); padding: 30px 20px; display: flex; flex-direction: column; overflow-y: auto; }
+        .side-menu.active { left: 0; }
+        .close-menu-btn { position: absolute; top: 15px; right: 20px; background: none; border: none; font-size: 2rem; color: #999; cursor: pointer; }
+        .menu-logo-container { text-align: center; margin-bottom: 30px; }
+        .menu-logo-img { max-width: 120px; }
+        .side-menu-content { display: flex; flex-direction: column; height: 100%; }
+        .nav-links { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; flex-grow: 1;}
+        .menu-link { font-family: 'Basic Choice', cursive; font-size: 1.2rem; color: var(--favu-moss); display: flex; align-items: center; gap: 10px; transition: 0.3s; text-decoration: none; cursor: pointer; background: #ffffff; padding: 12px 20px; border-radius: 12px; border: 1px solid #eee; box-shadow: var(--shadow-soft); }
+        .menu-link.active { background: var(--favu-rust); color: white; border-color: var(--favu-rust); }
+        .menu-link:hover { transform: translateY(-2px); }
+        .menu-bottom { margin-top: auto; padding-top: 20px; border-top: 2px dashed rgba(224, 159, 65, 0.3); }
+
+        .panel-card { background: white; padding: 20px; border-radius: 15px; box-shadow: var(--shadow-soft); margin-bottom: 20px; border: 1px solid #eee; }
+        .tab-pane { display: none; animation: fadeIn 0.4s; background: var(--favu-card); padding: 25px; border-radius: 24px; box-shadow: var(--shadow-soft); margin-top: 15px; }
+        .tab-pane.active { display: block; }
+        
+        .search-area { flex: 1; min-width: 250px; }
+        .search-bar { width: 100%; max-width: 400px; border-radius: 30px; border: 2px solid var(--favu-rust); }
+        .buttons-area { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; width: 100%; margin-bottom: 20px; }
+
+        /* MODAIS E SCROLLBAR */
+        .modal, .modal-direct { 
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(29, 40, 20, 0.7); z-index: 9999; 
+            justify-content: center; align-items: center; 
+            backdrop-filter: blur(4px); padding: 15px; 
+            overflow: hidden; 
+        }
+        .modal.show { display: flex; opacity: 1; }
+        .modal { transition: 0.3s; opacity: 0; }
+        
+        .modal-content { 
+            background: var(--favu-card); width: 100%; max-width: 600px; 
+            border-radius: var(--radius-lg); box-shadow: 0 15px 40px rgba(0,0,0,0.2); 
+            position: relative; display: flex; flex-direction: column; 
+            max-height: 85vh; 
+            overflow: hidden; 
+            transform: translateY(20px); transition: 0.3s;
+        }
+        .modal.show .modal-content { transform: translateY(0); }
+        .modal-direct .modal-content { transform: none; }
+        .modal-content-large { max-width: 1200px; } 
+        .modal-content-small { max-width: 400px; }
+        
+        .modal-header { padding: 25px 25px 15px 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed rgba(224, 159, 65, 0.3); flex-shrink: 0; }
+        .modal-header h3 { font-family: 'Basic Choice', cursive; color: var(--favu-rust); margin: 0; font-size: 1.8rem; }
+        .close-modal { background: none; border: none; font-size: 2rem; color: #999; cursor: pointer; line-height: 1; margin-left: 10px;}
+        .close-modal:hover { color: #E60000; }
+        
+        .modal-body { 
+            padding: 20px 25px 30px 25px; 
+            overflow-y: auto; 
+            overflow-x: hidden;
+            flex-grow: 1; 
+        }
+
+        .popup-conteudo { 
+            background-color: var(--favu-card); padding: 30px 25px 25px 25px; 
+            border-radius: 20px; width: 90%; max-width: 440px; text-align: center; 
+            position: relative; margin: auto; 
+            max-height: 85vh; 
+            overflow-y: auto; 
+            overflow-x: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2); 
+            font-family: 'Basic Choice', cursive;  
+        }
+
+        .modal-body::-webkit-scrollbar, .popup-conteudo::-webkit-scrollbar { width: 6px; }
+        .modal-body::-webkit-scrollbar-track, .popup-conteudo::-webkit-scrollbar-track { background: transparent; }
+        .modal-body::-webkit-scrollbar-thumb, .popup-conteudo::-webkit-scrollbar-thumb { background: rgba(224, 159, 65, 0.4); border-radius: 10px; }
+
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px; }
+        .form-grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 15px; margin-bottom: 15px; }
+
+        .table-responsive { width: 100%; overflow-x: auto; }
+        .favu-table { width: 100%; border-collapse: collapse; text-align: left; }
+        .favu-table thead th { background: transparent; font-family: 'Basic Choice', cursive; color: var(--favu-rust); font-size: 1.1rem; padding: 12px 10px; border-bottom: 2px solid var(--favu-rust); text-transform: uppercase; white-space: nowrap;}
+        .action-btns-wrapper { display: inline-flex; gap: 5px; justify-content: center; width: 100%; }
+        .favu-table tbody tr { transition: 0.2s ease; border-bottom: 1px solid #ddd; }
+        .favu-table tbody tr:hover { background-color: rgba(224, 159, 65, 0.05); }
+        .favu-table td { padding: 15px 10px; font-family: var(--font-numbers); font-size: 0.9rem; color: var(--text-dark); vertical-align: middle; }
+        .img-preview { width: 50px; height: 50px; border-radius: 10px; object-fit: cover; border: 1px solid #eee; }
+        .group-separator-top { border-top: 2px solid rgba(224, 159, 65, 0.4) !important; }
+        
+        .badge { font-family: var(--font-numbers); font-size: 0.8rem; padding: 4px 10px; border-radius: 20px; font-weight: bold; color: white; display: inline-block; white-space: nowrap;}
+        .badge.ativo { background: #28a745; } 
+        .badge.inativo { background: #E60000; }
+        .badge.agendado { background: #E09F41; }
+        .badge.concluso { background: #666; }
+
+        .grid-header { display: grid; grid-template-columns: 60px 1.2fr 1.5fr 60px 1.5fr 1.5fr 2.5fr 30px; gap: 8px; padding: 10px; background: rgba(224, 159, 65, 0.1); border-radius: 8px; font-family: 'Cocogoose', sans-serif; font-size: 0.65rem; color: var(--favu-rust); margin-bottom: 10px; width: 100%; text-transform: uppercase; align-items: center;}
+        .grid-row { display: grid; grid-template-columns: 60px 1.2fr 1.5fr 60px 1.5fr 1.5fr 2.5fr 30px; gap: 8px; margin-bottom: 8px; width: 100%; align-items: start; background: white; padding-bottom: 10px; border-bottom: 1px solid #eee;}
+        .grid-row input, .grid-row select, .grid-row textarea { padding: 10px 5px; font-size: 0.85rem; border-radius: 6px; border: 1px solid #ccc; width: 100%; font-family: var(--font-numbers); }
+
+        .prod-tabs { display: flex; gap: 8px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 10px; scrollbar-width: none; }
+        .prod-tabs::-webkit-scrollbar { display: none; }
+        .prod-tab-btn { background: white; border: 1px solid #ddd; font-family: var(--font-numbers); font-weight: bold; font-size: 0.9rem; color: var(--favu-moss); padding: 10px 20px; border-radius: 30px; cursor: pointer; transition: 0.2s; white-space: nowrap; box-shadow: var(--shadow-soft); }
+        .prod-tab-btn.active { background: var(--favu-green); color: white; border-color: var(--favu-green); }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        @media (max-width: 1024px) {
+            .hide-on-mobile { display: none !important; }
+            .favu-table thead { display: none; }
+            .favu-table, .favu-table tbody, .favu-table tr, .favu-table td { display: block; width: 100%; }
+            .favu-table tr { background: white; margin-bottom: 20px; border-radius: 16px; padding: 15px; box-shadow: var(--shadow-soft); border: 1px solid #eee; }
+            .favu-table td { display: flex; justify-content: space-between; align-items: center; text-align: right; border: none; border-bottom: 1px dashed #eee; padding: 10px 0; font-family: var(--font-numbers) !important; }
+            .favu-table td:last-child { border-bottom: none; text-align: left; } 
+            .action-btns-wrapper { justify-content: flex-end; width: auto; }
+            .favu-table td::before { content: attr(data-label); font-family: 'Basic Choice', cursive; color: var(--favu-rust); font-size: 1.1rem; text-align: left; margin-right: 15px; flex-shrink: 0; }
+            .buttons-area { justify-content: flex-start; }
+            .buttons-area .btn { width: 100%; }
+        }
+
+        /* ORÇAMENTO */
+        .categorias-draggable { display: flex; overflow-x: auto; padding: 12px 15px; gap: 10px; scrollbar-width: none; cursor: grab; user-select: none; width: max-content; margin: 0 auto; max-width: 100%; }
+        .categorias-draggable::-webkit-scrollbar { display: none; }
+        .categoria-btn-orc { display: inline-flex; align-items: center; justify-content: center; padding: 6px 18px; background-color: white; color: var(--text-dark); border-radius: 30px; font-size: 1rem; font-family: 'Basic Choice', cursive; white-space: nowrap; transition: 0.3s ease; border: 1px solid rgba(224, 159, 65, 0.3); box-shadow: 0 4px 10px rgba(0,0,0,0.05); text-transform: uppercase; cursor: pointer; }
+        .categoria-btn-orc.active-link { background-color: var(--favu-rust) !important; color: white !important; border-color: var(--favu-rust) !important; box-shadow: 0 4px 15px rgba(224, 159, 65, 0.3) !important; }
+        .categoria-group-orc { display: none; animation: fadeIn 0.4s ease; margin-bottom: 40px; width: 100%; }
+        .categoria-group-orc.active-group { display: block; }
+        .categoria-title-orc { font-family: 'Basic Choice', cursive; font-size: 2.6rem; color: var(--favu-rust); text-align: center; margin: 5px 0 25px 0; font-weight: normal; }
+        .table-card-orc { background: var(--favu-card); border-radius: 16px; padding: 15px 10px; box-shadow: var(--shadow-soft); border: 1px solid rgba(255,255,255,0.5); width: 100%; overflow: hidden; margin: 0 auto; }
+        .orc-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        .orc-table thead th { font-family: 'Basic Choice', cursive; color: #1D2814; font-size: 1rem; padding-bottom: 12px; text-align: center; border-bottom: 2px solid rgba(29, 40, 20, 0.2); text-transform: uppercase; font-weight: normal;}
+        .orc-table th.col-item, .orc-table td.col-item { text-align: left; padding-left: 5px; width: 35%; word-wrap: break-word; }
+        .orc-table th.col-icon, .orc-table td.col-icon { width: 6%; text-align: center; }
+        .orc-table th.col-sec, .orc-table td.col-sec, .orc-table th.col-unid, .orc-table td.col-unid, .orc-table th.col-qtd, .orc-table td.col-qtd { width: 19.6%; text-align: center; }
+        .orc-table tbody tr { border-bottom: 1px dashed rgba(224, 159, 65, 0.2); transition: 0.2s ease; }
+        .orc-table td { padding: 12px 5px; color: var(--text-dark); font-size: 0.95rem; font-family: 'Basic Choice', cursive; }
+        .orc-table td.col-item { font-size: 1.1rem; text-transform: uppercase; }
+        .descricao-orc { font-size: 0.8rem; color: var(--favu-moss); margin-top: 5px; font-family: 'Basic Choice', cursive; text-align: left; }
+        .quantidade-container { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .quantidade-input-group { display: flex; align-items: center; justify-content: center; gap: 5px; }
+        .qtd-btn-table { width: 25px; height: 30px; border: none; background: none; color: var(--favu-rust); font-size: 1.3rem; font-weight: bold; cursor: pointer; padding: 0; }
+        .orc-table input[type="number"] { width: 40px; height: 30px; text-align: center; border: 1px solid #ddd; border-radius: 6px; font-family: 'Basic Choice', cursive !important; font-size: 1.1rem; outline: none; padding: 0; }
+        .th-mobile { display: inline; } .th-desktop { display: none; }
+
+        @media (max-width: 1024px) {
+            .orc-table th.col-item, .orc-table td.col-item { width: 35%; font-size: 0.85rem;}
+            .orc-table th.col-sec, .orc-table td.col-sec { width: 15%; font-size: 0.7rem; }
+            .orc-table th.col-unid, .orc-table td.col-unid { width: 17%; font-size: 0.75rem; }
+            .orc-table th.col-qtd, .orc-table td.col-qtd { width: 25%;}
+            .orc-table input[type="number"] { width: 30px; height: 26px; font-size: 0.95rem;}
+        }
+        @media (min-width: 1024px) {
+            .th-mobile { display: none; } .th-desktop { display: inline; }
+            .table-card-orc { padding: 25px 35px; max-width: 850px; }
+            .orc-table td.col-item { font-size: 1.05rem; } 
+        }
+
+        #fixed-summary-orc { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 540px; background-color: var(--favu-green); color: #fff; padding: 12px 30px; border-radius: 50px; box-shadow: 0 5px 20px rgba(0,0,0,0.2); z-index: 1000; display: none; cursor: pointer; border: none; font-family: 'Basic Choice', cursive;}
+        .summary-content-orc { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+        #summary-text-orc { flex: 1; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; }
+        #summary-total-orc { font-size: 1.5rem; font-family: 'Basic Choice', cursive !important; }
+        #summary-item-count-orc { font-size: 0.85rem; font-family: 'Basic Choice', cursive !important; }
+        .foto-hint { color: var(--favu-rust); opacity: 0.65; font-size: 0.95rem; }
+
+        .fechar { position: absolute; top: 15px; right: 20px; font-size: 1.4rem; color: #999; cursor: pointer; line-height: 1; font-family: sans-serif; z-index: 100; }
+        .resumo-grupo-titulo { font-size: 1.1rem; text-align: left; margin-top: 20px; margin-bottom: 8px; }
+        .resumo-item-line { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px dashed rgba(29, 40, 20, 0.2); text-align: left; }
+        .resumo-item-name { flex: 1; font-size: 1rem; }
+        .resumo-item-name small { display: block; font-family: 'Basic Choice', cursive !important; font-size: 0.9rem; color: #666; margin-top: 2px; }
+        .resumo-item-input-group input[type="number"] { width: 40px; height: 30px; border: 1px solid rgba(29, 40, 20, 0.2); border-radius: 6px; text-align: center; font-family: 'Basic Choice', cursive !important; font-size: 1.1rem; outline: none; padding: 0;}
+        .btn-excluir { background: none; border: none; color: #E60000; font-size: 1rem; cursor: pointer; margin-left: 6px; }
+        .resumo-footer-area { border-top: 1px solid rgba(224, 159, 65, 0.2); padding-top: 15px; margin-top: 15px;}
+        .resumo-total { text-align: right; font-family: 'Basic Choice', cursive !important; font-size: 1.4rem; font-weight: bold; margin-bottom: 15px; }
+        #form-pedido-orc input, #form-pedido-orc select, #form-pedido-orc textarea { font-family: var(--font-numbers) !important; font-size: 1rem; }
+        .popup-footer-actions-top { display: flex; gap: 8px; width: 100%; margin-bottom: 8px;}
+        .btn-secondary-form { background-color: var(--favu-moss); color: #fff; border: none; padding: 10px; border-radius: 10px; font-family: 'Basic Choice', cursive; font-size: 0.85rem; cursor: pointer; flex: 1; transition: 0.2s;}
+        .btn-primary-large { background-color: var(--favu-rust); color: #fff; font-size: 1.1rem; padding: 12px; border-radius: 10px; width: 100%; font-family: 'Basic Choice', cursive; border: none; cursor: pointer; transition: 0.2s;}
+
+        /* KANBAN PEDIDOS */
+        .filter-bar { background-color: var(--favu-card); padding: 15px 20px; display: flex; gap: 20px; align-items: flex-end; flex-wrap: wrap; border-radius: 12px; margin-bottom: 20px; border: 1px solid rgba(224, 159, 65, 0.3); }
+        .filter-group-main { display: flex; gap: 20px; flex-wrap: wrap; flex: 1; }
+        .filter-group-additional { display: flex; gap: 20px; flex-wrap: wrap; }
+        .filter-bar .filter-item { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 180px; }
+        .filter-bar input, .filter-bar select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 8px; width: 100%; cursor: pointer; }
+        #kanban-board { display: flex; gap: 15px; height: 100%; padding-bottom: 10px; width: 100%; }
+        .kanban-column { 
+            background-color: var(--favu-card); 
+            flex: 1; /* Permite que todas as colunas dividam o espaço igualmente */
+            min-width: 140px; /* Reduz o limite para caberem 6 colunas sem quebrar */
+            border-radius: 12px; 
+            display: flex; 
+            flex-direction: column; 
+            border: 1px solid rgba(224, 159, 65, 0.2); 
+            max-height: none;
+        }
+        .column-header { padding: 15px; border-bottom: 2px solid var(--favu-rust); font-family: 'Basic Choice', cursive; color: var(--favu-green); display: flex; justify-content: space-between; align-items: center; font-size: 1.1em; cursor: default; }
+        .column-toggle { display: none; font-size: 1.2em; margin-left: 10px; transition: transform 0.3s; }
+        .kanban-column.collapsed .column-toggle { transform: rotate(-90deg); }
+        .column-select-all-checkbox { width: 18px; height: 18px; cursor: pointer; accent-color: var(--favu-rust); }
+        .column-content { padding: 10px; overflow-y: auto; flex: 1; }
+        .pedido-card { background-color: white; border-radius: 10px; padding: 12px; margin-bottom: 12px; border-left: 5px solid #ccc; cursor: grab; transition: transform 0.2s; display: flex; flex-direction: column; gap: 5px; }
+        .pedido-card.selected { border: 2px solid var(--favu-rust); }
+        .observacao-tag { display: inline-block; background-color: #fff9c4; color: #f57f17; font-size: 0.65em; text-transform: uppercase; padding: 3px 6px; border-radius: 4px; margin-top: 2px; }
+        .status-Pedidos-Orçados { border-left-color: #E09F41; } .status-Pedido-Recebido { border-left-color: #3498db; } .status-Pedido-Confirmado { border-left-color: #f39c12; } .status-Aguardando-Retirada { border-left-color: #9b59b6; } .status-Entregue { border-left-color: #28a745; } .status-Cancelado { border-left-color: #e74c3c; opacity: 0.6; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; }
+        .card-checkbox { cursor: pointer; width: 18px; height: 18px; margin-top: 2px; accent-color: var(--favu-rust); }
+        .card-id { font-size: 0.75em; color: #888; font-family: var(--font-numbers); font-weight: bold; }
+        .card-title { font-weight: bold; font-family: 'Basic Choice', cursive; font-size: 1.1em; color: var(--favu-green); margin-bottom: 5px; }
+        .card-info-box { font-size: 0.9em; font-family: var(--font-numbers); color: #555; display: flex; flex-direction: column; gap: 5px; }
+        .card-numero-btn { background: none; border: none; padding: 0; margin: 0; cursor: pointer; color: inherit; font-family: inherit; text-decoration: underline; text-decoration-style: dotted; }
+        .card-cupom { font-size: 0.85em; font-family: var(--font-numbers); color: var(--favu-rust); margin-top: 5px; margin-bottom: 3px; }
+        .card-price { font-weight: bold; font-family: var(--font-numbers); color: var(--favu-green); font-size: 0.9em; margin-top: 5px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .payment-type-tag { display: inline-block; padding: 3px 8px; border-radius: 8px; font-size: 0.7em; font-weight: bold; font-family: var(--font-numbers); }
+        .payment-type-tag.pix { background-color: #32CD32; color: white; } .payment-type-tag.dinheiro { background-color: #f1c40f; color: #333; } .payment-type-tag.cartao { background-color: #4169E1; color: white; }
+        .card-status-pagamento select { width: 100%; padding: 6px 10px; border-radius: 6px; border: none; font-size: 0.85em; font-weight: bold; font-family: var(--font-numbers); cursor: pointer; text-align: center; color: white; }
+        .card-status-pagamento select.pg-pendente { background-color: #ffb3b3; color: #8b0000; } .card-status-pagamento select.pg-pago { background-color: #a8e6a8; color: #006400; } .card-status-pagamento select.pg-parcial { background-color: #ffeb9c; color: #8b6914; }
+
+        @media (min-width: 1024px) {
+    /* Faz a aba de pedidos esticar verticalmente de forma natural */
+    #t-pedidos.active { 
+        display: flex; 
+        flex-direction: column; 
+        height: auto;
+        min-height: calc(100vh - 120px); 
+    }
+
+    /* O container intermediário também deve aceitar o crescimento vertical */
+    #main-content-pedidos { 
+        display: flex;
+        flex: 1;
+        height: auto;
+        align-items: stretch; 
+    }
+
+    /* O Tabuleiro Kanban - Força o alinhamento vertical uniforme sem afetar as larguras */
+    #kanban-board { 
+        display: flex; 
+        gap: 12px;
+        width: 100%; /* Substitua 100vw por 100% para respeitar as margens da página */
+        max-width: 100%; 
+        height: auto;
+        align-items: stretch; 
+        overflow-x: auto; 
+        padding-bottom: 20px;
+        box-sizing: border-box; 
+    }
+
+    /* A área interna onde os cards são soltos expande até o final da nova altura da coluna */
+    .column-content { 
+        flex: 1; /* Preenche todo o fundo da coluna, mesmo se não houver pedidos */
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 12px;
+        height: auto;
+        overflow-y: visible; /* Tira a barra de rolagem individual interna para o fundo crescer limpo */
+        min-height: 200px; /* Margem de segurança visual para colunas zeradas */
+    }
+}
+        @media (max-width: 768px) {
+            #kanban-board { flex-direction: column; overflow-y: auto; overflow-x: hidden; max-height: none;}
+            .kanban-column { width: 100%; min-width: 100%; margin-bottom: 10px; max-height: none; }
+            #filter-toggle-btn { display: block !important; padding: 10px; background: var(--favu-card); border-radius: 8px; text-align: center; cursor: pointer; border: 1px solid var(--favu-rust); margin-bottom: 10px;}
+            .filter-bar { flex-direction: column; align-items: stretch; display: none; }
+            .filter-bar.show { display: flex; }
+            .kanban-column:not(.expanded) .column-content { display: none !important; }
+            .column-header { cursor: pointer; }
+            .column-toggle { display: inline-block; }
+        }
+
+        #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); z-index: 10000; display: none; justify-content: center; align-items: center; flex-direction: column; }
+        .spinner { border: 5px solid #f3f3f3; border-top: 5px solid var(--favu-rust); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        #toast { position: fixed; top: 20px; right: 20px; background-color: #28a745; color: white; padding: 15px 25px; border-radius: 8px; z-index: 10000; display: none; font-family: var(--font-numbers); font-weight: bold;}
+
+        /* Calendário Modal */
+        .date-picker-content { background-color: var(--favu-card); border-radius: 20px; padding: 25px; max-width: 380px; width: 90%; margin: auto;}
+        .date-picker-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; font-weight: bold; font-size: 1.1em; font-family: 'Basic Choice', cursive; color: var(--favu-green);}
+        .date-picker-nav { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--favu-rust); padding: 5px 10px; font-weight: bold; }
+        .date-picker-calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 20px; font-family: var(--font-numbers); }
+        .date-picker-weekday { text-align: center; padding: 8px; font-size: 0.85em; color: var(--favu-rust); font-weight: bold; }
+        .date-picker-day { text-align: center; padding: 12px 8px; border-radius: 8px; cursor: pointer; background-color: #fff; min-height: 40px; }
+        .date-picker-day.selected { background-color: #ddd; border: 2px solid var(--favu-rust); }
+        .date-picker-day.in-range { background-color: #ddd; }
+        .date-picker-day.range-start, .date-picker-day.range-end { background-color: #ccc; border: 2px solid var(--favu-rust); }
+        .date-picker-day.today { border: 2px solid var(--favu-rust); }
+        .date-picker-buttons-row { display: flex; gap: 10px; margin-bottom: 10px; }
+        .date-picker-btn { flex: 1; padding: 10px; border: none; border-radius: 12px; cursor: pointer; font-family: 'Basic Choice', cursive; color: white;}
+    
+    /* Efeito de clique nos botões (Sensação tátil) */
+    .btn:active, .btn-action:active, .categoria-btn-orc:active { 
+        transform: scale(0.95) !important; 
+        transition: 0.1s; 
+    }
+
+    /* Foco elegante nos campos de digitação */
+    input:focus, textarea:focus, select:focus { 
+        border-color: var(--favu-rust); 
+        box-shadow: 0 0 0 4px rgba(224, 159, 65, 0.15) !important;
+        transition: all 0.2s ease-in-out;
+    }
+
+    /* Barra de rolagem global estilo App */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: var(--favu-beige); }
+    ::-webkit-scrollbar-thumb { background: rgba(224, 159, 65, 0.4); border-radius: 10px; border: 2px solid var(--favu-beige); }
+    ::-webkit-scrollbar-thumb:hover { background: var(--favu-rust); }
+
+    /* =========================================================================
+   UX: CABEÇALHO DE PEDIDOS MODERNO
+   ========================================================================= */
+.header-pedidos-moderno {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    gap: 15px;
+}
+
+.header-pedidos-moderno h2 {
+    margin: 0;
+    font-size: 2.2rem;
+    color: var(--favu-green);
+}
+
+.card-faturamento {
+    background: white;
+    padding: 15px 25px;
+    border-radius: 16px;
+    box-shadow: 0 8px 25px rgba(224, 159, 65, 0.15); /* Sombra laranja elegante */
+    border: none; /* Tiramos a borda feia */
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end; /* Alinha os números à direita no desktop */
+}
+
+.card-faturamento .fat-label {
+    font-size: 0.75rem;
+    font-family: var(--font-numbers);
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: bold;
+}
+
+.card-faturamento .fat-valor {
+    font-size: 1.8rem;
+    color: var(--favu-rust);
+    font-family: var(--font-numbers);
+    margin: 2px 0;
+}
+
+.card-faturamento .fat-sub {
+    font-size: 0.85rem;
+    color: var(--favu-moss);
+    font-family: var(--font-numbers);
+}
+
+/* =========================================================================
+   UX: BARRA FLUTUANTE DE AÇÕES (MOBILE)
+   ========================================================================= */
+/* Ajuste para a barra de "Etapa", "Pagamento", etc, não quebrar no celular */
+@media (max-width: 768px) {
+    .header-pedidos-moderno {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .card-faturamento {
+        width: 100%;
+        align-items: center; /* Centraliza no celular */
+        padding: 12px;
+    }
+
+    #bulk-actions-bar-pedidos {
+        flex-direction: column; /* Empilha os botões no celular */
+        gap: 8px;
+        padding: 15px;
+        border-radius: 20px 20px 0 0; /* Arredonda só em cima */
+        bottom: 0; /* Gruda no fundo da tela */
+        width: 100%;
+        box-shadow: 0 -10px 30px rgba(0,0,0,0.1);
+        background: white;
+    }
+
+    #bulk-actions-bar-pedidos .bulk-actions-btns {
+        display: grid;
+        grid-template-columns: 1fr 1fr; /* Coloca os botões em 2 colunas */
+        width: 100%;
+        gap: 8px;
+    }
+    
+    #bulk-actions-bar-pedidos .btn {
+        width: 100%;
+        font-size: 0.9rem;
+        padding: 10px 5px;
+    }
+}
+
+/* =========================================================================
+   UX: BARRA FLUTUANTE DE AÇÕES (FIXA NO RODAPÉ)
+   ========================================================================= */
+@keyframes fadeInCenter {
+    from { opacity: 0; transform: translate(-50%, 20px); }
+    to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+#bulk-actions-bar-pedidos {
+    position: fixed; 
+    bottom: 25px; 
+    left: 50%;
+    transform: translateX(-50%);
+    animation: fadeInCenter 0.3s ease-out !important; /* Impede que a animação desalinhe a barra */
+    z-index: 2000;
+    
+    background: white;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.25);
+    border: 2px solid var(--favu-rust);
+    padding: 15px 30px;
+    border-radius: 20px;
+    
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+}
+
+#bulk-actions-bar-pedidos.active {
+    display: flex !important;
+}
+
+@media (max-width: 768px) {
+    #bulk-actions-bar-pedidos {
+        width: 92%;
+        flex-direction: column;
+        bottom: 15px;
+        padding: 15px;
+        border-radius: 16px;
+        gap: 15px;
+    }
+    
+    #bulk-actions-bar-pedidos .bulk-actions-btns {
+        display: grid;
+        grid-template-columns: 1fr 1fr; /* Coloca os botões em 2 colunas */
+        width: 100%;
+        gap: 10px;
+    }
+    
+    #bulk-actions-bar-pedidos .btn {
+        width: 100%;
+        padding: 12px 5px;
+        font-size: 0.9rem;
+        margin: 0;
+    }
+}
+
+.colunas-fechamento {
+    display: flex;
+    gap: 20px;
+}
+
+/* Quando a tela for menor que 768px (celulares e tablets pequenos), ele empilha */
+@media (max-width: 768px) {
+    .colunas-fechamento {
+        flex-direction: column;
+        gap: 10px;
+    }
+}
+    
+
+.colunas-fechamento {
+    display: flex;
+    gap: 20px;
+}
+
+.valores-resumo-fechamento {
+    margin: 15px 0;
+    padding: 12px;
+    background: #fdfaf5;
+    border-radius: 8px;
+    border: 1px solid #ebd9be;
+}
+
+.valores-resumo-fechamento p {
+    margin: 6px 0;
+    font-size: 1.05rem;
+}
+
+@media (max-width: 768px) {
+    .colunas-fechamento {
+        flex-direction: column;
+        gap: 12px;
+    }
+}
+    
+
+/* === AJUSTES FAVU 2026-06-18: mobile, bulk actions, datas e horários === */
+input, select, textarea { max-width: 100%; min-width: 0; }
+input[type="date"], input[type="time"], .time-slot-select, .time-free-input {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+.form-grid > div, .form-grid-2 > div, .input-group { min-width: 0; }
+.form-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+#bulk-actions-produtos,
+#bulk-actions-categorias,
+#bulk-actions-avisos {
+    position: fixed;
+    bottom: 25px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2000;
+    background: white;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.25);
+    border: 2px solid var(--favu-rust) !important;
+    padding: 15px 30px;
+    border-radius: 20px;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    margin: 0;
+}
+#bulk-actions-produtos.active,
+#bulk-actions-categorias.active,
+#bulk-actions-avisos.active { display: flex !important; }
+#bulk-actions-produtos .bulk-actions-btns,
+#bulk-actions-categorias .bulk-actions-btns,
+#bulk-actions-avisos .bulk-actions-btns { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+#bulk-actions-produtos .btn,
+#bulk-actions-categorias .btn,
+#bulk-actions-avisos .btn { padding: 12px 18px !important; font-size: 0.95rem !important; }
+
+.orc-search-panel { width: 100%; }
+#search-orcamento { width: 100%; max-width: 420px; }
+
+.excecoes-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+.excecoes-tab-btn {
+    flex: 1;
+    border: 1px solid rgba(224, 159, 65, 0.35);
+    background: #fff;
+    color: var(--favu-moss);
+    padding: 10px;
+    border-radius: 12px;
+    font-family: 'Basic Choice', cursive;
+    font-size: 1rem;
+    cursor: pointer;
+}
+.excecoes-tab-btn.active { background: var(--favu-green); color: #fff; border-color: var(--favu-green); }
+.excecao-card {
+    display: flex;
+    align-items: center;
+    background: #fff;
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px solid #ddd;
+    gap: 14px;
+    margin-bottom: 10px;
+    width: 100%;
+}
+.excecao-card-data {
+    background: rgba(0,0,0,0.05);
+    padding: 10px 12px;
+    border-radius: 8px;
+    white-space: nowrap;
+    flex: 0 0 auto;
+    font-family: var(--font-numbers);
+}
+.excecao-card-conteudo { flex: 1; min-width: 0; }
+.excecao-card-conteudo input { min-width: 0; }
+.excecao-card-actions { flex: 0 0 auto; }
+
+@media (max-width: 768px) {
+    .form-grid-2 { grid-template-columns: 1fr; }
+    #bulk-actions-produtos,
+    #bulk-actions-categorias,
+    #bulk-actions-avisos {
+        width: 92%;
+        bottom: 15px;
+        padding: 15px;
+        border-radius: 16px;
+        flex-direction: column;
+        gap: 12px;
+    }
+    #bulk-actions-produtos .bulk-actions-btns,
+    #bulk-actions-categorias .bulk-actions-btns,
+    #bulk-actions-avisos .bulk-actions-btns {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        width: 100%;
+        gap: 10px;
+    }
+    #bulk-actions-produtos .btn,
+    #bulk-actions-categorias .btn,
+    #bulk-actions-avisos .btn {
+        width: 100%;
+        margin: 0;
+        padding: 12px 5px !important;
+    }
+    .excecao-card {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 10px;
+        align-items: center;
+    }
+    .excecao-card-data {
+        grid-column: 1 / 2;
+        width: 100%;
+        text-align: center;
+        white-space: normal;
+        font-size: 1rem;
+    }
+    .excecao-card-conteudo {
+        grid-column: 1 / 2;
+        width: 100%;
+    }
+    .excecao-card-actions {
+        grid-column: 2 / 3;
+        grid-row: 1 / span 2;
+        align-self: center;
+    }
+    .excecoes-tabs { flex-direction: column; }
+}
+
+
+/* === ÚLTIMA CORREÇÃO CATEGORIAS: aviso mobile, drag mobile e títulos desktop === */
+@media (min-width: 1025px) {
+    #tbl-categorias thead th {
+        font-size: 1.2rem !important;
+        line-height: 1.15 !important;
+    }
+}
+
+@media (max-width: 1024px) {
+    #tbl-categorias .cat-notice-cell {
+        justify-content: space-between !important;
+        align-items: center !important;
+    }
+    #tbl-categorias .cat-notice-summary {
+        margin-left: auto !important;
+        margin-right: 0 !important;
+        text-align: right !important;
+        display: inline-flex !important;
+        justify-content: flex-end !important;
+        width: auto !important;
+        max-width: none !important;
+    }
+    #tbl-categorias .cat-name-cell {
+        touch-action: none !important;
+        cursor: grab !important;
+    }
+}
+
+</style>
+
+<style>
+/* === AJUSTES FAVU: agenda desktop/mobile e ordem manual de categorias === */
+.agenda-admin-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+}
+.agenda-form-card, .agenda-datas-card { padding: 25px; }
+.agenda-title {
+    margin: 0 0 18px 0;
+    font-size: 1.8rem;
+    color: var(--favu-green);
+    line-height: 1.1;
+}
+.agenda-dia-lista { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; font-family: var(--font-numbers); }
+.agenda-dia-row { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 10px; align-items: center; }
+.agenda-dia-row label { display: flex; align-items: center; gap: 7px; margin: 0; font-weight: bold; font-family: var(--font-numbers); font-size: 0.95rem; color: var(--favu-moss); }
+.agenda-dia-row input[type="checkbox"], .agenda-check-fechado input { width: 20px; height: 20px; accent-color: var(--favu-rust); flex: 0 0 auto; }
+.agenda-dia-row input[type="text"] { margin: 0; min-width: 0; }
+.agenda-save-btn { width: 100%; }
+.agenda-excecao-form { background: rgba(224, 159, 65, 0.05); padding: 20px; border-radius: 12px; border: 1px solid rgba(224, 159, 65, 0.2); }
+.agenda-check-fechado { display: flex; align-items: center; gap: 10px; cursor: pointer; color: #E60000; font-weight: bold; margin: 0 0 15px 0; font-family: var(--font-numbers); }
+.agenda-datas-card { margin-top: 20px; }
+.agenda-datas-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 15px; flex-wrap: wrap; }
+.agenda-datas-hint { font-family: var(--font-numbers); color: #777; font-size: 0.85rem; margin-top: 6px; }
+.lista-excecoes-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.excecao-card { cursor: pointer; }
+.excecao-card:hover { border-color: var(--favu-rust); box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+.excecao-card-conteudo strong { display: block; font-size: 1rem; line-height: 1.35; word-break: break-word; }
+.excecao-card-resumo { color: #666; font-size: 0.82rem; line-height: 1.35; margin-top: 4px; font-family: var(--font-numbers); }
+.categoria-row[draggable="true"] { cursor: grab; }
+.categoria-row.dragging { opacity: 0.45; }
+.categoria-drag-handle { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; background: rgba(224,159,65,0.12); color: var(--favu-rust); margin-right: 8px; font-family: var(--font-numbers); font-weight: bold; vertical-align: middle; cursor: grab; }
+.categoria-drag-hint { display:block; color:#888; font-size:0.72rem; margin-top:4px; font-family:var(--font-numbers); }
+@media (max-width: 900px) {
+    .agenda-admin-grid { grid-template-columns: 1fr; }
+    .agenda-form-card, .agenda-datas-card { padding: 18px; }
+    .agenda-title { font-size: 1.55rem; }
+}
+@media (max-width: 768px) {
+    #t-horarios { padding: 15px; }
+    .agenda-dia-row { grid-template-columns: 1fr; gap: 6px; }
+    .agenda-dia-row label { width: 100%; }
+    .agenda-excecao-form { padding: 15px; }
+    .agenda-datas-hint { display: none; }
+    .lista-excecoes-grid { gap: 12px; }
+    .excecao-card { grid-template-columns: 1fr auto !important; padding: 14px !important; }
+    .excecao-card-conteudo input { display: none !important; }
+    .excecao-card-conteudo { padding-right: 5px; }
+    .excecao-card::after { content: "Editar"; grid-column: 1 / 2; color: var(--favu-rust); font-size: 0.78rem; font-weight: bold; font-family: var(--font-numbers); margin-top: 2px; }
+    .categoria-drag-hint { display:none; }
+}
+</style>
+
 </head>
 <body>
+
+    <div id="loading-overlay"><div class="spinner"></div><p style="color:var(--favu-green); font-weight:bold; margin-top:10px; font-family: 'Basic Choice', cursive;">Sincronizando...</p></div>
+    <div id="toast">Operação realizada!</div>
+
+    <div id="custom-alert" class="modal" style="z-index: 100000;" onclick="if(event.target === this) { this.classList.remove('show'); setTimeout(()=>this.style.display='none', 300); }">
+        <div class="popup-conteudo" style="max-width: 400px; padding: 30px;">
+            <button class="close-modal" onclick="document.getElementById('custom-alert').classList.remove('show'); setTimeout(()=>document.getElementById('custom-alert').style.display='none', 300)">&times;</button>
+            <h3 id="alert-title" class="font-display" style="color: var(--favu-rust); font-size: 1.8rem; margin:0 0 15px 0;"></h3>
+            <p id="alert-msg" style="margin: 0 0 25px 0; font-family: 'Basic Choice', cursive !important; font-size: 1.1rem; color: var(--favu-moss);"></p>
+            <button class="btn btn-primary" style="width: 100%;" onclick="document.getElementById('custom-alert').classList.remove('show'); setTimeout(()=>document.getElementById('custom-alert').style.display='none', 300)">OK</button>
+        </div>
+    </div>
+
+    <div id="custom-confirm" class="modal" style="z-index: 100000;" onclick="if(event.target === this) { this.classList.remove('show'); setTimeout(()=>this.style.display='none', 300); }">
+        <div class="popup-conteudo" style="max-width: 400px; padding: 30px;">
+            <button class="close-modal" onclick="document.getElementById('custom-confirm').classList.remove('show'); setTimeout(()=>document.getElementById('custom-confirm').style.display='none', 300)">&times;</button>
+            <h3 id="confirm-title" class="font-display" style="color: #E60000; font-size: 1.8rem; margin:0 0 15px 0;">Atenção</h3>
+            <p id="confirm-msg" style="margin: 0 0 25px 0; font-family: 'Basic Choice', cursive !important; font-size: 1.1rem; color: var(--favu-moss);"></p>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-secondary" style="flex:1;" onclick="document.getElementById('custom-confirm').classList.remove('show'); setTimeout(()=>document.getElementById('custom-confirm').style.display='none', 300)">Cancelar</button>
+                <button id="confirm-btn" class="btn btn-primary" style="flex:1;">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="login-screen" style="max-width: 400px; margin: 8vh auto; background: var(--favu-card); padding: 40px 30px; border-radius: 24px; box-shadow: 0 15px 40px rgba(0,0,0,0.1); text-align: center; animation: fadeIn 0.4s ease;">
+        <img src="images/favu.png" alt="FAVU" style="max-width: 140px; margin-bottom: 15px;">
+        <div style="margin-bottom: 15px; text-align: left;">
+            <label style="font-family: 'Cocogoose', sans-serif; font-size: 0.8rem; text-transform: uppercase;">E-mail</label>
+            <input type="email" id="login-user" placeholder="seu@email.com">
+        </div>
+        <div style="margin-bottom: 5px; text-align: left; position: relative;">
+            <label style="font-family: 'Cocogoose', sans-serif; font-size: 0.8rem; text-transform: uppercase;">Senha</label>
+            <div style="position: relative; display: flex; align-items: center;">
+                <input type="password" id="login-pass" placeholder="Senha" style="padding-right: 40px;">
+                <button type="button" onclick="window.togglePasswordVisibility()" style="position: absolute; right: 10px; background: none; border: none; color: var(--favu-rust); cursor: pointer; font-size: 1.1rem; padding: 5px;">
+                    <i id="eye-icon" class="fas fa-eye"></i>
+                </button>
+            </div>
+        </div>
+        <div style="text-align: right; margin-bottom: 20px;">
+            <a href="#" onclick="window.abrirModalRecuperarSenha(); return false;" style="font-family: 'Arial', sans-serif; font-size: 0.85rem; color: var(--favu-moss); text-decoration: underline;">Esqueci minha senha</a>
+        </div>
+        <p id="login-error" style="color: #E60000; font-size: 0.85rem; display: none; margin-bottom: 15px; font-family: 'Cocogoose', sans-serif;">Login ou senha incorretos.</p>
+        <button class="btn btn-primary" style="width: 100%; font-size: 1.3rem; padding: 15px;" onclick="window.fazerLogin()">Entrar</button>
+    </div>
+
+    <div id="modal-recuperar-senha" class="modal" style="z-index: 100000;" onclick="if(event.target === this) window.closeModal('modal-recuperar-senha')">
+        <div class="popup-conteudo" style="max-width: 400px; padding: 35px 30px 30px 30px; text-align: left; position: relative;">
+            <button class="close-modal" style="position: absolute; right: 20px; top: 15px;" onclick="window.closeModal('modal-recuperar-senha')">&times;</button>
+            
+            <h3 style="color: var(--favu-rust); font-family: 'Cocogoose', sans-serif !important; font-size: 1.6rem; margin:0 0 15px 0;">Recuperar Senha</h3>
+            
+            <p style="margin: 0 0 20px 0; font-family: var(--font-numbers); font-size: 1rem; color: var(--favu-moss); line-height: 1.4;">
+                Digite seu e-mail abaixo. Enviaremos um link seguro para você criar uma nova senha.
+            </p>
+            
+            <input type="email" id="recuperar-email" placeholder="Digite seu e-mail..." style="margin-bottom: 15px; width: 100%; box-sizing: border-box;">
+            
+            <p id="recuperar-msg" style="display: none; font-family: var(--font-numbers); font-size: 0.95rem; margin-bottom: 15px; font-weight: bold; text-align: center;"></p>
+            
+            <button class="btn btn-primary" id="btn-enviar-recuperacao" style="width: 100%; justify-content: center;" onclick="window.enviarEmailRecuperacao()">Enviar link de acesso</button>
+        </div>
+    </div>
+
+    <div id="menu-overlay" onclick="toggleMenu(false)"></div>
     <nav id="side-menu" class="side-menu">
-        <button id="close-menu-btn" class="close-menu-btn">&times;</button>
+        <button id="close-menu-btn" class="close-menu-btn" onclick="toggleMenu(false)">&times;</button>
         <div class="side-menu-content">
-            <div class="menu-logo-container">
-                <img src="images/favu.png" alt="Logo FAVU" class="menu-logo-img">
-            </div>
+            <div class="menu-logo-container"><img src="images/favu.png" alt="Logo FAVU" class="menu-logo-img"></div>
+            
             <ul class="nav-links">
-                <li><a href="#" id="menu-quem-somos" class="menu-link">QUEM SOMOS</a></li>
-                <li><a href="index.html" id="menu-inicial-link" class="menu-link">MENU INICIAL</a></li>
+                <li><a class="menu-link" onclick="switchTab('t-cats', this)"><i class="fas fa-tags"></i> Categorias</a></li>
+                <li><a class="menu-link" onclick="switchTab('t-avisos', this)"><i class="fas fa-bullhorn"></i> Comunicados</a></li>
+                <li><a class="menu-link" onclick="switchTab('t-tema', this)"><i class="fas fa-paint-roller"></i> Layout</a></li>
+                <li><a class="menu-link" onclick="switchTab('t-orcamentos', this)"><i class="fas fa-calculator"></i> Orçamentos</a></li>
+                <li><a class="menu-link active" onclick="switchTab('t-pedidos', this)"><i class="fas fa-clipboard-list"></i> Pedidos</a></li>
+                <li><a class="menu-link" onclick="switchTab('t-horarios', this)"><i class="fas fa-calendar-alt"></i> Horários</a></li>
+                <li><a class="menu-link" onclick="switchTab('t-prods', this)"><i class="fas fa-box-open"></i> Produtos</a></li>
             </ul>
-            <div class="menu-socials">
-                <a href="https://www.instagram.com/favucozinha/" target="_blank" class="menu-social-link">
-                    <i class="fab fa-instagram"></i> Nos siga no Instagram
-                </a>
-                <a href="http://wa.me/558195256641" target="_blank" class="menu-social-link">
-                    <i class="fab fa-whatsapp"></i> Falar com o Favu
-                </a>
+
+            <div class="menu-bottom">
+                <a class="menu-link" style="color: #E60000; background: #fff0f0; border-color: #ffcccc;" onclick="window.fazerLogout()"><i class="fas fa-sign-out-alt"></i> Sair</a>
             </div>
         </div>
     </nav>
 
-    <header id="header">
-        <div class="header-container-full">
-            <button id="mobile-menu-btn" class="menu-btn"><i class="fa-solid fa-bars"></i></button>
-        </div>
-    </header>
+    <div id="admin-panel" style="display: none;">
+        <header>
+            <button class="menu-btn" onclick="toggleMenu(true)"><i class="fas fa-bars"></i></button>
+            <img src="images/favu.png" alt="FAVU" class="header-logo" style="margin: 0;">
+            <div class="header-spacer" style="width:45px;"></div>
+        </header>
 
-    <nav id="categorias-nav" class="categorias-nav">
-        <div class="categorias-nav-wrapper">
-            <div id="categorias-horizontal" class="categorias-draggable"></div>
-        </div>
-    </nav>
+        <div class="admin-wrapper">
 
-    <div class="container">
-        <main class="menu-content" id="menu-principal"></main>
-        
-        <div id="popup-resumo" class="popup">
-            <div class="popup-conteudo">
-                <span class="fechar" onclick="window.fecharResumoPopup()">&times;</span>
-                <h2 class="font-display">RESUMO DO PEDIDO</h2>
-                
-                <div id="popup-resumo-itens" class="resumo-itens"></div>
-                
-                <div id="cupom-container">
-                    <strong>CUPOM DE DESCONTO</strong>
-                    <div id="cupom-input-group">
-                        <input type="text" id="cupom-input" placeholder="CÓDIGO">
-                        <button id="apply-cupom-btn" onclick="window.aplicarCupom()">APLICAR</button>
-                    </div>
-                    <div id="cupom-message" class="cupom-message"></div>
+            <div id="t-estoque" class="tab-pane">
+                <div class="buttons-area">
+                    <button class="btn btn-primary" onclick="window.openModal('modal-add-estoque')"><i class="fas fa-plus"></i> Novo Insumo</button>
                 </div>
-                
-                <div class="resumo-footer-area">
-                    <div id="popup-resumo-total" class="resumo-total"></div>
-                    <div id="fazer-pedido-button-container"></div>
+                <div class="panel-card" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; padding: 15px 20px;">
+                    <h2 class="font-display" style="margin: 0; font-size: 1.8rem; color: var(--favu-green);">Controle de Estoque</h2>
+                    <input type="text" id="search-estoque" class="search-bar" style="margin: 0; max-width: 320px;" placeholder="🔍 Buscar insumo...">
+                </div>
+
+                <div id="alertas-estoque" style="margin-bottom: 20px; display: none; background: #ffebee; border-left: 4px solid #E60000; padding: 15px; border-radius: 8px;">
+                    <h4 style="color: #E60000; margin-bottom: 5px; font-family: 'Basic Choice', cursive;">⚠️ Itens em Alerta / Pendentes</h4>
+                    <ul id="lista-faltas-estoque" style="color: #b71c1c; font-family: var(--font-numbers); font-size: 0.9rem; margin-left: 20px;"></ul>
+                </div>
+
+                <div class="panel-card table-responsive">
+                    <table class="favu-table" id="tbl-estoque">
+                        <thead>
+                            <tr>
+                                <th>Insumo</th>
+                                <th>Unidade de Medida</th>
+                                <th>Estoque Atual</th>
+                                <th>Estoque Mínimo</th>
+                                <th>Status</th>
+                                <th style="width: 120px;">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
                 </div>
             </div>
-        </div>
-        
-        <div id="popup-pedido" class="popup">
-            <div class="popup-conteudo">
-                <span class="fechar" onclick="window.fecharPopup()">&times;</span>
-                <h2 class="font-display">INFORMAÇÕES DO PEDIDO</h2>
+
+            <div id="t-pedidos" class="tab-pane active">
+                <div class="header-pedidos-moderno">
+                    <h2 class="font-display">Gestão de Pedidos</h2>
+                    
+                    <div class="card-faturamento" id="dashboard-totals" onclick="window.abrirModalFechamento()" style="cursor: pointer; transition: 0.2s;" onmouseover="this.style.transform='scale(0.98)'" onmouseout="this.style.transform='none'">
+                        <div class="fat-label">Faturamento</div>
+                        <strong class="fat-valor">R$ 0,00</strong>
+                        <div class="fat-sub" id="total-count">Carregando...</div>
+                    </div>
+                </div>
+
+                <div id="filter-toggle-btn" style="display: none;" onclick="document.getElementById('filter-bar-pedidos').classList.toggle('show')">
+                    <span style="font-weight: bold; color: var(--favu-rust); font-family: 'Basic Choice', cursive; font-size: 1.1rem;"><i class="fas fa-filter"></i> Filtros</span>
+                </div>
                 
-                <form id="form-pedido">
-                    <div class="input-group">
-                        <label for="nome">Nome:</label>
-                        <input type="text" id="nome" name="nome" placeholder="Nome Completo" required>
-                    </div>
-                    
-                    <div class="input-group">
-                        <label for="telefone">Número (WhatsApp):</label>
-                        <input type="tel" id="telefone" name="telefone" placeholder="(DDD) 9XXXX-XXXX" required>
-                    </div>
-                    
-                    <div class="input-group">
-                        <label for="data">Data de Entrega:</label>
-                        <input type="date" id="data" name="data" required>
-                        <div id="aviso-data-fechada" style="display: none; color: var(--danger, #E60000); font-weight: bold; font-size: 0.85rem; margin-top: 5px; font-family: var(--font-numbers); background: rgba(230,0,0,0.05); padding: 8px; border-radius: 6px; border: 1px solid rgba(230,0,0,0.2);">
-                            <i class="fa-solid fa-ban"></i> ⛔ FECHADO para encomendas nesta data.
+                <div class="filter-bar" id="filter-bar-pedidos">
+                    <div class="filter-group-main">
+                        <div class="filter-item">
+                            <label>Buscar</label>
+                            <input type="text" id="search-input-pedidos" placeholder="ID, nome ou telefone" oninput="window.filtrarPedidos()">
+                        </div>
+                        <div class="filter-item">
+                            <label>Data de Entrega</label>
+                            <input type="hidden" id="date-input" onchange="window.filtrarPedidos()">
+                            <input type="text" id="date-filter-display" readonly placeholder="Filtrar por Data" onclick="window.openDatePicker()" style="background:white; cursor:pointer;">
                         </div>
                     </div>
-                    
-                    <div class="input-group">
-                        <label for="horario">Horário de Entrega:</label>
-                        <input type="time" id="horario" name="horario" required>
+                    <div class="filter-group-additional">
+                        <div class="filter-item">
+                            <label>Status Pagamento</label>
+                            <select id="filter-status-pagamento" onchange="window.filtrarPedidos()">
+                                <option value="">Todos</option><option value="Pagamento pendente">Pagamento pendente</option><option value="Pago 50%">Pago 50%</option><option value="Pago 100%">Pago 100%</option>
+                            </select>
+                        </div>
+                        <div class="filter-item">
+                            <label>Forma Pagamento</label>
+                            <select id="filter-forma-pagamento" onchange="window.filtrarPedidos()">
+                                <option value="">Todas</option><option value="A confirmar">A confirmar</option><option value="Pix">Pix</option><option value="Dinheiro">Dinheiro</option><option value="Cartão">Cartão</option>
+                            </select>
+                        </div>
+                        <div class="filter-item">
+                            <label>Observação</label>
+                            <select id="filter-observacao" onchange="window.filtrarPedidos()">
+                                <option value="">Todos</option><option value="com">Com Observação</option><option value="sem">Sem Observação</option>
+                            </select>
+                        </div>
+                        <div class="filter-item" style="justify-content: flex-end;">
+                            <button class="btn btn-outline" style="padding: 8px 15px; border-color: #ddd; color: var(--favu-moss); white-space: nowrap;" onclick="window.limparFiltros()"><i class="fas fa-eraser"></i> Limpar Filtros</button>
+                        </div>
                     </div>
-                    
-                    <div class="input-group">
-                        <label for="pagamento">Forma de pagamento:</label>
-                        <select id="pagamento" name="pagamento" required>
-                            <option value="" disabled selected>Selecione...</option>
-                            <option value="Pix">Pix</option>
-                            <option value="Dinheiro">Dinheiro</option>
-                            <option value="Cartão">Cartão</option>
-                        </select>
+                </div>
+
+                <div id="main-content-pedidos" style="margin-top: 15px;">
+                    <div id="kanban-board"></div>
+                </div>
+
+                <div id="bulk-actions-bar-pedidos" class="bulk-actions-bar" style="display: none; border-color: transparent;">
+                    <span id="selected-count-pedidos" style="color:var(--favu-green); font-weight:bold; font-family:var(--font-numbers); font-size:1.1rem;">0 itens</span>
+                    <div class="bulk-actions-btns">
+                        <button class="btn btn-secondary" onclick="window.abrirBulkMove()">Etapa</button>
+                        <button class="btn btn-primary" onclick="window.abrirBulkPayment()">Pagamento</button>
+                        <button class="btn btn-outline" style="background-color: var(--favu-moss); border-color:var(--favu-moss); color: white;" onclick="window.abrirModalResumos()">Resumos</button>
+                        <button class="btn btn-danger" onclick="window.limparSelecaoPedidos()">Limpar</button>
                     </div>
-                    
-                    <div class="input-group">
-                        <label for="observacoes">Observações:</label>
-                        <textarea id="observacoes" name="Observacoes" placeholder="EX: Retirar Itens, Alergias, Etc." rows="2"></textarea>
+                </div> </div> <div id="t-prods" class="tab-pane"> <div class="buttons-area">
+                    <button class="btn btn-primary" onclick="window.openModal('modal-add-prod')"><i class="fas fa-plus"></i> Adicionar produto</button>
+                    <button class="btn btn-secondary hide-on-mobile" onclick="window.openBulkModal()"><i class="fas fa-layer-group"></i>Adicionar produtos</button>
+                </div>
+                <div id="prod-cats-nav" class="prod-tabs"></div>
+                <div class="panel-card" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; padding: 15px 20px;">
+                    <h2 class="font-display" style="margin: 0; font-size: 1.8rem; color: var(--favu-green);">Produtos Cadastrados</h2>
+                    <input type="text" id="search-prod" class="search-bar" style="margin: 0; max-width: 320px;" placeholder="🔍 Buscar em todos os campos...">
+                </div>
+                <div id="bulk-actions-produtos" class="bulk-actions-bar">
+                    <span style="font-family: 'Basic Choice', cursive !important; font-size: 1rem; color: var(--favu-rust);"><strong id="count-produtos">0</strong> itens selecionados</span>
+                    <div class="bulk-actions-btns">
+                        <button class="btn btn-secondary" onclick="window.bulkToggle('produtos', true)">Exibir</button>
+                        <button class="btn btn-outline" onclick="window.bulkToggle('produtos', false)">Ocultar</button>
+                        <button class="btn btn-danger" onclick="window.bulkDelete('produtos')">Excluir</button>
+                        <button class="btn btn-outline" style="border-color: #999; color: #666;" onclick="window.clearSelection('produtos')">Cancelar</button>
                     </div>
+                </div>
+                <div class="panel-card table-responsive">
+                    <table class="favu-table" id="tbl-produtos">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px; text-align: center;"><input type="checkbox" class="bulk-checkbox" onchange="window.toggleAll(this, 'produtos')"></th>
+                                <th style="width: 50px;">Foto</th><th>Nome</th><th>Categoria</th><th style="width: 6%;">Tam.</th><th style="width: 6%;">Mín.</th><th style="width: 10%;">Preço</th><th>Desc. Produto</th><th>Desc. Resumo</th><th>Desc. Imagem</th><th>Status</th><th style="width: 120px;">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="t-cats" class="tab-pane">
+                <div class="buttons-area"><button class="btn btn-primary" onclick="window.openModal('modal-add-cat')"><i class="fas fa-plus"></i> Nova Categoria</button></div>
+                <div class="panel-card cat-list-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; padding: 15px 20px;">
+                    <h2 class="font-display" style="margin: 0; font-size: 1.8rem; color: var(--favu-green);">Categorias Cadastradas</h2>
+                    <input type="text" id="search-cat" class="search-bar" style="margin: 0; max-width: 320px;" placeholder="Buscar categoria...">
+                </div>
+                <div id="bulk-actions-categorias" class="bulk-actions-bar">
+                    <span class="bulk-selected-label" id="bulk-label-categorias"><strong id="count-categorias">0</strong> categorias</span>
+                    <div class="bulk-actions-btns">
+                        <button class="btn btn-secondary" onclick="window.bulkToggle('categorias', true)">Exibir</button>
+                        <button class="btn btn-outline" onclick="window.bulkToggle('categorias', false)">Ocultar</button>
+                        <button class="btn btn-danger" onclick="window.bulkDelete('categorias')">Excluir</button>
+                        <button class="btn btn-outline" onclick="window.clearSelection('categorias')">Cancelar</button>
+                    </div>
+                </div>
+                <div class="panel-card table-responsive">
+                    <table class="favu-table" id="tbl-categorias">
+                        <thead><tr>
+                            <th class="cat-th-order" style="width: 70px;"></th>
+                            <th class="cat-th-select" style="width: 60px;"><input type="checkbox" class="bulk-checkbox" onchange="window.toggleAll(this, 'categorias')"></th>
+                            <th>Categoria</th>
+                            <th style="width: 82px;">Mínimo</th>
+                            <th style="width: 140px;">Medida</th>
+                            <th>Aviso</th>
+                            <th style="width: 210px;">Programação</th>
+                            <th style="width: 105px;">Status</th>
+                            <th style="width: 120px;">Ações</th>
+                        </tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="t-avisos" class="tab-pane">
+                <div class="buttons-area"><button class="btn btn-primary" onclick="window.openModal('modal-add-aviso')"><i class="fas fa-bullhorn"></i> Criar Comunicado</button></div>
+                <div class="panel-card aviso-list-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; padding: 15px 20px;">
+                    <h2 class="font-display" style="margin: 0; font-size: 1.8rem; color: var(--favu-green);">Comunicados Cadastrados</h2>
+                    <input type="text" id="search-aviso" class="search-bar" style="margin: 0; max-width: 320px;" placeholder="Buscar comunicado...">
+                </div>
+
+                <div class="avisos-tabs" role="tablist" aria-label="Filtro de comunicados">
+                    <button type="button" id="tab-avisos-ativos" class="avisos-tab-btn active" onclick="window.switchAvisosTab('ativos')">Comunicados Ativos</button>
+                    <button type="button" id="tab-avisos-inativos" class="avisos-tab-btn" onclick="window.switchAvisosTab('inativos')">Comunicados Inativos</button>
+                </div>
+
+                <div id="bulk-actions-avisos" class="bulk-actions-bar favu-selection-menu">
+                    <span class="bulk-selected-label" id="bulk-label-avisos"><strong id="count-avisos">0</strong> comunicados</span>
+                    <div class="bulk-actions-btns">
+                        <button class="btn btn-secondary" onclick="window.bulkToggle('avisos', true)">Exibir</button>
+                        <button class="btn btn-outline" onclick="window.bulkToggle('avisos', false)">Ocultar</button>
+                        <button class="btn btn-danger" onclick="window.bulkDelete('avisos')">Excluir</button>
+                        <button class="btn btn-outline" onclick="window.clearSelection('avisos')">Cancelar</button>
+                    </div>
+                </div>
+                <div class="panel-card table-responsive">
+                    <table class="favu-table" id="tbl-avisos">
+                        <thead><tr>
+                            <th class="aviso-th-select" style="width: 60px; text-align: center;"><input type="checkbox" class="bulk-checkbox" onchange="window.toggleAll(this, 'avisos')"></th>
+                            <th style="width: 90px;">Imagem</th>
+                            <th>Título</th>
+                            <th>Mensagem</th>
+                            <th style="width: 210px;">Programação</th>
+                            <th style="width: 105px;">Status</th>
+                            <th style="width: 150px;">Ações</th>
+                        </tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="t-tema" class="tab-pane">
+                <h2 class="font-display" style="color: var(--favu-rust); margin-top: 10px; margin-bottom: 20px; font-size: 2rem;">Cores do App</h2>
+                <form id="form-cores" class="form-grid panel-card">
+                    <div><label>Fundo Principal</label><input type="color" id="cor-bg" value="#F4E6CB"></div>
+                    <div><label>Fundo de Caixas/Menus</label><input type="color" id="cor-card" value="#FFF5EB"></div>
+                    <div><label>Cor dos Textos Base</label><input type="color" id="cor-txt" value="#1D2814"></div>
+                    <div><label>Cor de Destaque</label><input type="color" id="cor-acc" value="#E09F41"></div>
+                    <button type="submit" class="btn btn-primary" style="grid-column: 1 / -1;">Salvar</button>
                 </form>
 
-                <div class="popup-footer-actions">
-                    <div class="popup-footer-actions-top">
-                        <button type="button" class="btn-secondary" onclick="window.editarPedido()">EDITAR PEDIDO</button>
-                        <button type="button" class="btn-secondary" onclick="window.fecharPopup()">ADICIONAR ITENS</button>
+                <h2 class="font-display" style="color: var(--favu-rust); margin-top: 40px; margin-bottom: 20px; font-size: 2rem;">Imagens do Carrossel</h2>
+                <form id="form-carrossel" class="panel-card" style="display:flex; flex-direction: column; gap:15px;">
+                    <div>
+                        <label>Enviar Fotos Novas (Múltiplas permitidas)</label>
+                        <label class="custom-file-upload">
+                            <i class="fas fa-camera"></i> Escolher Arquivos
+                            <input type="file" id="car-files" multiple accept="image/*" required onchange="document.getElementById('car-file-name').textContent = this.files.length + ' arquivo(s) selecionado(s)';">
+                        </label>
+                        <span id="car-file-name" class="file-name-display">Nenhum arquivo escolhido</span>
                     </div>
-                    <button type="button" class="btn-primary-large" onclick="window.confirmarPedido()">CONFIRMAR PEDIDO</button>
+                    <button type="submit" class="btn btn-secondary" id="btn-up-car" style="width: 100%;"><i class="fas fa-upload"></i> Adicionar ao Carrossel</button>
+                </form>
+                <div id="galeria-preview" class="panel-card" style="display: flex; gap: 15px; overflow-x: auto; margin-top: 20px; padding-bottom: 10px;"></div>
+            </div>
+
+            <div id="t-orcamentos" class="tab-pane" style="position: relative; padding-bottom: 80px; background-color: var(--bg-color);">
+                <div class="panel-card" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; padding: 15px 20px;">
+                    <h2 class="font-display" style="margin: 0; font-size: 1.8rem; color: var(--favu-green);">Simulador de Orçamentos</h2>
+                    <div class="orc-search-panel">
+                        <input type="text" id="search-orcamento" class="search-bar" placeholder="🔍 Buscar item no orçamento..." oninput="window.renderOrcamentoMenu()">
+                    </div>
+                </div>
+                <div class="categorias-nav-wrapper" style="margin-bottom: 20px;">
+                    <div id="orc-cats-nav" class="categorias-draggable"></div>
+                </div>
+                <div class="table-responsive" style="padding: 0; background: transparent; box-shadow: none; border: none;">
+                    <div id="orc-menu-container" style="width: 100%;"></div>
+                </div>
+                <button type="button" id="fixed-summary-orc" onclick="window.abrirModalOrcamento()">
+                    <div class="summary-content-orc">
+                        <div id="summary-text-orc"><span id="summary-total-orc">R$: 0,00</span><span id="summary-item-count-orc">/ 0 itens</span></div>
+                        <div id="summary-button-orc"><i class="fas fa-shopping-cart" style="font-size: 1.5rem;"></i></div>
+                    </div>
+                </button>
+            </div>
+
+        </div>
+
+        <!-- NOVA ABA DE HORÁRIOS RESTRITOS -->
+            <div id="t-horarios" class="tab-pane">
+            <div class="agenda-admin-grid">
+                <div class="panel-card agenda-form-card">
+                    <h2 class="font-display agenda-title"><i class="fas fa-clock"></i> Horários por Dia da Semana</h2>
+                    <div class="agenda-dia-lista">
+                        <div class="agenda-dia-row">
+                            <label><input type="checkbox" id="dia-1-ativo"> Seg</label>
+                            <input type="text" id="dia-1-horas" placeholder="Ex: 11:00, 12:00, 15:00">
+                        </div>
+                        <div class="agenda-dia-row">
+                            <label><input type="checkbox" id="dia-2-ativo"> Ter</label>
+                            <input type="text" id="dia-2-horas" placeholder="Ex: 11:00, 12:00, 15:00">
+                        </div>
+                        <div class="agenda-dia-row">
+                            <label><input type="checkbox" id="dia-3-ativo"> Qua</label>
+                            <input type="text" id="dia-3-horas" placeholder="Ex: 11:00, 12:00, 15:00">
+                        </div>
+                        <div class="agenda-dia-row">
+                            <label><input type="checkbox" id="dia-4-ativo"> Qui</label>
+                            <input type="text" id="dia-4-horas" placeholder="Ex: 11:00, 12:00, 15:00">
+                        </div>
+                        <div class="agenda-dia-row">
+                            <label><input type="checkbox" id="dia-5-ativo"> Sex</label>
+                            <input type="text" id="dia-5-horas" placeholder="Ex: 11:00, 12:00, 15:00">
+                        </div>
+                        <div class="agenda-dia-row">
+                            <label><input type="checkbox" id="dia-6-ativo"> Sáb</label>
+                            <input type="text" id="dia-6-horas" placeholder="Ex: 11:00, 12:00, 15:00">
+                        </div>
+                        <div class="agenda-dia-row">
+                            <label><input type="checkbox" id="dia-0-ativo"> Dom</label>
+                            <input type="text" id="dia-0-horas" placeholder="Ex: 11:00, 12:00, 15:00">
+                        </div>
+                    </div>
+                    <button class="btn btn-secondary agenda-save-btn" onclick="window.salvarConfigAgendaGeral()">Salvar Horários</button>
+                </div>
+
+                <div class="panel-card agenda-form-card">
+                    <h2 class="font-display agenda-title"><i class="fas fa-calendar-day"></i> Exceções para Dias Específicos</h2>
+                    <div class="agenda-excecao-form">
+                        <div class="input-group">
+                            <label>Escolha a Data Especial:</label>
+                            <input type="date" id="exc-data">
+                        </div>
+                        <label class="agenda-check-fechado">
+                            <input type="checkbox" id="exc-fechado" onchange="window.toggleExcecaoCampos()">
+                            FECHAR AGENDA NESTA DATA
+                        </label>
+                        <div id="container-exc-horas" class="input-group">
+                            <label>Intervalos ou Horários Permitidos:</label>
+                            <input type="text" id="exc-horas" placeholder="Ex: 08h às 12h, 14h às 18h">
+                        </div>
+                        <div id="container-exc-msg" class="input-group" style="display:none;">
+                            <label>Mensagem de aviso para os clientes:</label>
+                            <input type="text" id="exc-mensagem" placeholder="Ex: Estaremos fechados nesta data.">
+                        </div>
+                        <button type="button" onclick="window.salvarExcecaoData()" class="btn btn-primary" style="width:100%;">Adicionar Regra Especial</button>
+                    </div>
                 </div>
             </div>
-        </div>
-        
-        <button type="button" id="fixed-summary">
-            <div class="summary-content">
-                <div id="summary-text">
-                    <span id="summary-total">R$: 0,00</span>
-                    <span id="summary-item-count">/ 0 itens</span>
+
+            <div class="panel-card agenda-datas-card">
+                <div class="agenda-datas-header">
+                    <h2 class="font-display agenda-title"><i class="fas fa-list"></i> Datas específicas</h2>
+                    <span class="agenda-datas-hint">Toque/click em uma data para editar. Use a lixeira para remover.</span>
                 </div>
-                <div id="summary-button"><i class="fas fa-shopping-cart"></i></div>
+                <div class="excecoes-tabs">
+                    <button type="button" id="tab-excecoes-futuras" class="excecoes-tab-btn active" onclick="window.setFiltroExcecoes('futuras')">Datas futuras</button>
+                    <button type="button" id="tab-excecoes-passadas" class="excecoes-tab-btn" onclick="window.setFiltroExcecoes('passadas')">Datas passadas</button>
+                </div>
+                <div id="lista-excecoes-container" class="lista-excecoes-grid"></div>
             </div>
-        </button>
-    </div>
-
-    <footer>
-        <div class="footer-container-center">
-            <img src="images/logoroda.png" alt="FAVU Rodapé" class="footer-logo">
-            <div class="desktop-signature">
-                <img src="images/BS.png" alt="Icone"><span>FAVU Cozinha Afetiva</span>
-            </div>
-            <p class="copy">&copy; 2026 Todos os direitos reservados.</p>
         </div>
-    </footer>
 
-    <div id="aboutModal" class="modal">
-        <div class="modal-content">
-            <div class="close-btn-wrapper" onclick="window.closeAboutModal()"><i class="fa-solid fa-xmark close-btn-icon"></i></div>
-            <div class="modal-body-scroll">
+        <div id="modal-editar-excecao" class="modal" onclick="if(event.target === this) window.closeModal('modal-editar-excecao', 'form-edit-excecao')">
+            <div class="modal-content" style="max-width: 520px;">
+                <div class="modal-header">
+                    <h3>Editar Data Específica</h3>
+                    <button class="close-modal" onclick="window.closeModal('modal-editar-excecao', 'form-edit-excecao')">&times;</button>
+                </div>
                 <div class="modal-body">
-                    <img src="images/BS.png" alt="História FAVU" class="modal-img">
-                    <div class="font-cocogoose modal-text">
-                        <p>Inspirada nas receitas e lembranças de família, juntamos a tradição e a criatividade para criar pratos, bolos e salgados sob encomenda, uma coisa melhor que a outra.</p>
-                        <p>Tudo artesanal, feito a quatro mãos, de <strong>mãe para filho</strong>, com ingredientes selecionados e um toque especial que só a FAVU tem!</p>
-                        <p class="highlight">Faça sua encomenda e vamos transformar seus momentos especiais em inesquecíveis!</p>
-                    </div>
-                    <a href="http://wa.me/558195256641" target="_blank" class="btn-primary full-width">Falar com o Favu</a>
+                    <form id="form-edit-excecao">
+                        <input type="hidden" id="edit-exc-data">
+                        <div class="input-group">
+                            <label>Data:</label>
+                            <input type="date" id="edit-exc-data-display" disabled>
+                        </div>
+                        <label class="agenda-check-fechado">
+                            <input type="checkbox" id="edit-exc-fechado" onchange="window.toggleEditExcecaoCampos()">
+                            FECHAR AGENDA NESTA DATA
+                        </label>
+                        <div id="edit-container-exc-horas" class="input-group">
+                            <label>Intervalos ou Horários Permitidos:</label>
+                            <input type="text" id="edit-exc-horas" placeholder="Ex: 08h às 12h, 14h às 18h">
+                        </div>
+                        <div id="edit-container-exc-msg" class="input-group" style="display:none;">
+                            <label>Mensagem exibida no site:</label>
+                            <input type="text" id="edit-exc-mensagem" placeholder="Ex: Estaremos fechados nesta data.">
+                        </div>
+                        <div style="display:flex; gap:10px; margin-top: 18px;">
+                            <button type="button" class="btn btn-outline" onclick="window.closeModal('modal-editar-excecao', 'form-edit-excecao')" style="flex:1;">Cancelar</button>
+                            <button type="submit" class="btn btn-secondary" style="flex:1;">Salvar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+    <div id="modal-orcamento-pedido" class="modal" onclick="if(event.target === this) window.closeModal('modal-orcamento-pedido')">
+        <div class="popup-conteudo" style="max-width: 500px;">
+            <span class="fechar" onclick="window.closeModal('modal-orcamento-pedido')">&times;</span>
+            <h2 class="font-display">RESUMO DO ORÇAMENTO</h2>
+            <div id="popup-resumo-itens-orc" class="resumo-itens"></div>
+            <div id="desconto-container" style="border: 1px dashed rgba(29, 40, 20, 0.3); border-radius: 12px; padding: 20px 15px 12px 15px; position: relative; margin: 25px 0 15px 0; text-align: center; background: transparent;">
+                <strong style="position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: var(--favu-card); padding: 0 10px; color: var(--text-dark); font-family: 'Basic Choice', cursive; font-size: 1rem; font-weight: normal; text-transform: uppercase; white-space: nowrap;">DESCONTO (R$)</strong>
+                <div style="display: flex; gap: 8px; justify-content: center;">
+                    <input type="number" step="0.01" id="orc-desconto" placeholder="0.00" value="0" oninput="window.calcOrcamentoTotal()" style="flex: 1; min-width: 130px; border: 1px solid rgba(29, 40, 20, 0.2); border-radius: 30px; padding: 8px 12px; font-family: 'Basic Choice', cursive !important; font-size: 1rem; color: var(--text-dark); text-align: center; outline: none;">
+                </div>
+            </div>
+            <div class="resumo-footer-area">
+                <div class="resumo-total">
+                    <span style="font-size: 1rem; color: #666; font-family: 'Basic Choice', cursive !important; text-transform: none; font-weight: normal;">Bruto: R$ <span id="orc-bruto-txt">0,00</span></span><br>
+                    <span style="font-family: 'Basic Choice', cursive !important; font-weight: bold;">TOTAL: R$ <span id="orc-liquido-txt">0,00</span></span>
+                </div>
+            </div>
+            <div class="popup-footer-actions">
+                <div class="popup-footer-actions-top">
+                    <button type="button" class="btn-secondary-form" onclick="window.closeModal('modal-orcamento-pedido')">Adicionar itens</button>
+                    <button type="button" class="btn-secondary-form" style="background-color: var(--favu-rust);" onclick="window.avancarDadosCliente()">Adicionar dados</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <div id="popup-item-imagem" class="modal">
-        <div class="modal-content modal-item-imagem">
-            <div class="close-btn-wrapper" onclick="window.fecharImagemPopup()"><i class="fa-solid fa-xmark close-btn-icon"></i></div>
-            <div class="modal-body-scroll">
-                <div class="modal-body modal-item-body">
-                    <img id="item-imagem-display" src="" alt="Imagem do Item" class="item-imagem-display">
-                    <div class="item-info">
-                        <h3 id="item-nome-display" class="font-display"></h3>
-                        <p id="item-descricao-display" style="font-family: 'Segoe UI', sans-serif; font-size: 1rem; line-height: 1.5; color: var(--text-dark);"></p>
+    <div id="modal-orcamento-cliente" class="modal" onclick="if(event.target === this) window.closeModal('modal-orcamento-cliente')">
+        <div class="popup-conteudo" style="max-width: 500px;">
+            <span class="fechar" onclick="window.closeModal('modal-orcamento-cliente')">&times;</span>
+            <h2 class="font-display">DADOS DO CLIENTE</h2>
+            <form id="form-pedido-orc">
+                <div class="input-group">
+                    <label>NOME DO CLIENTE:</label>
+                    <input type="text" id="orc-nome" placeholder="NOME DO CLIENTE">
+                </div>
+                <div class="input-group">
+                    <label>NÚMERO (WHATSAPP):</label>
+                    <div style="display: flex; gap: 5px;">
+                        <input type="tel" id="orc-tel" placeholder="(DDD) 9XXXX-XXXX">
+                        <button type="button" class="btn btn-secondary" onclick="window.buscarContato()" title="Buscar nos contatos" style="padding: 10px; border-radius: 10px;"><i class="fas fa-address-book"></i></button>
                     </div>
+                </div>
+                <div class="form-grid-2" style="margin-bottom: 0;">
+                    <div class="input-group"><label>DATA:</label><input type="date" id="orc-data"></div>
+                    <div class="input-group"><label>HORÁRIO:</label><select id="orc-hora" class="time-slot-select"></select></div>
+                </div>
+                <div class="input-group">
+                    <label>PAGAMENTO:</label>
+                    <select id="orc-pag"><option value="">SELECIONE...</option><option value="A confirmar">A confirmar</option><option value="Pix">Pix</option><option value="Dinheiro">Dinheiro</option><option value="Cartão">Cartão</option></select>
+                </div>
+                <div class="input-group">
+                    <label>DESCONTO (R$):</label>
+                    <input type="number" step="0.01" id="orc-desconto-cliente" placeholder="0,00" value="0" oninput="window.sincronizarDescontoCliente(this.value)">
+                </div>
+                <div class="input-group">
+                    <label>OBSERVAÇÕES:</label>
+                    <textarea id="orc-obs" placeholder="EX: RETIRAR CEBOLA, ALERGIAS, ETC." rows="2"></textarea>
+                </div>
+            </form>
+            <div class="popup-footer-actions">
+                <div class="popup-footer-actions-top">
+                    <button type="button" class="btn-secondary-form" onclick="window.voltarResumoOrcamento()">Editar orçamento</button>
+                    <button type="button" class="btn-secondary-form" onclick="window.closeModal('modal-orcamento-cliente')">Adicionar itens</button>
+                </div>
+                <button type="button" class="btn-primary-large" onclick="window.gerarOrcamentoWA()"><i class="fab fa-whatsapp"></i> GERAR PEDIDO / WHATSAPP</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-add-prod" class="modal">
+        <div class="modal-content">
+            <div class="modal-header"><h3>Adesão Produto</h3><button class="close-modal" onclick="window.closeModal('modal-add-prod', 'form-add-prod')">&times;</button></div>
+            <div class="modal-body">
+                <form id="form-add-prod">
+                    <div class="form-grid">
+                        <div><label>Nome do Produto</label><textarea id="a-nome" rows="1" required></textarea></div>
+                        <div><label>Categoria</label><select class="cat-select" id="a-cat" required></select></div>
+                    </div>
+                    
+                    <div class="form-grid">
+                        <div><label>Descrição do produto</label><textarea id="a-dmenu" rows="2"></textarea></div>
+                        <div><label>Descrição do Resumo</label><textarea id="a-dres" rows="2" required></textarea></div>
+                    </div>
+                    
+                    <div class="form-grid" style="align-items: stretch;">
+                        <div style="padding: 15px; border: 1px dashed var(--favu-rust); border-radius: 10px; background: rgba(224, 159, 65, 0.03);">
+                            <label style="font-size: 0.9rem; margin-bottom: 8px; display: block;">Imagem do Produto</label>
+                            <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 10px;">
+                                <label class="custom-file-upload" style="width: auto; padding: 8px 12px; font-size: 0.9rem;"><i class="fas fa-camera"></i> Escolher Foto<input type="file" id="a-file" accept="image/*" onchange="window.previewImage(this, 'a-img-preview', null, 'a-img-none', null); document.getElementById('a-file-name').textContent = (this.files[0] ? this.files[0].name : '');"></label>
+                                <img id="a-img-preview" src="" style="width: 45px; height: 45px; object-fit: cover; border-radius: 8px; display: none;">
+                                <span id="a-img-none" style="font-size:0.8rem; color:#999;">Nenhuma foto</span>
+                            </div>
+                            <span id="a-file-name" class="file-name-display" style="text-align: left;"></span>
+                        </div>
+                        <div>
+                            <label>Descrição da imagem</label>
+                            <textarea id="a-dpop" rows="4" style="height: calc(100% - 25px);"></textarea>
+                        </div>
+                    </div>
+
+                    <h4 class="font-display" style="color: var(--favu-moss); margin-top: 20px; margin-bottom: 10px; font-size: 1.5rem; border-bottom: 1px dashed #ccc; padding-bottom: 5px;">Tamanhos e Valores</h4>
+                    <div id="variations-container"></div>
+                    <button type="button" id="btn-add-variation" class="btn btn-outline" style="width: 100%; margin-bottom: 25px; border-style: dashed; font-size: 1rem; display: none;" onclick="window.addVariation(true)">+ Adicionar Outro Tamanho</button>
+                    
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;"><button type="button" class="btn btn-outline" onclick="window.closeModal('modal-add-prod', 'form-add-prod')" style="flex:1;">Cancelar</button><button type="submit" class="btn btn-primary" style="flex:2;">Salvar</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-editar-prod" class="modal">
+        <div class="modal-content" style="border: 2px solid var(--favu-moss);">
+            <div class="modal-header"><h3 style="color: var(--favu-moss);">Editar Produto</h3><button class="close-modal" onclick="window.closeModal('modal-editar-prod', 'form-edit-prod')">&times;</button></div>
+            <div class="modal-body">
+                <form id="form-edit-prod">
+                    <input type="hidden" id="e-id">
+                    <div class="form-grid">
+                        <div><label>Nome do Produto</label><textarea id="e-nome" rows="1" required></textarea></div>
+                        <div><label>Categoria</label><select class="cat-select" id="e-cat" required></select></div>
+                    </div>
+                    
+                    <div class="form-grid">
+                        <div><label>Descrição na Tabela</label><textarea id="e-dmenu" rows="2"></textarea></div>
+                        <div><label>Descrição do Resumo</label><textarea id="e-dres" rows="2" required></textarea></div>
+                    </div>
+                    
+                    <div class="form-grid" style="align-items: stretch;">
+                        <div style="padding: 15px; border: 1px dashed var(--favu-rust); border-radius: 10px; background: rgba(224, 159, 65, 0.03);">
+                            <label style="font-size: 0.9rem; margin-bottom: 8px; display: block;">Imagem Atual/Nova:</label>
+                            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                                <img id="e-img-preview" src="" style="width: 45px; height: 45px; object-fit: cover; border-radius: 8px; display: none;">
+                                <button type="button" id="btn-remove-e-img" class="btn btn-danger" style="padding: 6px 10px; font-size: 0.8rem; display: none;" onclick="window.markImageForRemoval('prod')"><i class="fas fa-trash"></i> </button>
+                                <span id="e-img-none" style="font-family: var(--font-numbers); font-size: 0.8rem; color: #999; display: none;">Nenhuma.</span>
+                            </div>
+                            <label class="custom-file-upload" style="padding: 8px 12px; font-size: 0.9rem;"><i class="fas fa-camera"></i> Alterar Imagem<input type="file" id="e-file" accept="image/*" onchange="window.previewImage(this, 'e-img-preview', 'btn-remove-e-img', 'e-img-none', 'e-remove-img'); document.getElementById('e-file-name').textContent = (this.files[0] ? this.files[0].name : '');"></label>
+                            <span id="e-file-name" class="file-name-display"></span><input type="hidden" id="e-remove-img" value="false">
+                        </div>
+                        <div>
+                            <label>Descrição da imagem</label>
+                            <textarea id="e-dpop" rows="4" style="height: calc(100% - 25px);"></textarea>
+                        </div>
+                    </div>
+
+                    <h4 class="font-display" style="color: var(--favu-moss); margin-top: 20px; margin-bottom: 10px; font-size: 1.5rem; border-bottom: 1px dashed #ccc; padding-bottom: 5px;">Tamanhos e Valores</h4>
+                    <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); background: rgba(224, 159, 65, 0.05); padding: 15px; border-radius: 10px; border: 1px dashed rgba(224, 159, 65, 0.3);">
+                        <div id="e-tam-container"><label>Tamanho</label><input type="text" id="e-tam" placeholder="Ex: P, M"></div>
+                        <div><label>Mín. Individual</label><input type="number" id="e-min" placeholder="Ex: 10"></div>
+                        <div><label>Preço (R$)</label><input type="number" step="0.01" id="e-preco" required></div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 25px;"><button type="button" class="btn btn-outline" onclick="window.closeModal('modal-editar-prod', 'form-edit-prod')" style="border-color: var(--favu-moss); color: var(--favu-moss); flex:1;">Cancelar Edição</button><button type="submit" class="btn btn-secondary" style="flex:2;">Salvar Alterações</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-bulk-prod" class="modal-direct hide-on-mobile">
+        <div class="modal-content modal-content-large" style="border: 2px dashed var(--favu-rust);">
+            <div class="modal-header"><h3>Adesão produtos em lote</h3><button class="close-modal" onclick="window.closeModal('modal-bulk-prod')">&times;</button></div>
+            <div class="modal-body" style="padding-top: 10px;">
+                <div class="grid-header"><div>FOTO</div><div>CATEGORIA</div><div>NOME PRODUTO</div><div>MÍN.</div><div>DESC. PRODUTO</div><div>DESC. IMAGEM</div><div>TAMANHO E PREÇO</div><div></div></div>
+                <div id="bulk-rows"></div>
+                <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 25px;"><button class="btn btn-outline" onclick="window.addGridRow()"><i class="fas fa-plus"></i> Novo Item</button><button class="btn btn-primary" id="btn-save-bulk" onclick="window.saveBulkItems()" style="flex:1; min-width: 200px;">Salvar</button></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE ADICIONAR CATEGORIA (ATUALIZADO) -->
+    <div id="modal-add-cat" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header"><h3>Cadastrar Categoria</h3><button class="close-modal" onclick="window.closeModal('modal-add-cat', 'form-add-cat')">&times;</button></div>
+            <div class="modal-body">
+                <form id="form-add-cat">
+                    <div style="margin-bottom:15px;"><label>Nome</label><input type="text" id="ac-nome" required></div>
+                    <div class="form-grid"><div><label>Mínimo Total</label><input type="number" id="ac-min" value="0" required></div><div><label>Medida</label><select id="ac-col"><option value="Nenhuma">Nenhuma</option><option value="Tamanho">Tamanho</option><option value="Mínimo">Mínimo</option><option value="Tamanho/Minimo">Tamanho/Mínimo</option></select></div></div>
+                    <div class="cat-rich-wrapper" style="margin-bottom: 15px;"><label>Comunicado Categoria</label><div class="cat-rich-toolbar aviso-rich-toolbar"><div class="rich-tools-left"><button type="button" onclick="window.execCatRichText('bold','ac')"><b>B</b></button><button type="button" onclick="window.execCatRichText('italic','ac')"><i>I</i></button><button type="button" onclick="window.execCatRichText('underline','ac')"><u>U</u></button></div><div class="rich-tools-separator"></div><div class="rich-tools-right"><button type="button" onclick="window.execCatRichText('justifyLeft','ac')"><i class="fas fa-align-left"></i></button><button type="button" onclick="window.execCatRichText('justifyCenter','ac')"><i class="fas fa-align-center"></i></button><button type="button" onclick="window.execCatRichText('justifyRight','ac')"><i class="fas fa-align-right"></i></button><button type="button" onclick="window.execCatRichText('justifyFull','ac')"><i class="fas fa-align-justify"></i></button></div></div><div id="ac-obs-editor" class="cat-rich-editor" contenteditable="true" onfocus="window.focusCatEditor('ac')"></div><textarea id="ac-obs" rows="2" style="display:none;"></textarea></div>
+                    
+                    <div class="aviso-schedule-box cat-schedule-box">
+                        <label class="aviso-schedule-title cat-schedule-title"><strong>Programar exibição</strong></label>
+                        <div class="form-grid" style="margin-bottom:10px;"><div><label style="font-size:0.85rem;">Data Início</label><input type="date" id="ac-inid"></div><div><label style="font-size:0.85rem;">Hora Início</label><input type="text" id="ac-inih" class="time-free-input" placeholder="Ex: 15:35" inputmode="text" autocomplete="off"></div></div>
+                        <div class="form-grid" style="margin-bottom:0;"><div><label style="font-size:0.85rem;">Data Fim</label><input type="date" id="ac-fimd"></div><div><label style="font-size:0.85rem;">Hora Fim</label><input type="text" id="ac-fimh" class="time-free-input" placeholder="Ex: 15:35" inputmode="text" autocomplete="off"></div></div>
+                    </div>
+
+                    <div style="display: flex; gap: 10px;"><button type="button" class="btn btn-secondary" onclick="window.closeModal('modal-add-cat', 'form-add-cat')" style="flex:1;">Cancelar</button><button type="submit" class="btn btn-primary" style="flex:1;">Criar Categoria</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-editar-cat" class="modal">
+        <div class="modal-content" style="max-width: 500px; border: 2px solid var(--favu-moss);">
+            <div class="modal-header"><h3 style="color: var(--favu-moss);">Editar Categoria</h3><button class="close-modal" onclick="window.closeModal('modal-editar-cat', 'form-edit-cat')">&times;</button></div>
+            <div class="modal-body">
+                <form id="form-edit-cat">
+                    <input type="hidden" id="ec-id">
+                    <div style="margin-bottom:15px;"><label>Nome</label><input type="text" id="ec-nome" required></div>
+                    <div class="form-grid"><div><label>Mínimo Total</label><input type="number" id="ec-min" required></div><div><label>Medida</label><select id="ec-col"><option value="Nenhuma">Nenhuma</option><option value="Tamanho">Tamanho</option><option value="Mínimo">Mínimo</option><option value="Tamanho/Minimo">Tamanho/Mínimo</option></select></div></div>
+                    <div class="cat-rich-wrapper" style="margin-bottom: 15px;"><label>Comunicado Categoria</label><div class="cat-rich-toolbar aviso-rich-toolbar"><div class="rich-tools-left"><button type="button" onclick="window.execCatRichText('bold','ec')"><b>B</b></button><button type="button" onclick="window.execCatRichText('italic','ec')"><i>I</i></button><button type="button" onclick="window.execCatRichText('underline','ec')"><u>U</u></button></div><div class="rich-tools-separator"></div><div class="rich-tools-right"><button type="button" onclick="window.execCatRichText('justifyLeft','ec')"><i class="fas fa-align-left"></i></button><button type="button" onclick="window.execCatRichText('justifyCenter','ec')"><i class="fas fa-align-center"></i></button><button type="button" onclick="window.execCatRichText('justifyRight','ec')"><i class="fas fa-align-right"></i></button><button type="button" onclick="window.execCatRichText('justifyFull','ec')"><i class="fas fa-align-justify"></i></button></div></div><div id="ec-obs-editor" class="cat-rich-editor" contenteditable="true" onfocus="window.focusCatEditor('ec')"></div><textarea id="ec-obs" rows="2" style="display:none;"></textarea></div>
+
+                    <div class="aviso-schedule-box cat-schedule-box">
+                        <label class="aviso-schedule-title cat-schedule-title"><strong>Programar exibição</strong></label>
+                        <div class="form-grid" style="margin-bottom:10px;"><div><label style="font-size:0.85rem;">Data Início</label><input type="date" id="ec-inid"></div><div><label style="font-size:0.85rem;">Hora Início</label><input type="text" id="ec-inih" class="time-free-input" placeholder="Ex: 15:35" inputmode="text" autocomplete="off"></div></div>
+                        <div class="form-grid" style="margin-bottom:0;"><div><label style="font-size:0.85rem;">Data Fim</label><input type="date" id="ec-fimd"></div><div><label style="font-size:0.85rem;">Hora Fim</label><input type="text" id="ec-fimh" class="time-free-input" placeholder="Ex: 15:35" inputmode="text" autocomplete="off"></div></div>
+                    </div>
+
+                    <div style="display: flex; gap: 10px;"><button type="button" class="btn btn-secondary" onclick="window.closeModal('modal-editar-cat', 'form-edit-cat')" style="flex:1;">Cancelar</button><button type="submit" class="btn btn-primary" style="flex:1;">Atualizar</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-add-aviso" class="modal">
+        <div class="modal-content" style="max-width: 560px;">
+            <div class="modal-header"><h3>Criar Comunicado</h3><button class="close-modal" onclick="window.closeModal('modal-add-aviso', 'form-add-aviso')">&times;</button></div>
+            <div class="modal-body">
+                <form id="form-add-aviso">
+                    <div style="margin-bottom:15px;"><label>Título do Aviso</label><input type="text" id="aa-tit"></div>
+
+                    <div class="aviso-rich-wrapper" style="margin-bottom: 15px;">
+                        <label>Texto do Aviso</label>
+                        <div class="cat-rich-toolbar aviso-rich-toolbar">
+                            <div class="rich-tools-left">
+                                <button type="button" onclick="window.execAvisoRichText('bold','aa')"><b>B</b></button>
+                                <button type="button" onclick="window.execAvisoRichText('italic','aa')"><i>I</i></button>
+                                <button type="button" onclick="window.execAvisoRichText('underline','aa')"><u>U</u></button>
+                            </div>
+                            <div class="rich-tools-separator"></div>
+                            <div class="rich-tools-right">
+                                <button type="button" onclick="window.execAvisoRichText('justifyLeft','aa')"><i class="fas fa-align-left"></i></button>
+                                <button type="button" onclick="window.execAvisoRichText('justifyCenter','aa')"><i class="fas fa-align-center"></i></button>
+                                <button type="button" onclick="window.execAvisoRichText('justifyRight','aa')"><i class="fas fa-align-right"></i></button>
+                                <button type="button" onclick="window.execAvisoRichText('justifyFull','aa')"><i class="fas fa-align-justify"></i></button>
+                            </div>
+                        </div>
+                        <div id="aa-txt-editor" class="cat-rich-editor aviso-rich-editor" contenteditable="true" onfocus="window.focusAvisoEditor('aa')"></div>
+                        <textarea id="aa-txt" rows="3" style="display:none;"></textarea>
+                    </div>
+
+                    <div class="aviso-image-wrapper" style="margin-bottom: 25px;">
+                        <label>Posição da imagem</label>
+                        <div class="cat-rich-toolbar aviso-position-toolbar">
+                            <button type="button" id="aa-img-pos-top" class="aviso-pos-btn active" onclick="window.setAvisoImagePosition('aa','top')">Cabeçalho</button>
+                            <button type="button" id="aa-img-pos-bottom" class="aviso-pos-btn" onclick="window.setAvisoImagePosition('aa','bottom')">Rodapé</button>
+                        </div>
+                        <div class="aviso-image-field">
+                            <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 10px;"><label class="custom-file-upload" style="width: auto;"><i class="fas fa-image"></i> Foto<input type="file" id="aa-file" accept="image/*" onchange="window.previewImage(this, 'aa-img-preview', null, 'aa-img-none', null); document.getElementById('aa-file-name').textContent = (this.files[0] ? this.files[0].name : '');"></label><img id="aa-img-preview" src="" style="width: 50px; height: 50px; object-fit: cover; border-radius: 8px; display: none;"><span id="aa-img-none" style="font-size:0.8rem; color:#999;">Nenhuma foto</span></div><span id="aa-file-name" class="file-name-display" style="text-align: left;"></span>
+                        </div>
+                        <input type="hidden" id="aa-img-pos" value="top">
+                    </div>
+
+                    <div class="aviso-schedule-box cat-schedule-box">
+                        <label class="aviso-schedule-title cat-schedule-title"><strong>Programação</strong></label>
+                        <div class="form-grid" style="margin-bottom:10px;"><div><label style="font-size:0.85rem;">Data Início</label><input type="date" id="aa-inid"></div><div><label style="font-size:0.85rem;">Hora Início</label><input type="text" id="aa-inih" class="time-free-input" placeholder="Ex: 15:35" inputmode="text" autocomplete="off"></div></div>
+                        <div class="form-grid" style="margin-bottom:0;"><div><label style="font-size:0.85rem;">Data Fim</label><input type="date" id="aa-fimd"></div><div><label style="font-size:0.85rem;">Hora Fim</label><input type="text" id="aa-fimh" class="time-free-input" placeholder="Ex: 15:35" inputmode="text" autocomplete="off"></div></div>
+                    </div>
+                    <div style="display: flex; gap: 10px;"><button type="button" class="btn btn-secondary" onclick="window.closeModal('modal-add-aviso', 'form-add-aviso')" style="flex:1;">Cancelar</button><button type="submit" class="btn btn-primary" style="flex:1;">Criar Comunicado</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-editar-aviso" class="modal">
+        <div class="modal-content" style="max-width: 560px; border: 2px solid var(--favu-moss);">
+            <div class="modal-header"><h3 style="color: var(--favu-moss);">Editar Comunicado</h3><button class="close-modal" onclick="window.closeModal('modal-editar-aviso', 'form-edit-aviso')">&times;</button></div>
+            <div class="modal-body">
+                <form id="form-edit-aviso">
+                    <input type="hidden" id="ea-id">
+                    <div style="margin-bottom:15px;"><label>Título do Aviso</label><input type="text" id="ea-tit"></div>
+
+                    <div class="aviso-rich-wrapper" style="margin-bottom: 15px;">
+                        <label>Texto do Aviso</label>
+                        <div class="cat-rich-toolbar aviso-rich-toolbar">
+                            <div class="rich-tools-left">
+                                <button type="button" onclick="window.execAvisoRichText('bold','ea')"><b>B</b></button>
+                                <button type="button" onclick="window.execAvisoRichText('italic','ea')"><i>I</i></button>
+                                <button type="button" onclick="window.execAvisoRichText('underline','ea')"><u>U</u></button>
+                            </div>
+                            <div class="rich-tools-separator"></div>
+                            <div class="rich-tools-right">
+                                <button type="button" onclick="window.execAvisoRichText('justifyLeft','ea')"><i class="fas fa-align-left"></i></button>
+                                <button type="button" onclick="window.execAvisoRichText('justifyCenter','ea')"><i class="fas fa-align-center"></i></button>
+                                <button type="button" onclick="window.execAvisoRichText('justifyRight','ea')"><i class="fas fa-align-right"></i></button>
+                                <button type="button" onclick="window.execAvisoRichText('justifyFull','ea')"><i class="fas fa-align-justify"></i></button>
+                            </div>
+                        </div>
+                        <div id="ea-txt-editor" class="cat-rich-editor aviso-rich-editor" contenteditable="true" onfocus="window.focusAvisoEditor('ea')"></div>
+                        <textarea id="ea-txt" rows="3" style="display:none;"></textarea>
+                    </div>
+
+                    <div class="aviso-image-wrapper" style="margin-bottom: 25px;">
+                        <label>Posição da imagem</label>
+                        <div class="cat-rich-toolbar aviso-position-toolbar">
+                            <button type="button" id="ea-img-pos-top" class="aviso-pos-btn" onclick="window.setAvisoImagePosition('ea','top')">Cabeçalho</button>
+                            <button type="button" id="ea-img-pos-bottom" class="aviso-pos-btn" onclick="window.setAvisoImagePosition('ea','bottom')">Rodapé</button>
+                        </div>
+                        <div class="aviso-image-field">
+                            <label style="font-size: 0.9rem;">Imagem Atual:</label><div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;"><img id="ea-img-preview" src="" style="width: 70px; height: 70px; object-fit: cover; border-radius: 8px; display: none;"><button type="button" id="btn-remove-ea-img" class="btn btn-danger" style="padding: 6px 12px; font-size: 0.85rem; display: none;" onclick="window.markImageForRemoval('aviso')"><i class="fas fa-trash"></i> </button><span id="ea-img-none" style="font-family: var(--font-numbers); font-size: 0.9rem; color: #999; display: none;">Nenhuma imagem.</span></div>
+                            <label style="font-size: 0.9rem; margin-top: 10px;">Substituir/Adicionar Foto:</label><label class="custom-file-upload"><i class="fas fa-camera"></i> Selecionar Imagem<input type="file" id="ea-file" accept="image/*" onchange="window.previewImage(this, 'ea-img-preview', 'btn-remove-ea-img', 'ea-img-none', 'ea-remove-img'); document.getElementById('ea-file-name').textContent = (this.files[0] ? this.files[0].name : '');"></label><span id="ea-file-name" class="file-name-display"></span><input type="hidden" id="ea-remove-img" value="false">
+                        </div>
+                        <input type="hidden" id="ea-img-pos" value="top">
+                    </div>
+
+                    <div class="aviso-schedule-box cat-schedule-box">
+                        <label class="aviso-schedule-title cat-schedule-title"><strong>Programação</strong></label>
+                        <div class="form-grid" style="margin-bottom:10px;"><div><label style="font-size:0.85rem;">Data Início</label><input type="date" id="ea-inid"></div><div><label style="font-size:0.85rem;">Hora Início</label><input type="text" id="ea-inih" class="time-free-input" placeholder="Ex: 15:35" inputmode="text" autocomplete="off"></div></div>
+                        <div class="form-grid" style="margin-bottom:0;"><div><label style="font-size:0.85rem;">Data Fim</label><input type="date" id="ea-fimd"></div><div><label style="font-size:0.85rem;">Hora Fim</label><input type="text" id="ea-fimh" class="time-free-input" placeholder="Ex: 15:35" inputmode="text" autocomplete="off"></div></div>
+                    </div>
+                    <div style="display: flex; gap: 10px;"><button type="button" class="btn btn-secondary" onclick="window.closeModal('modal-editar-aviso', 'form-edit-aviso')" style="flex:1;">Cancelar</button><button type="submit" class="btn btn-primary" style="flex:1;">Salvar Alterações</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="edit-modal-pedido" class="modal" onclick="if(event.target === this) window.fecharModalPedido('edit-modal-pedido')">
+        <div class="modal-content">
+            <div class="modal-header"><h3>Editar Pedido</h3><button class="close-modal" onclick="window.fecharModalPedido('edit-modal-pedido')">&times;</button></div>
+            <div class="modal-body">
+                <div id="modal-id-display" style="font-size:1.1rem; color:var(--favu-moss); font-family: var(--font-numbers); font-weight: bold; margin-bottom: 15px; border-bottom: 1px dashed rgba(224,159,65,0.3); padding-bottom: 10px;"></div>
+                <form id="edit-form-pedido" onsubmit="window.submitEditForm(event)">
+                    <input type="hidden" id="edit-id-pedido">
+                    <label>Nome do Cliente:</label> <input type="text" id="edit-nome-pedido" required style="margin-bottom:10px;">
+                    <label>Telefone:</label> <input type="text" id="edit-telefone-pedido" required style="margin-bottom:10px;">
+                    <div style="display:flex; gap:10px; margin-bottom:10px;">
+                        <div style="flex:1;"><label>Data Entrega:</label> <input type="date" id="edit-data-pedido" required></div>
+                        <div style="flex:1;"><label>Horário:</label> <select id="edit-hora-pedido" class="time-slot-select" required></select></div>
+                    </div>
+                    <div style="display:flex; gap:10px; margin-bottom:10px;">
+                        <div style="flex:1;"><label>Forma Pagamento:</label><select id="edit-forma-pedido"><option value="A confirmar">A confirmar</option><option value="Pix">Pix</option><option value="Dinheiro">Dinheiro</option><option value="Cartão">Cartão</option></select></div>
+                        <div style="flex:1;"><label>Status Pagamento:</label><select id="edit-status-pgto-pedido"><option value="Pagamento pendente">Pagamento pendente</option><option value="Pago 50%">Pago 50%</option><option value="Pago 100%">Pago 100%</option></select></div>
+                    </div>
+                    <div style="display:flex; gap:10px; margin-bottom:10px; align-items: flex-end;">
+                        <div style="flex:2;">
+                            <label>Cupom:</label> 
+                            <input type="text" id="edit-cupom-pedido" style="margin-bottom:0;">
+                        </div>
+                        <div style="flex:1.5;">
+                            <label>Abater Desconto (R$):</label> 
+                            <div style="display:flex; gap:5px;">
+                                <input type="number" step="0.01" id="edit-desconto-pedido" placeholder="0,00" style="margin:0;">
+                                <button type="button" class="btn btn-secondary" style="padding: 10px 15px; margin:0;" onclick="window.aplicarDescontoEdit()" title="Aplicar Desconto"><i class="fas fa-check"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                    <label>Total Final (R$):</label> <input type="text" id="edit-total-pedido" required style="margin-bottom:10px;">
+                    <label>Observações:</label> <textarea id="edit-obs-pedido" rows="2" style="margin-bottom:10px;"></textarea>
+                    
+                    <fieldset style="border: 2px solid var(--favu-rust); border-radius: 8px; padding: 15px; margin: 15px 0;">
+                        <legend style="font-weight: bold; color: var(--favu-rust); padding: 0 10px;">Adicionar Item</legend>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;">
+                            <div style="flex: 2; min-width: 200px;"><label style="font-size:0.9em;">Produto:</label><select id="add-produto-select" onchange="window.toggleCamposOutros()"></select></div>
+                            <div id="add-nome-outros-container" style="flex: 2; min-width: 200px; display: none;"><label style="font-size:0.9em;">Nome do Item:</label><input type="text" id="add-nome-outros" placeholder="Nome"></div>
+                            <div style="flex: 1; min-width: 80px;"><label style="font-size:0.9em;">Qtd:</label><input type="number" id="add-qtd" value="1" min="1"></div>
+                            <div style="flex: 1; min-width: 100px;"><label style="font-size:0.9em;">Preço (R$):</label><input type="text" id="add-preco" placeholder="0,00"></div>
+                            <div><button type="button" class="btn btn-secondary" onclick="window.adicionarItemAoResumoPedido()">Add</button></div>
+                        </div>
+                    </fieldset>
+
+                    <label>Itens do Pedido:</label> <textarea id="edit-resumo-pedido" rows="4"></textarea>
+                    <div style="display:flex; justify-content:center; gap:10px; margin-top:20px;">
+                        <button type="button" class="btn btn-outline" style="flex:1; border-color:var(--favu-moss); color:var(--favu-moss);" onclick="window.fecharModalPedido('edit-modal-pedido')">Cancelar</button>
+                        <button type="submit" class="btn btn-primary" style="flex:1;">Salvar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="bulk-move-modal" class="modal-direct">
+        <div class="modal-content modal-content-small" style="text-align:center;">
+            <div class="modal-body">
+                <h3 style="color:var(--favu-rust); font-family:'Basic Choice', cursive; margin-bottom:15px;">Mover para...</h3>
+                <select id="bulk-move-select" style="width:100%; margin: 10px 0 20px 0;"></select>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn btn-outline" style="flex:1;" onclick="document.getElementById('bulk-move-modal').style.display='none'">Cancelar</button>
+                    <button class="btn btn-primary" style="flex:1;" onclick="window.executarBulkMove()">Mover</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <div id="popup-aviso" class="modal">
-        <div class="modal-content" style="padding: 40px 20px; border: 3px solid var(--accent-orange); background: var(--card-bg);">
-            <span class="close-btn-wrapper" onclick="document.getElementById('popup-aviso').classList.remove('show'); setTimeout(() => document.getElementById('popup-aviso').style.display='none', 300);"><i class="fa-solid fa-xmark close-btn-icon"></i></span>
-            <h2 id="aviso-titulo" class="font-display" style="color: var(--accent-orange); font-size: 2.2rem; margin-bottom: 15px; margin-top: 0;"></h2>
-            <div id="aviso-texto" style="font-family: 'Segoe UI', Arial, sans-serif; color: var(--text-dark); font-size: 1.05rem; line-height: 1.6;"></div>
+    <div id="bulk-payment-modal" class="modal-direct">
+        <div class="modal-content modal-content-small" style="text-align:center;">
+            <div class="modal-body">
+                <h3 style="color:var(--favu-rust); font-family:'Basic Choice', cursive; margin-bottom:15px;">Alterar Pagamento</h3>
+                <select id="bulk-payment-select" style="width:100%; margin: 10px 0 20px 0;">
+                    <option value="Pagamento pendente">Pagamento pendente</option><option value="Pago 50%">Pago 50%</option><option value="Pago 100%">Pago 100%</option>
+                </select>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn btn-outline" style="flex:1;" onclick="document.getElementById('bulk-payment-modal').style.display='none'">Cancelar</button>
+                    <button class="btn btn-primary" style="flex:1;" onclick="window.executarBulkPayment()">Alterar</button>
+                </div>
+            </div>
         </div>
     </div>
 
-    <script type="module" src="script-cardapio.js"></script>
+    <div id="date-picker-modal" class="modal-direct" onclick="if(event.target === this) window.closeDatePicker()">
+        <div class="date-picker-content">
+            <div class="date-picker-header">
+                <button class="date-picker-nav" onclick="window.mudarMes(-1)">‹</button>
+                <div id="month-year-display"></div>
+                <button class="date-picker-nav" onclick="window.mudarMes(1)">›</button>
+            </div>
+            <div class="date-picker-calendar" id="calendar-grid"></div>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+                <div class="date-picker-buttons-row">
+                    <button class="date-picker-btn" style="background:#A5D6A7; color:#1D2814;" onclick="window.selecionarHoje()">Hoje</button>
+                    <button class="date-picker-btn" style="background:var(--favu-green);" onclick="window.filtrarMesAtual()">Mês Atual</button>
+                </div>
+                <div class="date-picker-buttons-row">
+                    <button class="date-picker-btn" style="background:#E60000;" onclick="window.limparFiltros(); window.closeDatePicker();">Limpar Filtros</button>
+                    <button class="date-picker-btn" style="background:var(--favu-rust);" onclick="window.aplicarFiltroData()">Aplicar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="whatsapp-confirm-modal" class="modal-direct" onclick="if(event.target === this) this.style.display='none'">
+        <div class="modal-content modal-content-small" style="text-align:center;">
+            <button class="close-modal" style="position:absolute; right:15px; top:15px;" onclick="document.getElementById('whatsapp-confirm-modal').style.display='none'">&times;</button>
+            <div class="modal-body" style="padding-top:40px;">
+                <h3 id="whatsapp-confirm-title" style="margin-bottom:15px; color:var(--favu-green); font-family:'Basic Choice', cursive; font-size:1.5rem;"></h3>
+                <div id="whatsapp-confirm-message"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="resumos-modal" class="modal-direct" onclick="if(event.target === this) this.style.display='none'">
+        <div class="modal-content modal-content-small" style="text-align:center;">
+            <button class="close-modal" style="position:absolute; right:15px; top:15px;" onclick="document.getElementById('resumos-modal').style.display='none'">&times;</button>
+            <div class="modal-body" style="padding-top:40px;">
+                <h3 style="margin-bottom:20px; color:var(--favu-green); font-family:'Basic Choice', cursive; font-size:1.5rem;">Escolha o resumo</h3>
+                <button class="btn btn-primary" style="width:100%; justify-content:center; margin-bottom:10px;" onclick="window.gerarListaPedidos()">📋 Lista de pedidos (Inteira)</button>
+                <button class="btn btn-secondary" style="width:100%; justify-content:center;" onclick="window.gerarResumoItens()">📦 Lista de itens (Agrupados)</button>
+            </div>
+        </div>
+    </div>
+
+<style>
+    /* Regra para as caixas ficarem lado a lado no PC e uma abaixo da outra no Celular */
+    .stack-mobile { display: flex; gap: 10px; }
+    @media (max-width: 768px) { .stack-mobile { flex-direction: column; gap: 12px; } }
+
+
+/* === AJUSTES FAVU 2026-06-18: mobile, bulk actions, datas e horários === */
+input, select, textarea { max-width: 100%; min-width: 0; }
+input[type="date"], input[type="time"], .time-slot-select, .time-free-input {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+.form-grid > div, .form-grid-2 > div, .input-group { min-width: 0; }
+.form-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+#bulk-actions-produtos,
+#bulk-actions-categorias,
+#bulk-actions-avisos {
+    position: fixed;
+    bottom: 25px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2000;
+    background: white;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.25);
+    border: 2px solid var(--favu-rust) !important;
+    padding: 15px 30px;
+    border-radius: 20px;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    margin: 0;
+}
+#bulk-actions-produtos.active,
+#bulk-actions-categorias.active,
+#bulk-actions-avisos.active { display: flex !important; }
+#bulk-actions-produtos .bulk-actions-btns,
+#bulk-actions-categorias .bulk-actions-btns,
+#bulk-actions-avisos .bulk-actions-btns { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+#bulk-actions-produtos .btn,
+#bulk-actions-categorias .btn,
+#bulk-actions-avisos .btn { padding: 12px 18px !important; font-size: 0.95rem !important; }
+
+.orc-search-panel { width: 100%; }
+#search-orcamento { width: 100%; max-width: 420px; }
+
+.excecoes-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+.excecoes-tab-btn {
+    flex: 1;
+    border: 1px solid rgba(224, 159, 65, 0.35);
+    background: #fff;
+    color: var(--favu-moss);
+    padding: 10px;
+    border-radius: 12px;
+    font-family: 'Basic Choice', cursive;
+    font-size: 1rem;
+    cursor: pointer;
+}
+.excecoes-tab-btn.active { background: var(--favu-green); color: #fff; border-color: var(--favu-green); }
+.excecao-card {
+    display: flex;
+    align-items: center;
+    background: #fff;
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px solid #ddd;
+    gap: 14px;
+    margin-bottom: 10px;
+    width: 100%;
+}
+.excecao-card-data {
+    background: rgba(0,0,0,0.05);
+    padding: 10px 12px;
+    border-radius: 8px;
+    white-space: nowrap;
+    flex: 0 0 auto;
+    font-family: var(--font-numbers);
+}
+.excecao-card-conteudo { flex: 1; min-width: 0; }
+.excecao-card-conteudo input { min-width: 0; }
+.excecao-card-actions { flex: 0 0 auto; }
+
+@media (max-width: 768px) {
+    .form-grid-2 { grid-template-columns: 1fr; }
+    #bulk-actions-produtos,
+    #bulk-actions-categorias,
+    #bulk-actions-avisos {
+        width: 92%;
+        bottom: 15px;
+        padding: 15px;
+        border-radius: 16px;
+        flex-direction: column;
+        gap: 12px;
+    }
+    #bulk-actions-produtos .bulk-actions-btns,
+    #bulk-actions-categorias .bulk-actions-btns,
+    #bulk-actions-avisos .bulk-actions-btns {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        width: 100%;
+        gap: 10px;
+    }
+    #bulk-actions-produtos .btn,
+    #bulk-actions-categorias .btn,
+    #bulk-actions-avisos .btn {
+        width: 100%;
+        margin: 0;
+        padding: 12px 5px !important;
+    }
+    .excecao-card {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 10px;
+        align-items: center;
+    }
+    .excecao-card-data {
+        grid-column: 1 / 2;
+        width: 100%;
+        text-align: center;
+        white-space: normal;
+        font-size: 1rem;
+    }
+    .excecao-card-conteudo {
+        grid-column: 1 / 2;
+        width: 100%;
+    }
+    .excecao-card-actions {
+        grid-column: 2 / 3;
+        grid-row: 1 / span 2;
+        align-self: center;
+    }
+    .excecoes-tabs { flex-direction: column; }
+}
+
+
+
+/* === AJUSTES CATEGORIAS V3 === */
+#tbl-categorias thead th,
+#tbl-categorias td {
+    text-align: center !important;
+}
+#tbl-categorias thead th {
+    font-family: 'Basic Choice', cursive !important;
+    font-weight: normal;
+    font-size: 1.05rem;
+    letter-spacing: 0;
+}
+#tbl-categorias td::before {
+    font-family: Arial, Helvetica, sans-serif !important;
+}
+#tbl-categorias th,
+#tbl-categorias td {
+    border-left: 1px solid rgba(29, 40, 20, 0.055);
+}
+#tbl-categorias th:first-child,
+#tbl-categorias td:first-child {
+    border-left: none;
+}
+#tbl-categorias .mobile-schedule-cell { display: none; }
+#tbl-categorias .cat-notice-summary {
+    display: block;
+    width: 100%;
+    max-width: 135px;
+    margin: 0 auto;
+    font-family: var(--font-numbers) !important;
+    font-size: 0.82rem;
+    line-height: 1.25;
+}
+#tbl-categorias .cat-notice-desktop {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+#tbl-categorias .cat-notice-mobile { display: none; }
+#tbl-categorias .cat-drag-handle {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    border: 1px dashed var(--favu-rust);
+    background: #fffaf2;
+    color: var(--favu-rust);
+    cursor: grab;
+    touch-action: none;
+}
+#tbl-categorias .cat-row.cat-dragging {
+    opacity: 0.92;
+    background: #fff7e8 !important;
+    outline: 2px dashed rgba(224, 159, 65, 0.55);
+    box-shadow: 0 12px 30px rgba(0,0,0,0.12);
+}
+body.cat-sorting-active {
+    cursor: grabbing !important;
+}
+.cat-rich-toolbar {
+    display: flex;
+    gap: 6px;
+    padding: 8px;
+    border: 1px solid rgba(224, 159, 65, 0.3);
+    border-bottom: 0;
+    border-radius: 8px 8px 0 0;
+    background: rgba(224, 159, 65, 0.06);
+}
+.cat-rich-toolbar button {
+    width: 34px;
+    height: 32px;
+    border: 1px solid rgba(224, 159, 65, 0.35);
+    border-radius: 7px;
+    background: white;
+    color: var(--favu-moss);
+    cursor: pointer;
+    font-family: Arial, Helvetica, sans-serif;
+}
+.cat-rich-toolbar button:hover {
+    border-color: var(--favu-rust);
+    color: var(--favu-rust);
+}
+.cat-rich-editor {
+    width: 100%;
+    min-height: 82px;
+    padding: 12px;
+    border: 1px solid rgba(224, 159, 65, 0.3);
+    border-radius: 0 0 8px 8px;
+    background: white;
+    font-family: var(--font-numbers);
+    font-size: 0.95rem;
+    outline: none;
+    overflow-y: auto;
+}
+.cat-rich-editor:focus {
+    border-color: var(--favu-rust);
+}
+
+@media (max-width: 1024px) {
+    #t-cats .panel-card h2 {
+        white-space: nowrap;
+        font-size: clamp(1.25rem, 6vw, 1.8rem) !important;
+        line-height: 1;
+    }
+    #tbl-categorias tbody tr.cat-row {
+        display: grid !important;
+        grid-template-columns: auto minmax(0, 1fr);
+        column-gap: 12px;
+        align-items: center;
+    }
+    #tbl-categorias .cat-order-cell { display: none !important; }
+    #tbl-categorias .cat-select-cell,
+    #tbl-categorias .cat-name-cell {
+        grid-row: 1;
+        border-bottom: 1px dashed #eee !important;
+        min-height: 42px;
+    }
+    #tbl-categorias .cat-select-cell {
+        grid-column: 1;
+        width: auto !important;
+        justify-content: center !important;
+        padding-right: 0 !important;
+    }
+    #tbl-categorias .cat-name-cell {
+        grid-column: 2;
+        justify-content: flex-start !important;
+        text-align: left !important;
+        cursor: grab;
+        touch-action: pan-y;
+    }
+    #tbl-categorias .cat-select-cell::before,
+    #tbl-categorias .cat-name-cell::before { display: none !important; content: none !important; }
+    #tbl-categorias .cat-name-cell strong {
+        text-align: left !important;
+        display: block;
+        width: 100%;
+    }
+    #tbl-categorias td:not(.cat-select-cell):not(.cat-name-cell) {
+        grid-column: 1 / -1;
+    }
+    #tbl-categorias .desktop-schedule-cell { display: none !important; }
+    #tbl-categorias .mobile-schedule-cell { display: flex !important; }
+    #tbl-categorias .cat-notice-summary {
+        max-width: 58%;
+        text-align: right;
+        margin-left: auto;
+    }
+    #tbl-categorias .cat-notice-desktop { display: none !important; }
+    #tbl-categorias .cat-notice-mobile {
+        display: inline-block !important;
+        font-family: Arial, Helvetica, sans-serif !important;
+        font-weight: 700;
+        color: var(--favu-moss);
+    }
+    #tbl-categorias td::before {
+        font-size: 0.95rem !important;
+        color: var(--favu-rust);
+    }
+}
+
+
+
+/* === CATEGORIAS: ações selecionadas, tags de aviso, copiar e mobile final === */
+#bulk-actions-categorias {
+    display: none;
+    position: fixed !important;
+    bottom: 25px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    animation: fadeInCenter 0.3s ease-out !important;
+    z-index: 1500 !important;
+    background: #fff !important;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.25) !important;
+    border: 0 !important;
+    outline: 0 !important;
+    padding: 15px 30px !important;
+    border-radius: 20px !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 20px !important;
+    margin: 0 !important;
+}
+#bulk-actions-categorias.active { display: flex !important; }
+#bulk-actions-categorias .bulk-selected-label {
+    color: var(--favu-green) !important;
+    font-weight: 700 !important;
+    font-family: var(--font-numbers) !important;
+    font-size: 1.1rem !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+}
+#bulk-actions-categorias .bulk-actions-btns {
+    display: flex !important;
+    gap: 10px !important;
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+}
+#bulk-actions-categorias .btn {
+    border: 0 !important;
+    outline: 0 !important;
+    box-shadow: none !important;
+    color: #fff !important;
+    font-family: 'Basic Choice', cursive !important;
+    font-size: 0.95rem !important;
+    padding: 12px 20px !important;
+    border-radius: 10px !important;
+    min-width: 110px !important;
+}
+#bulk-actions-categorias .bulk-actions-btns .btn:nth-child(1) { background: var(--favu-green) !important; }
+#bulk-actions-categorias .bulk-actions-btns .btn:nth-child(2) { background: var(--favu-rust) !important; }
+#bulk-actions-categorias .bulk-actions-btns .btn:nth-child(3) { background: #E60000 !important; }
+#bulk-actions-categorias .bulk-actions-btns .btn:nth-child(4) { background: var(--favu-moss) !important; }
+
+#tbl-categorias .cat-notice-summary {
+    max-width: none !important;
+    width: auto !important;
+    margin: 0 auto !important;
+    text-align: center !important;
+}
+#tbl-categorias .cat-notice-badge {
+    font-family: var(--font-numbers) !important;
+    font-weight: 700 !important;
+    white-space: nowrap !important;
+}
+#tbl-categorias .cat-notice-desktop { display: inline-block !important; }
+#tbl-categorias .cat-notice-mobile { display: none !important; }
+.btn-action.copy { background: var(--favu-rust) !important; color: #fff !important; }
+#tbl-categorias .cat-drag-handle, #tbl-categorias .cat-name-cell { touch-action: none !important; }
+#tbl-categorias .cat-row.cat-dragging { position: relative; z-index: 5; }
+
+@media (max-width: 768px) {
+    #bulk-actions-categorias {
+        width: 92% !important;
+        bottom: 15px !important;
+        padding: 15px !important;
+        border-radius: 16px !important;
+        flex-direction: column !important;
+        gap: 15px !important;
+    }
+    #bulk-actions-categorias .bulk-actions-btns {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        width: 100% !important;
+        gap: 10px !important;
+    }
+    #bulk-actions-categorias .btn {
+        width: 100% !important;
+        min-width: 0 !important;
+        margin: 0 !important;
+        padding: 12px 5px !important;
+        font-size: 0.9rem !important;
+    }
+}
+
+@media (max-width: 1024px) {
+    #tbl-categorias .cat-notice-desktop { display: none !important; }
+    #tbl-categorias .cat-notice-mobile { display: inline-block !important; }
+    #tbl-categorias td::before {
+        font-family: Arial, Helvetica, sans-serif !important;
+        font-weight: 700 !important;
+    }
+}
+
+
+/* === CORREÇÕES FOCADAS CATEGORIAS === */
+.time-free-input {
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    min-height: 44px !important;
+    box-sizing: border-box !important;
+    font-family: var(--font-numbers) !important;
+    line-height: 1.2 !important;
+}
+
+#bulk-actions-categorias {
+    z-index: 1500 !important;
+}
+body.side-menu-open #bulk-actions-categorias {
+    display: none !important;
+}
+
+#bulk-actions-categorias .bulk-actions-btns .btn:nth-child(1) {
+    background: #28a745 !important;
+    color: #fff !important;
+    border: 2px solid #28a745 !important;
+}
+#bulk-actions-categorias .bulk-actions-btns .btn:nth-child(2) {
+    background: #fff !important;
+    color: #E60000 !important;
+    border: 2px solid #E60000 !important;
+}
+#bulk-actions-categorias .bulk-actions-btns .btn:nth-child(3) {
+    background: #E60000 !important;
+    color: #fff !important;
+    border: 2px solid #E60000 !important;
+}
+#bulk-actions-categorias .bulk-actions-btns .btn:nth-child(4) {
+    background: var(--favu-rust) !important;
+    color: #fff !important;
+    border: 2px solid var(--favu-rust) !important;
+}
+
+.btn-action.toggle.cat-toggle-visible {
+    background: #fff !important;
+    color: #28a745 !important;
+    border: 2px solid #28a745 !important;
+}
+.btn-action.toggle.cat-toggle-hidden {
+    background: #fff !important;
+    color: #E60000 !important;
+    border: 2px solid #E60000 !important;
+}
+
+.cat-period-cell .cat-period-line {
+    display: block;
+    white-space: nowrap;
+    font-family: var(--font-numbers) !important;
+    font-size: 0.88rem;
+    line-height: 1.45;
+}
+
+</style>
+
+<div id="modal-fechamento-financeiro" class="modal" onclick="if(event.target === this) window.closeModal('modal-fechamento-financeiro')">
+    <div class="modal-content modal-content-small" style="max-width: 500px; border: 2px solid var(--favu-rust); font-family: var(--font-numbers) !important;">
+        <div class="modal-header" style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+                <h3 style="color: var(--favu-rust); font-family: var(--font-numbers) !important; font-weight: bold; margin: 0;">Fechamento</h3>
+                <span id="fechamento-periodo" style="display: block; font-size: 1rem; color: #666; font-family: var(--font-numbers) !important; margin-top: 4px;"></span>
+            </div>
+            <button class="close-modal" onclick="window.closeModal('modal-fechamento-financeiro')">&times;</button>
+        </div>
+        <div class="modal-body" style="font-family: var(--font-numbers) !important;">
+            
+            <div style="background: rgba(224, 159, 65, 0.08); padding: 15px; border-radius: 12px; margin-bottom: 15px; border: 1px dashed var(--favu-rust); font-family: var(--font-numbers) !important;">
+                <h4 style="margin: 0 0 10px 0; color: var(--favu-moss); font-size: 1rem; font-family: var(--font-numbers) !important;">Divisão de Lucros (%):</h4>
+                <div class="stack-mobile">
+                    <div style="flex: 1;">
+                        <label style="font-size: 0.85rem; display: block; margin-bottom: 4px; font-family: var(--font-numbers) !important;">% Caixa</label>
+                        <input type="number" id="perc-caixa" step="0.1" value="30" style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #ccc; font-family: var(--font-numbers) !important; font-weight: bold; font-size: 1.1rem; text-align: center;" oninput="window.calcularDivisaoFechamento()">
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="font-size: 0.85rem; display: block; margin-bottom: 4px; font-family: var(--font-numbers) !important;">% Arabela</label>
+                        <input type="number" id="perc-ara" step="0.1" value="35" style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #ccc; font-family: var(--font-numbers) !important; font-weight: bold; font-size: 1.1rem; text-align: center;" oninput="window.calcularDivisaoFechamento()">
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="font-size: 0.85rem; display: block; margin-bottom: 4px; font-family: var(--font-numbers) !important;">% Flávio</label>
+                        <input type="number" id="perc-fla" step="0.1" value="35" style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #ccc; font-family: var(--font-numbers) !important; font-weight: bold; font-size: 1.1rem; text-align: center;" oninput="window.calcularDivisaoFechamento()">
+                    </div>
+                </div>
+            </div>
+
+            <div style="background: rgba(224, 159, 65, 0.08); padding: 15px; border-radius: 12px; margin-bottom: 15px; border: 1px dashed var(--favu-rust); font-family: var(--font-numbers) !important;">
+                <h4 style="margin: 0 0 10px 0; color: var(--favu-moss); font-size: 1rem; font-family: var(--font-numbers) !important;">Lançar Gastos do Período (R$):</h4>
+                <div class="stack-mobile">
+                    <div style="flex: 1;">
+                        <label style="font-size: 0.85rem; display: block; margin-bottom: 4px; font-family: var(--font-numbers) !important;">Gastos Caixa</label>
+                        <input type="number" id="gasto-manual-caixa" step="0.01" value="0.00" style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #ccc; font-family: var(--font-numbers) !important; font-size: 1.05rem;" oninput="window.calcularDivisaoFechamento()">
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="font-size: 0.85rem; display: block; margin-bottom: 4px; font-family: var(--font-numbers) !important;">Gastos Arabela</label>
+                        <input type="number" id="gasto-manual-ara" step="0.01" value="0.00" style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #ccc; font-family: var(--font-numbers) !important; font-size: 1.05rem;" oninput="window.calcularDivisaoFechamento()">
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="font-size: 0.85rem; display: block; margin-bottom: 4px; font-family: var(--font-numbers) !important;">Gastos Flávio</label>
+                        <input type="number" id="gasto-manual-fla" step="0.01" value="0.00" style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #ccc; font-family: var(--font-numbers) !important; font-size: 1.05rem;" oninput="window.calcularDivisaoFechamento()">
+                    </div>
+                </div>
+            </div>
+
+            <p style="display: none !important;">
+                <strong id="fechamento-lucro-liquido"></strong>
+            </p>
+
+            <div id="fechamento-divisao-detalhe" style="background:rgba(0,0,0,0.03); padding:15px; border-radius:10px; font-family:var(--font-numbers) !important; line-height:1.8; font-size:1.05rem; margin-bottom: 20px;">
+                </div>
+
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button class="btn btn-primary" style="flex:1; background-color:#25D366; border-color:#25D366; font-family: var(--font-numbers) !important; font-weight: bold;" onclick="window.enviarFechamentoWA('Arabela')"><i class="fab fa-whatsapp"></i> Arabela</button>
+                <button class="btn btn-primary" style="flex:1; background-color:#25D366; border-color:#25D366; font-family: var(--font-numbers) !important; font-weight: bold;" onclick="window.enviarFechamentoWA('Flavio')"><i class="fab fa-whatsapp"></i> Flávio</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+    <div id="modal-edit-estoque" class="modal">
+        <div class="modal-content" style="max-width: 500px; border: 2px solid var(--favu-moss);">
+            <div class="modal-header"><h3 style="color: var(--favu-moss);">Editar Insumo</h3><button class="close-modal" onclick="window.closeModal('modal-edit-estoque', 'form-edit-estoque')">&times;</button></div>
+            <div class="modal-body">
+                <form id="form-edit-estoque">
+                    <input type="hidden" id="ee-id">
+                    <div class="form-grid">
+                        <div><label>Nome do Insumo</label><input type="text" id="ee-nome" required></div>
+                        <div><label>Unidade de Medida</label><select id="ee-unidade" required><option value="Unidade">Unidade (un)</option><option value="Kg">Quilograma (kg)</option><option value="Gramas">Gramas (g)</option><option value="Litros">Litros (L)</option><option value="Caixa">Caixa/Lata</option></select></div>
+                    </div>
+                    <div class="form-grid">
+                        <div><label>Estoque Atual</label><input type="number" step="0.01" id="ee-atual" required></div>
+                        <div><label>Alerta de Estoque Mínimo</label><input type="number" step="0.01" id="ee-minimo" required></div>
+                    </div>
+                    <div style="display: flex; gap: 10px; margin-top: 15px;">
+                        <button type="button" class="btn btn-outline" onclick="window.closeModal('modal-edit-estoque', 'form-edit-estoque')" style="border-color: var(--favu-moss); color: var(--favu-moss); flex:1;">Cancelar</button>
+                        <button type="submit" class="btn btn-secondary" style="flex:1;">Atualizar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-registrar-compra" class="modal">
+        <div class="modal-content" style="max-width: 500px; border: 2px solid var(--favu-rust);">
+            <div class="modal-header">
+                <h3 style="color: var(--favu-rust);">Lançar Compra</h3>
+                <button class="close-modal" onclick="window.closeModal('modal-registrar-compra', 'form-registrar-compra')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="form-registrar-compra">
+                    <input type="hidden" id="rc-insumo-id">
+                    <div style="margin-bottom: 15px;">
+                        <label>Insumo</label>
+                        <input type="text" id="rc-insumo-nome" disabled style="background: #eee; font-weight: bold; color: var(--favu-moss);">
+                    </div>
+                    <div class="form-grid">
+                        <div>
+                            <label>Marca (Opcional)</label>
+                            <input type="text" id="rc-marca" placeholder="Ex: Dona Benta">
+                        </div>
+                        <div>
+                            <label>Valor Pago (R$)</label>
+                            <input type="number" step="0.01" id="rc-valor" required placeholder="0,00">
+                        </div>
+                    </div>
+                    <div class="form-grid">
+                        <div>
+                            <label>Qtd Comprada</label>
+                            <input type="number" step="0.01" id="rc-qtd" required placeholder="Ex: 5">
+                        </div>
+                        <div>
+                            <label>Medida na Embalagem</label>
+                            <select id="rc-medida" required>
+                                <option value="Kg">Quilograma (kg)</option>
+                                <option value="Gramas">Gramas (g)</option>
+                                <option value="Litros">Litros (L)</option>
+                                <option value="Mililitros">Mililitros (ml)</option>
+                                <option value="Unidade">Unidade (un)</option>
+                                <option value="Caixa">Caixa/Lata</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 10px; margin-top: 15px;">
+                        <button type="button" class="btn btn-outline" onclick="window.closeModal('modal-registrar-compra', 'form-registrar-compra')" style="flex:1;">Cancelar</button>
+                        <button type="submit" class="btn btn-primary" style="flex:1;"><i class="fas fa-check"></i> Registrar Compra</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.toggleMenu = function(show) {
+            const menu = document.getElementById('side-menu');
+            const overlay = document.getElementById('menu-overlay');
+            document.body.classList.toggle('side-menu-open', !!show);
+            if (show) { menu.classList.add('active'); overlay.style.display = 'block'; } 
+            else { menu.classList.remove('active'); overlay.style.display = 'none'; }
+        };
+        
+        window.switchTab = function(tabId, element) {
+            document.querySelectorAll('.tab-pane').forEach(t => {
+                t.classList.remove('active');
+                t.style.display = 'none';
+            });
+            document.querySelectorAll('.menu-link').forEach(l => l.classList.remove('active'));
+            
+            const target = document.getElementById(tabId);
+            target.classList.add('active');
+            target.style.display = '';
+
+            if(element) element.classList.add('active');
+            window.toggleMenu(false);
+        };
+        
+        window.openModal = function(id) {
+            const m = document.getElementById(id);
+            m.style.display = 'flex';
+            setTimeout(() => m.classList.add('show'), 10);
+        };
+        window.closeModal = function(id, formId) {
+            const m = document.getElementById(id);
+            m.classList.remove('show');
+            setTimeout(() => { m.style.display = 'none'; if(formId) document.getElementById(formId).reset(); }, 300);
+        };
+        window.openBulkModal = function() { window.openModal('modal-bulk-prod'); };
+
+    </script>
+
+    <!-- MODAIS DE AGENDA -->
+    <div id="modal-add-agenda" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header"><h3>Restringir Data</h3><button class="close-modal" onclick="window.closeModal('modal-add-agenda', 'form-add-agenda')">&times;</button></div>
+            <div class="modal-body">
+                <form id="form-add-agenda">
+                    <div style="margin-bottom: 15px;"><label>Selecione a Data</label><input type="date" id="ag-data" required></div>
+                    <div style="margin-bottom: 15px;">
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; color:#E60000;">
+                            <input type="checkbox" id="ag-indisponivel" style="width:18px; height:18px; accent-color:#E60000;" onchange="document.getElementById('ag-horas-container').style.display = this.checked ? 'none' : 'block'"> 
+                            <strong>Dia Indisponível (Fechar Agenda)</strong>
+                        </label>
+                    </div>
+
+                    <div id="ag-horas-container" style="margin-bottom: 20px;">
+                        <label>Horários Permitidos (Separados por vírgula)</label>
+                        <textarea id="ag-horas" rows="2" placeholder="Ex: 16:00, 16:30, 17:00"></textarea>
+                    </div>
+
+                    <div style="display: flex; gap: 10px;"><button type="button" class="btn btn-outline" onclick="window.closeModal('modal-add-agenda', 'form-add-agenda')" style="flex:1;">Cancelar</button><button type="submit" class="btn btn-primary" style="flex:1;">Salvar Regra</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-editar-agenda" class="modal">
+        <div class="modal-content" style="max-width: 500px; border: 2px solid var(--favu-moss);">
+            <div class="modal-header"><h3 style="color: var(--favu-moss);">Editar Data</h3><button class="close-modal" onclick="window.closeModal('modal-editar-agenda', 'form-edit-agenda')">&times;</button></div>
+            <div class="modal-body">
+                <form id="form-edit-agenda">
+                    <input type="hidden" id="e-ag-data">
+                    <div style="margin-bottom: 15px;"><label>Data</label><input type="date" id="e-ag-data-display" disabled></div>
+                    <div style="margin-bottom: 15px;">
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; color:#E60000;">
+                            <input type="checkbox" id="e-ag-indisponivel" style="width:18px; height:18px; accent-color:#E60000;" onchange="document.getElementById('e-ag-horas-container').style.display = this.checked ? 'none' : 'block'"> 
+                            <strong>Dia Indisponível (Fechar Agenda)</strong>
+                        </label>
+                    </div>
+
+                    <div id="e-ag-horas-container" style="margin-bottom: 20px;">
+                        <label>Horários Permitidos (Separados por vírgula)</label>
+                        <textarea id="e-ag-horas" rows="2"></textarea>
+                    </div>
+
+                    <div style="display: flex; gap: 10px;"><button type="button" class="btn btn-outline" onclick="window.closeModal('modal-editar-agenda', 'form-edit-agenda')" style="border-color: var(--favu-moss); color: var(--favu-moss); flex:1;">Cancelar</button><button type="submit" class="btn btn-secondary" style="flex:1;">Atualizar</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+
+
+<style>
+/* === AJUSTES COMUNICADOS: desktop/mobile isolado da aba Categorias === */
+.avisos-tabs {
+    display: flex;
+    gap: 8px;
+    margin: 0 0 18px 0;
+}
+.avisos-tab-btn {
+    flex: 1;
+    border: 1px solid rgba(224, 159, 65, 0.35);
+    background: #fff;
+    color: var(--favu-moss);
+    padding: 11px 14px;
+    border-radius: 14px;
+    font-family: 'Basic Choice', cursive;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: 0.2s;
+    text-transform: uppercase;
+}
+.avisos-tab-btn.active {
+    background: var(--favu-green);
+    color: #fff;
+    border-color: var(--favu-green);
+}
+#tbl-avisos thead th {
+    font-family: 'Basic Choice', cursive !important;
+    color: var(--favu-rust) !important;
+    font-size: 1.2rem !important;
+    line-height: 1.15 !important;
+    padding: 12px 10px !important;
+    border-bottom: 2px solid var(--favu-rust) !important;
+    text-transform: uppercase;
+    white-space: nowrap;
+    text-align: center !important;
+}
+#tbl-avisos th,
+#tbl-avisos td {
+    border-left: 1px solid rgba(29, 40, 20, 0.055);
+    text-align: center !important;
+}
+#tbl-avisos th:first-child,
+#tbl-avisos td:first-child {
+    border-left: none;
+}
+#tbl-avisos .aviso-title-cell strong {
+    color: var(--favu-rust);
+    font-size: 1.05rem;
+}
+#tbl-avisos .aviso-message-summary {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: var(--font-numbers) !important;
+    font-size: 0.82rem;
+    line-height: 1.25;
+    max-width: 220px;
+    margin: 0 auto;
+}
+#tbl-avisos .aviso-period-line {
+    display: block;
+    font-family: var(--font-numbers) !important;
+    font-size: 0.9rem;
+    line-height: 1.45;
+}
+#tbl-avisos .mobile-schedule-cell,
+#tbl-avisos .aviso-mobile-preview-cell {
+    display: none;
+}
+#tbl-avisos .btn-action.copy { background: var(--favu-rust) !important; color: #fff !important; }
+#tbl-avisos .btn-action.cat-toggle-visible { background: #fff !important; border: 2px solid #28a745 !important; color: #28a745 !important; }
+#tbl-avisos .btn-action.cat-toggle-hidden { background: #fff !important; border: 2px solid #E60000 !important; color: #E60000 !important; }
+
+#bulk-actions-avisos {
+    display: none;
+    position: fixed !important;
+    bottom: 25px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    animation: fadeInCenter 0.3s ease-out !important;
+    z-index: 1500 !important;
+    background: #fff !important;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.25) !important;
+    border: 0 !important;
+    outline: 0 !important;
+    padding: 15px 30px !important;
+    border-radius: 20px !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 20px !important;
+    margin: 0 !important;
+}
+#bulk-actions-avisos.active { display: flex !important; }
+#bulk-actions-avisos .bulk-selected-label {
+    color: var(--favu-green) !important;
+    font-weight: 700 !important;
+    font-family: var(--font-numbers) !important;
+    font-size: 1.1rem !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+}
+#bulk-actions-avisos .bulk-actions-btns {
+    display: flex !important;
+    gap: 10px !important;
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+}
+#bulk-actions-avisos .btn {
+    border: 0 !important;
+    outline: 0 !important;
+    box-shadow: none !important;
+    font-family: 'Basic Choice', cursive !important;
+    font-size: 0.95rem !important;
+    padding: 12px 20px !important;
+    border-radius: 10px !important;
+    min-width: 110px !important;
+}
+#bulk-actions-avisos .bulk-actions-btns .btn:nth-child(1) { background: #28a745 !important; color: #fff !important; border: 2px solid #28a745 !important; }
+#bulk-actions-avisos .bulk-actions-btns .btn:nth-child(2) { background: #fff !important; color: #E60000 !important; border: 2px solid #E60000 !important; }
+#bulk-actions-avisos .bulk-actions-btns .btn:nth-child(3) { background: #E60000 !important; color: #fff !important; border: 2px solid #E60000 !important; }
+#bulk-actions-avisos .bulk-actions-btns .btn:nth-child(4) { background: var(--favu-rust) !important; color: #fff !important; border: 2px solid var(--favu-rust) !important; }
+body.side-menu-open #bulk-actions-avisos { display: none !important; }
+
+.aviso-position-toolbar { border-bottom: 1px solid rgba(224, 159, 65, 0.3); border-radius: 8px; }
+.aviso-position-toolbar .aviso-pos-btn {
+    width: auto !important;
+    min-width: 110px;
+    padding: 0 12px;
+    font-family: 'Basic Choice', cursive !important;
+    color: var(--favu-moss);
+}
+.aviso-position-toolbar .aviso-pos-btn.active {
+    background: var(--favu-rust) !important;
+    border-color: var(--favu-rust) !important;
+    color: white !important;
+}
+.aviso-schedule-box {
+    background: rgba(224, 159, 65, 0.05);
+    padding: 15px;
+    border-radius: 10px;
+    border: 1px dashed rgba(224, 159, 65, 0.3);
+    margin-bottom: 20px;
+}
+.aviso-schedule-title {
+    display: block;
+    margin-bottom: 12px;
+    color: var(--favu-rust);
+}
+
+@media (max-width: 1024px) {
+    #t-avisos .aviso-list-header h2 {
+        white-space: nowrap;
+        font-size: clamp(1.15rem, 5.2vw, 1.8rem) !important;
+        line-height: 1;
+    }
+    #tbl-avisos thead { display: none; }
+    #tbl-avisos,
+    #tbl-avisos tbody,
+    #tbl-avisos tr,
+    #tbl-avisos td { display: block; width: 100%; }
+    #tbl-avisos tbody tr.aviso-row {
+        display: grid !important;
+        grid-template-columns: auto minmax(0, 1fr);
+        column-gap: 12px;
+        align-items: center;
+        background: white;
+        margin-bottom: 20px;
+        border-radius: 16px;
+        padding: 15px;
+        box-shadow: var(--shadow-soft);
+        border: 1px solid #eee;
+    }
+    #tbl-avisos td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        text-align: right !important;
+        border-left: none !important;
+        border-bottom: 1px dashed #eee;
+        padding: 10px 0;
+        font-family: var(--font-numbers) !important;
+    }
+    #tbl-avisos td::before {
+        content: attr(data-label);
+        font-family: Arial, Helvetica, sans-serif !important;
+        font-weight: 700 !important;
+        color: var(--favu-rust);
+        font-size: 0.95rem !important;
+        text-align: left;
+        margin-right: 15px;
+        flex-shrink: 0;
+    }
+    #tbl-avisos .aviso-select-cell,
+    #tbl-avisos .aviso-title-cell {
+        grid-row: 1;
+        border-bottom: 1px dashed #eee !important;
+        min-height: 42px;
+    }
+    #tbl-avisos .aviso-select-cell {
+        grid-column: 1;
+        width: auto !important;
+        justify-content: center !important;
+        padding-right: 0 !important;
+    }
+    #tbl-avisos .aviso-title-cell {
+        grid-column: 2;
+        justify-content: flex-start !important;
+        text-align: left !important;
+    }
+    #tbl-avisos .aviso-select-cell::before,
+    #tbl-avisos .aviso-title-cell::before { display: none !important; content: none !important; }
+    #tbl-avisos .aviso-title-cell strong {
+        text-align: left !important;
+        display: block;
+        width: 100%;
+        color: var(--favu-rust);
+    }
+    #tbl-avisos td:not(.aviso-select-cell):not(.aviso-title-cell) {
+        grid-column: 1 / -1;
+    }
+    #tbl-avisos .aviso-image-cell,
+    #tbl-avisos .aviso-message-cell,
+    #tbl-avisos .desktop-schedule-cell { display: none !important; }
+    #tbl-avisos .mobile-schedule-cell,
+    #tbl-avisos .aviso-mobile-preview-cell { display: flex !important; }
+    #tbl-avisos .aviso-mobile-preview-cell {
+        justify-content: center !important;
+        align-items: stretch !important;
+        padding: 12px 0;
+    }
+    #tbl-avisos .aviso-mobile-preview-cell::before { display: none !important; content: none !important; }
+    .aviso-mobile-preview {
+        width: 100%;
+        border: 1px solid rgba(224, 159, 65, 0.18);
+        border-radius: 14px;
+        padding: 12px;
+        background: #fffaf2;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        align-items: center;
+        justify-content: center;
+    }
+    .aviso-mobile-preview img {
+        max-width: 100%;
+        width: 100%;
+        max-height: 180px;
+        object-fit: cover;
+        border-radius: 10px;
+    }
+    .aviso-mobile-text {
+        width: 100%;
+        font-family: var(--font-numbers) !important;
+        font-size: 0.95rem;
+        line-height: 1.35;
+        color: var(--favu-green);
+        text-align: center;
+    }
+    #tbl-avisos .aviso-actions-cell::before { display: none !important; content: none !important; }
+    #tbl-avisos .aviso-actions-cell {
+        justify-content: center !important;
+        border-bottom: none !important;
+        padding-top: 14px;
+    }
+    #tbl-avisos .aviso-actions-cell .action-btns-wrapper {
+        width: 100% !important;
+        justify-content: center !important;
+    }
+    #bulk-actions-avisos {
+        width: 92% !important;
+        bottom: 15px !important;
+        padding: 15px !important;
+        border-radius: 16px !important;
+        flex-direction: column !important;
+        gap: 15px !important;
+    }
+    #bulk-actions-avisos .bulk-actions-btns {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        width: 100% !important;
+        gap: 10px !important;
+    }
+    #bulk-actions-avisos .btn {
+        width: 100% !important;
+        min-width: 0 !important;
+        margin: 0 !important;
+        padding: 12px 5px !important;
+        font-size: 0.9rem !important;
+    }
+}
+
+/* === CORREÇÃO PONTUAL SOLICITADA: Categorias e Comunicados === */
+
+/* Categoria: espaço entre botões do modal Cadastrar Categoria */
+#form-add-cat > div:last-child {
+    display: flex !important;
+    gap: 14px !important;
+    column-gap: 14px !important;
+}
+
+/* Categoria: mobile/não desktop - Aviso à direita e sem título "Ações" */
+@media (max-width: 1024px) {
+    #tbl-categorias .cat-notice-cell {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        text-align: right !important;
+    }
+
+    #tbl-categorias .cat-notice-summary {
+        margin-left: auto !important;
+        margin-right: 0 !important;
+        text-align: right !important;
+        display: inline-flex !important;
+        justify-content: flex-end !important;
+        width: auto !important;
+        max-width: none !important;
+    }
+
+    #tbl-categorias .cat-notice-mobile {
+        display: inline-block !important;
+    }
+
+    #tbl-categorias .cat-actions-cell::before {
+        display: none !important;
+        content: none !important;
+    }
+
+    #tbl-categorias .cat-actions-cell {
+        justify-content: center !important;
+        text-align: center !important;
+        border-bottom: none !important;
+    }
+
+    #tbl-categorias .cat-actions-cell .action-btns-wrapper {
+        width: 100% !important;
+        justify-content: center !important;
+    }
+}
+
+/* Comunicados: espaço entre botões dos modais Criar/Editar Comunicado */
+#form-add-aviso > div:last-child,
+#form-edit-aviso > div:last-child {
+    display: flex !important;
+    gap: 14px !important;
+    column-gap: 14px !important;
+}
+
+/* Comunicados: toolbar "Texto do Aviso" em uma única linha */
+.aviso-rich-toolbar {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+}
+
+.aviso-rich-toolbar .rich-tools-left,
+.aviso-rich-toolbar .rich-tools-right {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    flex-wrap: nowrap !important;
+    white-space: nowrap !important;
+}
+
+.aviso-rich-toolbar .rich-tools-separator {
+    flex: 0 0 1px !important;
+    width: 1px !important;
+    min-width: 1px !important;
+    align-self: stretch !important;
+    background: rgba(224, 159, 65, 0.28) !important;
+}
+
+/* Comunicados: mensagem completa no desktop */
+@media (min-width: 1025px) {
+    #tbl-avisos .aviso-message-summary {
+        display: block !important;
+        -webkit-line-clamp: unset !important;
+        -webkit-box-orient: initial !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        max-width: none !important;
+        white-space: normal !important;
+        line-height: 1.35 !important;
+    }
+}
+
+
+/* === AJUSTES PONTUAIS: toolbars e posição da imagem === */
+.aviso-rich-toolbar,
+.cat-rich-toolbar.aviso-rich-toolbar {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    overflow-x: visible !important;
+    overflow-y: hidden !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    flex-wrap: nowrap !important;
+}
+
+.aviso-rich-toolbar .rich-tools-left,
+.aviso-rich-toolbar .rich-tools-right,
+.cat-rich-toolbar.aviso-rich-toolbar .rich-tools-left,
+.cat-rich-toolbar.aviso-rich-toolbar .rich-tools-right {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    flex-wrap: nowrap !important;
+    min-width: 0 !important;
+}
+
+.aviso-rich-toolbar button,
+.cat-rich-toolbar.aviso-rich-toolbar button {
+    flex: 0 0 34px !important;
+}
+
+.aviso-image-wrapper {
+    width: 100%;
+}
+
+.aviso-image-wrapper .aviso-position-toolbar {
+    border-bottom: 0 !important;
+    border-radius: 8px 8px 0 0 !important;
+}
+
+.aviso-image-field {
+    padding: 15px;
+    border: 1px solid rgba(224, 159, 65, 0.3);
+    border-top: 0;
+    border-radius: 0 0 8px 8px;
+    background: white;
+}
+
+@media (max-width: 420px) {
+    .aviso-rich-toolbar,
+    .cat-rich-toolbar.aviso-rich-toolbar {
+        gap: 4px !important;
+        padding: 7px !important;
+    }
+    .aviso-rich-toolbar .rich-tools-left,
+    .aviso-rich-toolbar .rich-tools-right,
+    .cat-rich-toolbar.aviso-rich-toolbar .rich-tools-left,
+    .cat-rich-toolbar.aviso-rich-toolbar .rich-tools-right {
+        gap: 4px !important;
+    }
+    .aviso-rich-toolbar button,
+    .cat-rich-toolbar.aviso-rich-toolbar button {
+        flex-basis: 30px !important;
+        width: 30px !important;
+        height: 30px !important;
+    }
+}
+
+</style>
+
+    <script type="module" src="./admin.js?v=20260618-comunicados-1"></script>
+
 </body>
 </html>
