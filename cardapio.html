@@ -5,7 +5,32 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" href="images/favu.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="style-cardapio.css?v=20260619-campos-largura-1">
+    <link rel="stylesheet" href="style-cardapio.css?v=20260619-qtd-visual-1">
+
+<style>
+/* === FAVU 2026-06-19: correção campo de data no iOS === */
+input[type="date"] {
+    min-height: 44px !important;
+    height: 44px !important;
+    line-height: 22px !important;
+    padding: 10px 12px !important;
+    display: flex !important;
+    align-items: center !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    box-sizing: border-box !important;
+    background-color: #fff !important;
+}
+input[type="date"]::-webkit-date-and-time-value {
+    min-height: 22px !important;
+    line-height: 22px !important;
+    text-align: left !important;
+}
+input[type="date"]::-webkit-calendar-picker-indicator {
+    min-height: 22px !important;
+}
+</style>
+
 </head>
 <body>
     <nav id="side-menu" class="side-menu">
@@ -22,7 +47,7 @@
                 <a href="https://www.instagram.com/favucozinha/" target="_blank" class="menu-social-link">
                     <i class="fab fa-instagram"></i> Nos siga no Instagram
                 </a>
-                <a href="http://wa.me/558195256641" target="_blank" class="menu-social-link">
+                <a href="https://wa.me/558195256641" target="_blank" class="menu-social-link">
                     <i class="fab fa-whatsapp"></i> Falar com o Favu
                 </a>
             </div>
@@ -91,7 +116,7 @@
                         </div>
                     </div>
                     
-                    <div class="input-group" id="horario-entrega-container" style="display: none; margin-top: -6px !important;">
+                    <div class="input-group" id="horario-entrega-container" style="display: none; margin-top: 0;">
                         <label for="horario" style="display: block; margin-bottom: 5px;">Horário de Entrega:</label>
                         <input type="time" id="horario" name="horario" required>
                     </div>
@@ -108,7 +133,7 @@
                     
                     <div class="input-group">
                         <label for="observacoes">Observações:</label>
-                        <textarea id="observacoes" name="Observacoes" placeholder="EX: Retirar Itens, Alergias, Etc." rows="2" style="resize: vertical; width: 100%; max-width: 100%; min-width: 100%; box-sizing: border-box;"></textarea>
+                        <textarea id="observacoes" name="Observacoes" placeholder="EX: Retirar Itens, Alergias, Etc." rows="2"></textarea>
                     </div>
                 </form>
 
@@ -154,7 +179,7 @@
                         <p>Tudo artesanal, feito a quatro mãos, de <strong>mãe para filho</strong>, com ingredientes selecionados e um toque especial que só a FAVU tem!</p>
                         <p class="highlight">Faça sua encomenda e vamos transformar seus momentos especiais em inesquecíveis!</p>
                     </div>
-                    <a href="http://wa.me/558195256641" target="_blank" class="btn-primary full-width">Falar com o Favu</a>
+                    <a href="https://wa.me/558195256641" target="_blank" class="btn-primary full-width">Falar com o Favu</a>
                 </div>
             </div>
         </div>
@@ -183,6 +208,6 @@
         </div>
     </div>
 
-    <script type="module" src="script-cardapio.js?v=20260619-data-icon-gap-1"></script>
+    <script type="module" src="script-cardapio.js?v=20260619-correcoes-ios-data-1"></script>
 </body>
 </html>
