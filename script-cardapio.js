@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, getDocs, getDoc, doc, query, where, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, getDocs, getDoc, doc, query, where, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD5JlV7R2w629uiescD4AiixNAr-Qt0qI0",
@@ -291,11 +291,13 @@ document.addEventListener("DOMContentLoaded", async function () {
                 const c = doc.data();
                 let estaVisivel = c.ativo !== false;
                 
-                if (estaVisivel && c.agendarVisibilidade && c.inicio && c.fim) {
+                if (estaVisivel && c.agendarVisibilidade) {
                     const agora = Date.now();
-                    if (agora < c.inicio || agora > c.fim) {
-                        estaVisivel = false;
-                    }
+                    const inicio = c.inicio || null;
+                    const fim = c.fim || null;
+
+                    if (inicio && agora < inicio) estaVisivel = false;
+                    if (fim && agora > fim) estaVisivel = false;
                 }
 
                 if (estaVisivel) { 
@@ -778,6 +780,46 @@ document.addEventListener("DOMContentLoaded", async function () {
     
     window.editarPedido = function() { window.fecharPopup(); setTimeout(() => window.abrirResumoPopup(), 300); }
 
+
+    function getCupomMaxUsosCliente(dadosCupom) {
+        return Number(dadosCupom?.quantidadeDisponivel ?? dadosCupom?.maxUsos ?? 0) || 0;
+    }
+
+    function getCupomUsosAtuaisCliente(dadosCupom) {
+        return Number(dadosCupom?.usosAtuais ?? dadosCupom?.usos ?? 0) || 0;
+    }
+
+    function getStatusOperacionalCupomCliente(dadosCupom) {
+        const status = String(dadosCupom?.statusCupom || '').trim().toLowerCase();
+        if (status === 'inativo' || status === 'pausado' || dadosCupom?.ativo === false) return 'inativo';
+        return 'ativo';
+    }
+
+    function isCupomEsgotadoCliente(dadosCupom) {
+        const max = getCupomMaxUsosCliente(dadosCupom);
+        const usos = getCupomUsosAtuaisCliente(dadosCupom);
+        return max > 0 && usos >= max;
+    }
+
+    async function registrarUsoCupomCliente(codigo) {
+        const cupomCodigo = String(codigo || '').trim().toUpperCase();
+        if (!cupomCodigo) return;
+
+        try {
+            const refCupom = doc(db, "cupons", cupomCodigo);
+            const snapCupom = await getDoc(refCupom);
+            if (!snapCupom.exists()) return;
+
+            const dados = snapCupom.data();
+            await updateDoc(refCupom, {
+                usosAtuais: getCupomUsosAtuaisCliente(dados) + 1,
+                updatedAt: Date.now()
+            });
+        } catch (err) {
+            console.warn("Não foi possível registrar uso do cupom:", err);
+        }
+    }
+
     let cupomAplicado = { codigo: null, desconto: 0, mensagem: '' };
     
     window.aplicarCupom = async function() {
@@ -792,13 +834,14 @@ document.addEventListener("DOMContentLoaded", async function () {
             if (docSnap.exists()) {
                 const dadosCupom = docSnap.data();
                 
-                if (dadosCupom.ativo === false) {
+                const statusCupomCliente = getStatusOperacionalCupomCliente(dadosCupom);
+                if (statusCupomCliente === 'inativo') {
                     cupomMessage.innerHTML = '<span class="cupom-error">Cupom inativo.</span>';
                     cupomAplicado = { codigo: null, desconto: 0, mensagem: '' };
                 } else if (dadosCupom.dataValidade && new Date() > new Date(dadosCupom.dataValidade)) {
                     cupomMessage.innerHTML = '<span class="cupom-error">Cupom expirado.</span>';
                     cupomAplicado = { codigo: null, desconto: 0, mensagem: '' };
-                } else if (dadosCupom.quantidadeDisponivel !== undefined && dadosCupom.quantidadeDisponivel <= 0) {
+                } else if (isCupomEsgotadoCliente(dadosCupom)) {
                     cupomMessage.innerHTML = '<span class="cupom-error">Cupom esgotado.</span>';
                     cupomAplicado = { codigo: null, desconto: 0, mensagem: '' };
                 } else if (window.totalPedidoAtivo < (dadosCupom.valorMinimo || 0)) {
@@ -1164,7 +1207,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
         txt += `- *Informações:*\nNome: ${nm}\nNúmero: ${validarEFormatarTelefone(tel)}\nData: ${dataFormatada}\nHorário: ${hr.substring(0,5)}\nPagamento: ${pag}\n`;
         if(obs) txt += `Observações: ${obs}\n`;
-        if(cupomAplicado.codigo) txt += `Cupom: ${cupomAplicado.codigo} (-R$ ${cupomAplicado.desconto.toFixed(2)})\n`;
+        if(cupomAplicado.codigo) { txt += `Cupom: ${cupomAplicado.codigo}\n`; txt += `Desconto: -R$${cupomAplicado.desconto.toFixed(2).replace('.', ',')}\n`; }
         txt += `*Total Final: R$ ${totalLiquido.toLocaleString('pt-BR',{minimumFractionDigits:2})}*\n`;
 
         const dadosPedido = {
@@ -1178,7 +1221,7 @@ document.addEventListener("DOMContentLoaded", async function () {
             Total_Final: totalLiquido.toLocaleString('pt-BR',{minimumFractionDigits:2}),
             Forma_de_Pagamento: pag,
             Status_Pagamento: 'Pagamento pendente', 
-            Cupom: cupomAplicado.codigo ? `${cupomAplicado.codigo} (-R$ ${cupomAplicado.desconto.toFixed(2).replace('.', ',')})` : "",
+            Cupom: cupomAplicado.codigo ? `Cupom: ${cupomAplicado.codigo}\nDesconto: -R$${cupomAplicado.desconto.toFixed(2).replace('.', ',')}` : "",
             Observacoes: obs || "",
             Resumo_dos_Itens: itensParaPlanilha.trim(),
             createdAt: Date.now()
@@ -1186,6 +1229,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         
         try {
             await setDoc(doc(db, "pedidos", idPedido), dadosPedido);
+            if (cupomAplicado.codigo) await registrarUsoCupomCliente(cupomAplicado.codigo);
         } catch (error) {
             console.error("Erro ao salvar pedido no Firestore:", error);
             alert("Erro de conexão ao salvar pedido.");

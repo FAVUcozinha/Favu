@@ -1,4 +1,4 @@
-const CACHE_NAME = 'favu-app-v40-correcoes-ios-orc-agenda-retirada';
+const CACHE_NAME = 'favu-client-v60-cupom-popup-categoria';
 const urlsToCache = [
   './',
   './index.html',
