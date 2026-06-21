@@ -174,6 +174,34 @@ window.gerarHorarios = function(texto) {
     return [...new Set(resultado)].sort();
 };
 
+
+window.filtrarHorariosDisponiveisPorAgora = function(dataISO, horarios) {
+    if (!dataISO || !Array.isArray(horarios)) return horarios || [];
+
+    const hoje = new Date();
+    const hojeISO = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`;
+    if (dataISO !== hojeISO) return horarios;
+
+    const minutosAgora = (hoje.getHours() * 60) + hoje.getMinutes();
+
+    const paraMinutos = (valor) => {
+        const texto = String(valor || '').trim();
+        const match = texto.match(/^(\d{1,2}):(\d{2})$/);
+        if (!match) return null;
+        const h = Number(match[1]);
+        const m = Number(match[2]);
+        if (!Number.isInteger(h) || !Number.isInteger(m)) return null;
+        return (h * 60) + m;
+    };
+
+    return horarios.filter(hora => {
+        const minutosHorario = paraMinutos(hora);
+        if (minutosHorario === null) return true;
+        return minutosHorario >= minutosAgora;
+    });
+};
+
+
 document.addEventListener("DOMContentLoaded", async function () {
     
     // Tema Cores
@@ -291,11 +319,13 @@ document.addEventListener("DOMContentLoaded", async function () {
                 const c = doc.data();
                 let estaVisivel = c.ativo !== false;
                 
-                if (estaVisivel && c.agendarVisibilidade && c.inicio && c.fim) {
+                if (estaVisivel && c.agendarVisibilidade) {
                     const agora = Date.now();
-                    if (agora < c.inicio || agora > c.fim) {
-                        estaVisivel = false;
-                    }
+                    const inicio = c.inicio || null;
+                    const fim = c.fim || null;
+
+                    if (inicio && agora < inicio) estaVisivel = false;
+                    if (fim && agora > fim) estaVisivel = false;
                 }
 
                 if (estaVisivel) { 
@@ -758,6 +788,13 @@ document.addEventListener("DOMContentLoaded", async function () {
                     arrayHorariosFinal = window.gerarHorarios(regraExcecao.horarios);
                 } else if (regraGeralDoDia && regraGeralDoDia.horarios && regraGeralDoDia.horarios.trim() !== '') {
                     arrayHorariosFinal = window.gerarHorarios(regraGeralDoDia.horarios);
+                }
+
+                const tinhaHorariosConfigurados = arrayHorariosFinal.length > 0;
+                arrayHorariosFinal = window.filtrarHorariosDisponiveisPorAgora(dataEscolhida, arrayHorariosFinal);
+
+                if (tinhaHorariosConfigurados && arrayHorariosFinal.length === 0) {
+                    return resetarDataInvalida("⛔ Não há mais horários disponíveis para esta data.");
                 }
 
                 if (arrayHorariosFinal.length > 0) {
