@@ -6,6 +6,160 @@
     <link rel="icon" type="image/png" href="images/favu.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style-cardapio.css?v=20260619-qtd-visual-1">
+
+<style>
+.item-imagem-carousel { position:relative; width:100%; }
+.item-carousel-btn {
+    position:absolute; top:50%; transform:translateY(-50%); z-index:5;
+    width:36px; height:36px; border:0; border-radius:50%;
+    background:rgba(29,40,20,.72); color:#fff; display:flex; align-items:center; justify-content:center;
+    font-size:1.6rem; cursor:pointer;
+}
+.item-carousel-prev { left:8px; }
+.item-carousel-next { right:8px; }
+.item-imagem-counter {
+    position:absolute; right:10px; bottom:10px; background:rgba(0,0,0,.55);
+    color:#fff; padding:3px 8px; border-radius:999px; font-size:.78rem;
+}
+</style>
+
+
+<style>
+/* === CLIENTE 2026-06-21: zoom de imagens === */
+.imagem-ampliavel {
+    cursor: zoom-in !important;
+}
+
+.popup-zoom-imagem {
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 18px !important;
+    background: rgba(0,0,0,.70) !important;
+    z-index: 999999 !important;
+}
+
+.zoom-imagem-backdrop {
+    position: absolute;
+    inset: 0;
+}
+
+.zoom-imagem-content {
+    position: relative;
+    z-index: 2;
+    max-width: 96vw;
+    max-height: 92vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.zoom-imagem-content img {
+    max-width: 96vw;
+    max-height: 92vh;
+    object-fit: contain;
+    border-radius: 14px;
+    box-shadow: 0 10px 35px rgba(0,0,0,.35);
+    background: #fff;
+}
+
+.zoom-imagem-close {
+    position: absolute;
+    top: -12px;
+    right: -12px;
+    width: 38px;
+    height: 38px;
+    border: 0;
+    border-radius: 50%;
+    background: #fff;
+    color: #c0392b;
+    font-size: 1.5rem;
+    font-weight: 900;
+    cursor: pointer;
+    box-shadow: 0 5px 15px rgba(0,0,0,.25);
+}
+</style>
+
+
+<style>
+/* === CLIENTE 2026-06-21: galeria de imagens em comunicados === */
+.aviso-popup-gallery {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+}
+
+.aviso-popup-gallery img {
+    flex: 0 0 auto;
+    max-width: 100%;
+    max-height: 260px;
+    object-fit: contain;
+    border-radius: 12px;
+}
+</style>
+
+
+<style>
+/* === CLIENTE 2026-06-21: fechar zoom mais sutil === */
+.zoom-imagem-close {
+    top: 8px !important;
+    right: 8px !important;
+    width: 30px !important;
+    height: 30px !important;
+    background: rgba(0,0,0,.34) !important;
+    color: #fff !important;
+    font-size: 1.1rem !important;
+    box-shadow: none !important;
+    opacity: .82 !important;
+}
+.zoom-imagem-close:hover {
+    opacity: 1 !important;
+    background: rgba(0,0,0,.48) !important;
+}
+</style>
+
+
+<style>
+/* === CLIENTE 2026-06-21: sem indicador em imagem única === */
+.item-imagem-counter:empty {
+    display: none !important;
+}
+
+.item-imagem-counter[style*="display: none"] {
+    display: none !important;
+}
+</style>
+
+
+<style>
+/* === CLIENTE 2026-06-21: X zoom sem círculo === */
+.zoom-imagem-close {
+    top: 4px !important;
+    right: 4px !important;
+    width: auto !important;
+    height: auto !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    padding: 0 4px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    color: rgba(255,255,255,.92) !important;
+    font-size: 2.1rem !important;
+    line-height: 1 !important;
+    font-weight: 400 !important;
+    box-shadow: none !important;
+    text-shadow: 0 2px 7px rgba(0,0,0,.55) !important;
+    opacity: .88 !important;
+}
+
+.zoom-imagem-close:hover {
+    background: transparent !important;
+    color: #fff !important;
+    opacity: 1 !important;
+}
+</style>
+
 </head>
 <body>
     <nav id="side-menu" class="side-menu">
@@ -165,7 +319,12 @@
             <div class="close-btn-wrapper" onclick="window.fecharImagemPopup()"><i class="fa-solid fa-xmark close-btn-icon"></i></div>
             <div class="modal-body-scroll">
                 <div class="modal-body modal-item-body">
-                    <img id="item-imagem-display" src="" alt="Imagem do Item" class="item-imagem-display">
+                    <div id="item-imagem-carousel" class="item-imagem-carousel" style="display:none;">
+                        <button type="button" class="item-carousel-btn item-carousel-prev" onclick="window.mudarImagemProdutoPopup(-1)">‹</button>
+                        <img id="item-imagem-display" src="" alt="Imagem do Item" class="item-imagem-display imagem-ampliavel">
+                        <button type="button" class="item-carousel-btn item-carousel-next" onclick="window.mudarImagemProdutoPopup(1)">›</button>
+                        <div id="item-imagem-counter" class="item-imagem-counter"></div>
+                    </div>
                     <div class="item-info">
                         <h3 id="item-nome-display" class="font-display"></h3>
                         <p id="item-descricao-display" style="font-family: 'Segoe UI', sans-serif; font-size: 1rem; line-height: 1.5; color: var(--text-dark);"></p>
@@ -183,6 +342,6 @@
         </div>
     </div>
 
-    <script type="module" src="script-cardapio.js?v=20260620-orcamento-todas-categorias-agenda-cliente-1"></script>
+    <script type="module" src="script-cardapio.js?v=20260621-botoes-editar-produto-mesmo-tamanho-1"></script>
 </body>
 </html>

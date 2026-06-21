@@ -238,11 +238,61 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
     await carregarAgenda();
 
+    
+    // === CLIENTE 2026-06-21: ampliar imagens de produtos e comunicados ===
+    window.abrirZoomImagem = function(src) {
+        if (!src) return;
+
+        let modal = document.getElementById('popup-zoom-imagem');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'popup-zoom-imagem';
+            modal.className = 'modal popup-zoom-imagem';
+            modal.innerHTML = `
+                <div class="zoom-imagem-backdrop" onclick="window.fecharZoomImagem()"></div>
+                <div class="zoom-imagem-content">
+                    <button type="button" class="zoom-imagem-close" onclick="window.fecharZoomImagem()">×</button>
+                    <img id="zoom-imagem-display" src="" alt="Imagem ampliada">
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        const img = document.getElementById('zoom-imagem-display');
+        if (img) img.src = src;
+
+        modal.style.display = 'flex';
+        setTimeout(() => modal.classList.add('show'), 20);
+        document.body.style.overflow = 'hidden';
+    };
+
+    window.fecharZoomImagem = function() {
+        const modal = document.getElementById('popup-zoom-imagem');
+        if (!modal) return;
+        modal.classList.remove('show');
+        setTimeout(() => {
+            modal.style.display = 'none';
+            const img = document.getElementById('zoom-imagem-display');
+            if (img) img.src = '';
+            document.body.style.overflow = 'auto';
+        }, 200);
+    };
+
+
+    
+    function getAvisoImagensCliente(aviso) {
+        const imgs = [];
+        if (Array.isArray(aviso?.imagensUrls)) aviso.imagensUrls.forEach(url => { if (url && !imgs.includes(url)) imgs.push(url); });
+        if (aviso?.imagemUrl && !imgs.includes(aviso.imagemUrl)) imgs.push(aviso.imagemUrl);
+        return imgs;
+    }
+
     function renderAvisoPopupContent(aviso) {
         const texto = window.formatText(aviso?.texto || '');
         const posicaoImagem = (aviso?.posicaoImagem || 'top').toLowerCase() === 'bottom' ? 'bottom' : 'top';
-        const imagemHtml = aviso?.imagemUrl
-            ? `<div class="aviso-popup-image aviso-popup-image-${posicaoImagem}"><img src="${aviso.imagemUrl}" alt="Imagem do comunicado"></div>`
+        const avisoImgs = getAvisoImagensCliente(aviso);
+        const imagemHtml = avisoImgs.length
+            ? `<div class="aviso-popup-image aviso-popup-image-${posicaoImagem} aviso-popup-gallery">${avisoImgs.map((url, idx) => `<img src="${url}" alt="Imagem do comunicado ${idx + 1}" class="imagem-ampliavel" onclick="window.abrirZoomImagem(this.src)">`).join('')}</div>`
             : '';
 
         return `
@@ -381,6 +431,53 @@ document.addEventListener("DOMContentLoaded", async function () {
             .toLowerCase();
     }
 
+    
+    window.produtoPopupImagens = [];
+    window.produtoPopupImagemAtual = 0;
+
+    function getProdutoImagensCliente(item) {
+        const imgs = [];
+        if (Array.isArray(item?.imagensUrls)) item.imagensUrls.forEach(url => { if (url && !imgs.includes(url)) imgs.push(url); });
+        if (item?.imagemUrl && !imgs.includes(item.imagemUrl)) imgs.push(item.imagemUrl);
+        return imgs;
+    }
+
+    window.renderProdutoImagemPopup = function() {
+        const imgs = window.produtoPopupImagens || [];
+        const idx = window.produtoPopupImagemAtual || 0;
+        const carousel = document.getElementById('item-imagem-carousel');
+        const img = document.getElementById('item-imagem-display');
+        const counter = document.getElementById('item-imagem-counter');
+        const prev = document.querySelector('.item-carousel-prev');
+        const next = document.querySelector('.item-carousel-next');
+
+        if (!carousel || !img) return;
+
+        if (!imgs.length) {
+            carousel.style.display = 'none';
+            img.src = '';
+            return;
+        }
+
+        carousel.style.display = 'block';
+        img.src = imgs[idx] || imgs[0];
+        img.classList.add('imagem-ampliavel');
+        img.onclick = () => window.abrirZoomImagem(img.src);
+        img.classList.add('imagem-ampliavel');
+        img.onclick = () => window.abrirZoomImagem(img.src);
+        if (counter) { counter.textContent = imgs.length > 1 ? `${idx + 1}/${imgs.length}` : ''; counter.style.display = imgs.length > 1 ? 'block' : 'none'; }
+        if (prev) prev.style.display = imgs.length > 1 ? 'flex' : 'none';
+        if (next) next.style.display = imgs.length > 1 ? 'flex' : 'none';
+    };
+
+    window.mudarImagemProdutoPopup = function(delta) {
+        const imgs = window.produtoPopupImagens || [];
+        if (!imgs.length) return;
+        window.produtoPopupImagemAtual = (window.produtoPopupImagemAtual + delta + imgs.length) % imgs.length;
+        window.renderProdutoImagemPopup();
+    };
+
+
     function getProdutoCompartilhadoKey(item) {
         const nome = normalizarChaveProduto(item?.nome || item?.descricaoResumo || '');
         const tamanho = normalizarChaveProduto(item?.tamanho || '');
@@ -511,7 +608,8 @@ document.addEventListener("DOMContentLoaded", async function () {
                     <button type="button" class="qtd-btn-table" onclick="window.alterarQuantidadeTabela('${itemKey}', 1, ${item.min || 1})">+</button>
                 </div>`;
 
-            const temFoto = item.imagemUrl && item.imagemUrl.trim() !== "";
+            const imagensProdutoItem = getProdutoImagensCliente(item);
+            const temFoto = imagensProdutoItem.length > 0;
             const temDescPopup = item.descricaoPopup && item.descricaoPopup.trim() !== "";
             const isClickable = temFoto || temDescPopup;
 
@@ -599,7 +697,8 @@ document.addEventListener("DOMContentLoaded", async function () {
         const itemInfo = bancoDeProdutos[itemId]; 
         if(!itemInfo) return;
 
-        const temFoto = itemInfo.imagemUrl && itemInfo.imagemUrl.trim() !== "";
+        const imagensProdutoPopup = getProdutoImagensCliente(itemInfo);
+        const temFoto = imagensProdutoPopup.length > 0;
         const temDescPopup = itemInfo.descricaoPopup && itemInfo.descricaoPopup.trim() !== "";
         
         if(!temFoto && !temDescPopup) return;
@@ -608,14 +707,9 @@ document.addEventListener("DOMContentLoaded", async function () {
         document.getElementById('item-nome-display').textContent = itemInfo.nome;
         document.getElementById('item-descricao-display').innerHTML = window.formatText(itemInfo.descricaoPopup || itemInfo.descricaoItem || '');
         
-        const img = document.getElementById('item-imagem-display');
-        if(temFoto) { 
-            img.src = itemInfo.imagemUrl; 
-            img.style.display = 'block'; 
-        } else { 
-            img.src = '';
-            img.style.display = 'none'; 
-        }
+        window.produtoPopupImagens = imagensProdutoPopup;
+        window.produtoPopupImagemAtual = 0;
+        window.renderProdutoImagemPopup();
         
         modal.style.display = 'flex'; 
         modal.classList.add('show'); 
