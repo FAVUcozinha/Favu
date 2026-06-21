@@ -291,13 +291,11 @@ document.addEventListener("DOMContentLoaded", async function () {
                 const c = doc.data();
                 let estaVisivel = c.ativo !== false;
                 
-                if (estaVisivel && c.agendarVisibilidade) {
+                if (estaVisivel && c.agendarVisibilidade && c.inicio && c.fim) {
                     const agora = Date.now();
-                    const inicio = c.inicio || null;
-                    const fim = c.fim || null;
-
-                    if (inicio && agora < inicio) estaVisivel = false;
-                    if (fim && agora > fim) estaVisivel = false;
+                    if (agora < c.inicio || agora > c.fim) {
+                        estaVisivel = false;
+                    }
                 }
 
                 if (estaVisivel) { 
@@ -780,6 +778,22 @@ document.addEventListener("DOMContentLoaded", async function () {
     
     window.editarPedido = function() { window.fecharPopup(); setTimeout(() => window.abrirResumoPopup(), 300); }
 
+    window.toggleCreditoCliente = function() {
+        // Mantido apenas por compatibilidade com versões antigas. Não há mais campo separado de tipo de crédito.
+    };
+
+    function getTaxaPagamentoCliente(forma, modalidade) {
+        if (forma === 'Débito') return { percentual: 1.99, label: 'Taxa Débito' };
+        if (forma === 'Crédito' || forma === 'Crédito Link') return { percentual: 4.98, label: 'Taxa Crédito' };
+        if (forma === 'Crédito Retirada') return { percentual: 3.09, label: 'Taxa Crédito' };
+        return { percentual: 0, label: '' };
+    }
+
+    function formatarPagamentoCliente(forma, modalidade) {
+        return forma || '';
+    }
+
+
 
     function getCupomMaxUsosCliente(dadosCupom) {
         return Number(dadosCupom?.quantidadeDisponivel ?? dadosCupom?.maxUsos ?? 0) || 0;
@@ -1185,6 +1199,8 @@ document.addEventListener("DOMContentLoaded", async function () {
         const selectHorario = document.getElementById("horario-select");
         const hr = (selectHorario && !selectHorario.disabled && selectHorario.style.display !== 'none') ? selectHorario.value : hrInput.value;
         const pag = document.getElementById("pagamento").value;
+        const modalidadeCredito = '';
+        const formaPagamentoFirestore = pag === 'Crédito' ? 'Crédito Link' : pag;
         const obs = document.getElementById("observacoes").value;
 
         if (!nm || !tel || !dt || !hr || !pag) { 
@@ -1204,8 +1220,11 @@ document.addEventListener("DOMContentLoaded", async function () {
         if(totalLiquido < 0) totalLiquido = 0;
 
         const dataFormatada = dt.split("-").reverse().join("/");
+        const taxaPagamento = getTaxaPagamentoCliente(formaPagamentoFirestore, modalidadeCredito);
+        const valorTaxaPagamento = totalLiquido * ((taxaPagamento.percentual || 0) / 100);
+        const valorRecebidoPagamento = Math.max(0, totalLiquido - valorTaxaPagamento);
 
-        txt += `- *Informações:*\nNome: ${nm}\nNúmero: ${validarEFormatarTelefone(tel)}\nData: ${dataFormatada}\nHorário: ${hr.substring(0,5)}\nPagamento: ${pag}\n`;
+        txt += `- *Informações:*\nNome: ${nm}\nNúmero: ${validarEFormatarTelefone(tel)}\nData: ${dataFormatada}\nHorário: ${hr.substring(0,5)}\nPagamento: ${formatarPagamentoCliente(pag, modalidadeCredito)}\n`;
         if(obs) txt += `Observações: ${obs}\n`;
         if(cupomAplicado.codigo) { txt += `Cupom: ${cupomAplicado.codigo}\n`; txt += `Desconto: -R$${cupomAplicado.desconto.toFixed(2).replace('.', ',')}\n`; }
         txt += `*Total Final: R$ ${totalLiquido.toLocaleString('pt-BR',{minimumFractionDigits:2})}*\n`;
@@ -1219,7 +1238,12 @@ document.addEventListener("DOMContentLoaded", async function () {
             Data_Entrega: dataFormatada,
             Horario_Entrega: hr.substring(0,5),
             Total_Final: totalLiquido.toLocaleString('pt-BR',{minimumFractionDigits:2}),
-            Forma_de_Pagamento: pag,
+            Forma_de_Pagamento: formaPagamentoFirestore,
+            Modalidade_Credito: modalidadeCredito,
+            Taxa_Pagamento: taxaPagamento.label || '',
+            Percentual_Taxa_Pagamento: taxaPagamento.percentual || 0,
+            Valor_Taxa_Pagamento: valorTaxaPagamento > 0 ? valorTaxaPagamento.toLocaleString('pt-BR',{minimumFractionDigits:2}) : '',
+            Valor_Recebido: valorTaxaPagamento > 0 ? valorRecebidoPagamento.toLocaleString('pt-BR',{minimumFractionDigits:2}) : '',
             Status_Pagamento: 'Pagamento pendente', 
             Cupom: cupomAplicado.codigo ? `Cupom: ${cupomAplicado.codigo}\nDesconto: -R$${cupomAplicado.desconto.toFixed(2).replace('.', ',')}` : "",
             Observacoes: obs || "",
