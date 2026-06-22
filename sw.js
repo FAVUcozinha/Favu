@@ -1,4 +1,4 @@
-const CACHE_NAME = 'favu-client-v100-upload-sem-nome-sem-preview-vazio';
+const CACHE_NAME = 'favu-client-v103-gastos-layout-igual-categorias';
 const urlsToCache = [
   './',
   './index.html',
