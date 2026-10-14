@@ -1,0 +1,13 @@
+{
+  "name": "FAVU | Cozinha Afetiva",
+  "short_name": "FAVU",
+  "description": "Inspirada nas receitas e lembranças de família.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#F4E6CB",
+  "theme_color": "#1D2814",
+  "icons": [
+    { "src": "images/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "images/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

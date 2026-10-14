@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="images/favu.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style-cardapio.css?v=20260619-qtd-visual-1">
+
+<style>
+.item-imagem-carousel { position:relative; width:100%; }
+.item-carousel-btn {
+    position:absolute; top:50%; transform:translateY(-50%); z-index:5;
+    width:36px; height:36px; border:0; border-radius:50%;
+    background:rgba(29,40,20,.72); color:#fff; display:flex; align-items:center; justify-content:center;
+    font-size:1.6rem; cursor:pointer;
+}
+.item-carousel-prev { left:8px; }
+.item-carousel-next { right:8px; }
+.item-imagem-counter {
+    position:absolute; right:10px; bottom:10px; background:rgba(0,0,0,.55);
+    color:#fff; padding:3px 8px; border-radius:999px; font-size:.78rem;
+}
+</style>
+
+
+<style>
+/* === CLIENTE 2026-06-21: zoom de imagens === */
+.imagem-ampliavel {
+    cursor: zoom-in !important;
+}
+
+.popup-zoom-imagem {
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 18px !important;
+    background: rgba(0,0,0,.70) !important;
+    z-index: 999999 !important;
+}
+
+.zoom-imagem-backdrop {
+    position: absolute;
+    inset: 0;
+}
+
+.zoom-imagem-content {
+    position: relative;
+    z-index: 2;
+    max-width: 96vw;
+    max-height: 92vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.zoom-imagem-content img {
+    max-width: 96vw;
+    max-height: 92vh;
+    object-fit: contain;
+    border-radius: 14px;
+    box-shadow: 0 10px 35px rgba(0,0,0,.35);
+    background: #fff;
+}
+
+.zoom-imagem-close {
+    position: absolute;
+    top: -12px;
+    right: -12px;
+    width: 38px;
+    height: 38px;
+    border: 0;
+    border-radius: 50%;
+    background: #fff;
+    color: #c0392b;
+    font-size: 1.5rem;
+    font-weight: 900;
+    cursor: pointer;
+    box-shadow: 0 5px 15px rgba(0,0,0,.25);
+}
+</style>
+
+
+<style>
+/* === CLIENTE 2026-06-21: galeria de imagens em comunicados === */
+.aviso-popup-gallery {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+}
+
+.aviso-popup-gallery img {
+    flex: 0 0 auto;
+    max-width: 100%;
+    max-height: 260px;
+    object-fit: contain;
+    border-radius: 12px;
+}
+</style>
+
+
+<style>
+/* === CLIENTE 2026-06-21: fechar zoom mais sutil === */
+.zoom-imagem-close {
+    top: 8px !important;
+    right: 8px !important;
+    width: 30px !important;
+    height: 30px !important;
+    background: rgba(0,0,0,.34) !important;
+    color: #fff !important;
+    font-size: 1.1rem !important;
+    box-shadow: none !important;
+    opacity: .82 !important;
+}
+.zoom-imagem-close:hover {
+    opacity: 1 !important;
+    background: rgba(0,0,0,.48) !important;
+}
+</style>
+
+
+<style>
+/* === CLIENTE 2026-06-21: sem indicador em imagem única === */
+.item-imagem-counter:empty {
+    display: none !important;
+}
+
+.item-imagem-counter[style*="display: none"] {
+    display: none !important;
+}
+</style>
+
+
+<style>
+/* === CLIENTE 2026-06-21: X zoom sem círculo === */
+.zoom-imagem-close {
+    top: 4px !important;
+    right: 4px !important;
+    width: auto !important;
+    height: auto !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    padding: 0 4px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    color: rgba(255,255,255,.92) !important;
+    font-size: 2.1rem !important;
+    line-height: 1 !important;
+    font-weight: 400 !important;
+    box-shadow: none !important;
+    text-shadow: 0 2px 7px rgba(0,0,0,.55) !important;
+    opacity: .88 !important;
+}
+
+.zoom-imagem-close:hover {
+    background: transparent !important;
+    color: #fff !important;
+    opacity: 1 !important;
+}
+</style>
+
+<style>
+/* === CLIENTE 2026-10: carrossel de imagens nos comunicados === */
+.aviso-carousel { position: relative; width: 100%; margin: 0 auto 12px; }
+.aviso-carousel-track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; scrollbar-width: none; border-radius: 12px; }
+.aviso-carousel-track::-webkit-scrollbar { display: none; }
+.aviso-carousel-slide { flex: 0 0 100%; scroll-snap-align: center; display: flex; align-items: center; justify-content: center; }
+.aviso-carousel-slide img { width: 100%; max-height: 300px; object-fit: contain; border-radius: 12px; }
+.aviso-carousel-btn { position: absolute; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; border: 0; border-radius: 50%; background: rgba(29,40,20,.6); color: #fff; font-size: 1.4rem; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.aviso-carousel-btn.prev { left: 6px; } .aviso-carousel-btn.next { right: 6px; }
+.aviso-carousel-dots { display: flex; justify-content: center; gap: 6px; margin-top: 8px; }
+.aviso-carousel-dots span { width: 8px; height: 8px; border-radius: 50%; background: rgba(29,40,20,.25); cursor: pointer; transition: .2s; }
+.aviso-carousel-dots span.ativo { background: var(--accent-orange, #E09F41); width: 18px; border-radius: 4px; }
+</style>
+</head>
+<body>
+    <nav id="side-menu" class="side-menu">
+        <button id="close-menu-btn" class="close-menu-btn">&times;</button>
+        <div class="side-menu-content">
+            <div class="menu-logo-container">
+                <img src="images/favu.png" alt="Logo FAVU" class="menu-logo-img">
+            </div>
+            <ul class="nav-links">
+                <li><a href="#" id="menu-quem-somos" class="menu-link">QUEM SOMOS</a></li>
+                <li><a href="index.html" id="menu-inicial-link" class="menu-link">MENU INICIAL</a></li>
+            </ul>
+            <div class="menu-socials">
+                <a href="https://www.instagram.com/favucozinha/" target="_blank" class="menu-social-link">
+                    <i class="fab fa-instagram"></i> Nos siga no Instagram
+                </a>
+                <a href="https://wa.me/558195256641" target="_blank" class="menu-social-link">
+                    <i class="fab fa-whatsapp"></i> Falar com o Favu
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <header id="header">
+        <div class="header-container-full">
+            <button id="mobile-menu-btn" class="menu-btn"><i class="fa-solid fa-bars"></i></button>
+        </div>
+    </header>
+
+    <nav id="categorias-nav" class="categorias-nav">
+        <div class="categorias-nav-wrapper">
+            <div id="categorias-horizontal" class="categorias-draggable"></div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <main class="menu-content" id="menu-principal"></main>
+        
+        <div id="popup-resumo" class="popup">
+            <div class="popup-conteudo">
+                <span class="fechar" onclick="window.fecharResumoPopup()">&times;</span>
+                <h2 class="font-display">RESUMO DO PEDIDO</h2>
+                
+                <div id="popup-resumo-itens" class="resumo-itens"></div>
+                
+                <div id="cupom-container">
+                    <strong>CUPOM DE DESCONTO</strong>
+                    <div id="cupom-input-group">
+                        <input type="text" id="cupom-input" placeholder="CÓDIGO">
+                        <button id="apply-cupom-btn" onclick="window.aplicarCupom()">APLICAR</button>
+                    </div>
+                    <div id="cupom-message" class="cupom-message"></div>
+                </div>
+                
+                <div class="resumo-footer-area">
+                    <div id="popup-resumo-total" class="resumo-total"></div>
+                    <div id="fazer-pedido-button-container"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="popup-pedido" class="popup">
+            <div class="popup-conteudo">
+                <span class="fechar" onclick="window.fecharPopup()">&times;</span>
+                <h2 class="font-display">INFORMAÇÕES DO PEDIDO</h2>
+                
+                <form id="form-pedido">
+                    <div class="input-group">
+                        <label for="nome">Nome:</label>
+                        <input type="text" id="nome" name="nome" placeholder="Nome Completo" required>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="telefone">Número (WhatsApp):</label>
+                        <input type="tel" id="telefone" name="telefone" placeholder="(DDD) 9XXXX-XXXX" required>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="data">Data de Entrega:</label>
+                        <input type="date" id="data" name="data" required>
+                        <div id="aviso-data-fechada" style="display: none; color: var(--danger, #E60000); font-weight: bold; font-size: 0.85rem; margin-top: 5px; font-family: var(--font-numbers); background: rgba(230,0,0,0.05); padding: 8px; border-radius: 6px; border: 1px solid rgba(230,0,0,0.2);">
+                            <i class="fa-solid fa-ban"></i> ⛔ FECHADO para encomendas nesta data.
+                        </div>
+                    </div>
+                    
+                    <div class="input-group" id="horario-entrega-container" style="display: none; margin-top: 0;">
+                        <label for="horario" style="display: block; margin-bottom: 5px;">Horário de Entrega:</label>
+                        <input type="time" id="horario" name="horario" required>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="pagamento">Forma de pagamento:</label>
+                        <select id="pagamento" name="pagamento" required>
+                            <option value="" disabled selected>Selecione...</option>
+                            <option value="Crédito">Crédito</option>
+                            <option value="Débito">Débito</option>
+                            <option value="Dinheiro">Dinheiro</option>
+                            <option value="Pix">Pix</option>
+                        </select>
+                    </div>
+<div class="input-group">
+                        <label for="observacoes">Observações:</label>
+                        <textarea id="observacoes" name="Observacoes" placeholder="EX: Retirar Itens, Alergias, Etc." rows="2"></textarea>
+                    </div>
+                </form>
+
+                <div class="popup-footer-actions">
+                    <div class="popup-footer-actions-top">
+                        <button type="button" class="btn-secondary" onclick="window.editarPedido()">EDITAR PEDIDO</button>
+                        <button type="button" class="btn-secondary" onclick="window.fecharPopup()">ADICIONAR ITENS</button>
+                    </div>
+                    <button type="button" class="btn-primary-large" onclick="window.confirmarPedido()">CONFIRMAR PEDIDO</button>
+                </div>
+            </div>
+        </div>
+        
+        <button type="button" id="fixed-summary">
+            <div class="summary-content">
+                <div id="summary-text">
+                    <span id="summary-total">R$: 0,00</span>
+                    <span id="summary-item-count">/ 0 itens</span>
+                </div>
+                <div id="summary-button"><i class="fas fa-shopping-cart"></i></div>
+            </div>
+        </button>
+    </div>
+
+    <footer>
+        <div class="footer-container-center">
+            <img src="images/logoroda.png" alt="FAVU Rodapé" class="footer-logo">
+            <div class="desktop-signature">
+                <img src="images/BS.png" alt="Icone"><span>FAVU Cozinha Afetiva</span>
+            </div>
+            <p class="copy">&copy; 2026 Todos os direitos reservados.</p>
+        </div>
+    </footer>
+
+    <div id="aboutModal" class="modal">
+        <div class="modal-content">
+            <div class="close-btn-wrapper" onclick="window.closeAboutModal()"><i class="fa-solid fa-xmark close-btn-icon"></i></div>
+            <div class="modal-body-scroll">
+                <div class="modal-body">
+                    <img src="images/BS.png" alt="História FAVU" class="modal-img">
+                    <div class="font-cocogoose modal-text">
+                        <p>Inspirada nas receitas e lembranças de família, juntamos a tradição e a criatividade para criar pratos, bolos e salgados sob encomenda, uma coisa melhor que a outra.</p>
+                        <p>Tudo artesanal, feito a quatro mãos, de <strong>mãe para filho</strong>, com ingredientes selecionados e um toque especial que só a FAVU tem!</p>
+                        <p class="highlight">Faça sua encomenda e vamos transformar seus momentos especiais em inesquecíveis!</p>
+                    </div>
+                    <a href="https://wa.me/558195256641" target="_blank" class="btn-primary full-width">Falar com o Favu</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="popup-item-imagem" class="modal">
+        <div class="modal-content modal-item-imagem">
+            <div class="close-btn-wrapper" onclick="window.fecharImagemPopup()"><i class="fa-solid fa-xmark close-btn-icon"></i></div>
+            <div class="modal-body-scroll">
+                <div class="modal-body modal-item-body">
+                    <div id="item-imagem-carousel" class="item-imagem-carousel" style="display:none;">
+                        <button type="button" class="item-carousel-btn item-carousel-prev" onclick="window.mudarImagemProdutoPopup(-1)">‹</button>
+                        <img id="item-imagem-display" src="" alt="Imagem do Item" class="item-imagem-display imagem-ampliavel">
+                        <button type="button" class="item-carousel-btn item-carousel-next" onclick="window.mudarImagemProdutoPopup(1)">›</button>
+                        <div id="item-imagem-counter" class="item-imagem-counter"></div>
+                    </div>
+                    <div class="item-info">
+                        <h3 id="item-nome-display" class="font-display"></h3>
+                        <p id="item-descricao-display" style="font-family: 'Segoe UI', sans-serif; font-size: 1rem; line-height: 1.5; color: var(--text-dark);"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="popup-aviso" class="modal">
+        <div class="modal-content" style="padding: 40px 20px; border: 3px solid var(--accent-orange); background: var(--card-bg);">
+            <span class="close-btn-wrapper" onclick="document.getElementById('popup-aviso').classList.remove('show'); setTimeout(() => document.getElementById('popup-aviso').style.display='none', 300);"><i class="fa-solid fa-xmark close-btn-icon"></i></span>
+            <h2 id="aviso-titulo" class="font-display" style="color: var(--accent-orange); font-size: 2.2rem; margin-bottom: 15px; margin-top: 0;"></h2>
+            <div id="aviso-texto" style="font-family: 'Segoe UI', Arial, sans-serif; color: var(--text-dark); font-size: 1.05rem; line-height: 1.6; text-align: left;"></div>
+        </div>
+    </div>
+
+    <script type="module" src="script-cardapio.js?v=20261014-pacote-2"></script>
+</body>
+</html>
