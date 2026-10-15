@@ -170,6 +170,26 @@
 .aviso-carousel-dots { display: flex; justify-content: center; gap: 6px; margin-top: 8px; }
 .aviso-carousel-dots span { width: 8px; height: 8px; border-radius: 50%; background: rgba(29,40,20,.25); cursor: pointer; transition: .2s; }
 .aviso-carousel-dots span.ativo { background: var(--accent-orange, #E09F41); width: 18px; border-radius: 4px; }
+/* 2026-10-15: tabela do celular menos apertada e com letras menores;
+   o ícone de foto/informação fica afastado das colunas de tamanho e valor. */
+@media (max-width: 600px) {
+    .table-card { padding: 14px 12px !important; }
+    .table-card table thead th { font-size: 0.85rem !important; padding-bottom: 10px !important; }
+    .table-card table td { font-size: 0.85rem !important; padding-top: 11px !important; padding-bottom: 11px !important; }
+    .table-card table td.col-item { font-size: 0.95rem !important; line-height: 1.3 !important; padding-right: 4px !important; }
+    .table-card table th.col-icon, .table-card table td.col-icon { width: 34px !important; padding: 0 10px 0 4px !important; text-align: center !important; }
+    .table-card table td.col-icon .foto-hint { font-size: 0.85rem !important; }
+    .table-card table th.col-sec, .table-card table td.col-sec { width: 54px !important; padding-left: 2px !important; padding-right: 2px !important; }
+    .table-card table td.col-sec { line-height: 1.2 !important; }
+    .table-card table .peso-mobile { font-size: 0.68rem !important; margin-top: 2px !important; }
+    .table-card table th.col-unid, .table-card table td.col-unid { width: 62px !important; line-height: 1.2 !important; }
+    .table-card table td.col-unid .moeda { font-size: 0.68rem !important; }
+    .table-card table td.col-unid .valor { font-size: 0.8rem !important; }
+    .table-card table th.col-qtd, .table-card table td.col-qtd { width: 86px !important; }
+    .table-card table input[type="number"] { width: 30px !important; height: 26px !important; font-size: 0.85rem !important; }
+    .table-card table .qtd-btn-table { width: 22px !important; height: 26px !important; font-size: 1.1rem !important; }
+    .table-card table .quantidade-input-group { gap: 3px !important; }
+}
 .categorias-nav-wrapper { max-width: 100% !important; }
 .categorias-draggable.abas-cabem { justify-content: center; }
 .aviso-janela-retirada.alerta { animation: avisoPeriodoPisca 1.4s ease; }
@@ -358,6 +378,6 @@
         </div>
     </div>
 
-    <script type="module" src="script-cardapio.js?v=20261015-pacote-7"></script>
+    <script type="module" src="script-cardapio.js?v=20261015-pacote-8"></script>
 </body>
 </html>

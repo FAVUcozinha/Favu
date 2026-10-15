@@ -1646,6 +1646,8 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
 
     window.confirmarPedido = async function() {
+        // Prévia do tema (painel): nada é gravado nem enviado.
+        if (new URLSearchParams(location.search).has('tema_previa')) { alert('Esta é uma prévia do tema: pedidos estão desativados aqui.'); return; }
         const btn = document.querySelector('.btn-primary-large');
         const txtOriginal = btn.textContent;
         btn.textContent = "Processando...";
