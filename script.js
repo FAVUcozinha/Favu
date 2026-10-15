@@ -109,18 +109,26 @@ function aplicarTemaSite(t) {
             r.push(`body { background: ${fundo} !important; background-attachment: fixed !important; }`);
         } else root.style.setProperty('--bg-color', fundo);
     }
-    if (t.card) root.style.setProperty('--card-bg', t.card);
-    if (t.txt) root.style.setProperty('--text-dark', t.txt);
+    if (t.card) root.style.setProperty('--card-bg', t.card); else root.style.removeProperty('--card-bg');
+    if (t.txt) root.style.setProperty('--text-dark', t.txt); else root.style.removeProperty('--text-dark');
     if (t.acc) { root.style.setProperty('--accent-orange', t.acc); root.style.setProperty('--accent-rust', t.acc); }
     // "__sem__" = o tema pediu para não ter imagem nesse lugar.
     const SEM = '__sem__';
-    const trocarImg = (sel, v) => { if (!v) return; document.querySelectorAll(sel).forEach(img => { if (v === SEM) img.style.display = 'none'; else { img.style.display = ''; img.src = v; } }); };
-    const trocarFundo = (sel, v) => { if (!v) return; const el = document.querySelector(sel); if (el) el.style.backgroundImage = v === SEM ? 'none' : `url('${v}')`; };
+    // Guarda a imagem original para voltar a ela quando o campo fica vazio (prévia ao vivo).
+    const trocarImg = (sel, v) => { document.querySelectorAll(sel).forEach(img => {
+        if (img.dataset.orig === undefined) img.dataset.orig = img.getAttribute('src') || '';
+        if (!v) { img.style.display = ''; img.src = img.dataset.orig; }
+        else if (v === SEM) img.style.display = 'none';
+        else { img.style.display = ''; img.src = v; } }); };
+    const trocarFundo = (sel, v) => { const el = document.querySelector(sel); if (!el) return; el.style.backgroundImage = !v ? '' : (v === SEM ? 'none' : `url('${v}')`); };
     trocarImg('.hero-logo-big', t.logoPrincipal);
     trocarImg('.menu-logo-img', t.logoMenu || t.logoPrincipal);
     trocarImg('.footer-logo', t.logoRodape);
     trocarFundo('header', t.imgTopo);
     trocarFundo('footer', t.imgRodape);
+    trocarImg('#aboutModal .modal-img', t.imgQuemSomos);
+    // Regras de cada elemento, já prontas no tema (painel > Temas).
+    (Array.isArray(t.regrasCss) ? t.regrasCss : []).forEach(x => r.push(x));
 
     const add = (cor, regra) => { if (cor) r.push(regra.replace(/\$C/g, cor)); };
     add(t.corMenuLateral, '.side-menu { background: $C !important; }');
@@ -144,12 +152,48 @@ function aplicarTemaSite(t) {
     tag.textContent = r.join('\n');
 }
 
+// Prévia ao vivo (editor de temas do painel): recebe o tema que está sendo editado
+// e faz piscar o elemento que a pessoa clicou.
+function prepararPreviaAoVivo() {
+    if (window.__aoVivoPronto) return;
+    window.__aoVivoPronto = true;
+    const st = document.createElement('style');
+    st.textContent = '.favu-destaque{outline:3px dashed #E60000 !important;outline-offset:3px !important;animation:favuPisca 1s ease 3;} @keyframes favuPisca{50%{outline-color:transparent;}}';
+    document.head.appendChild(st);
+    window.addEventListener('message', async (ev) => {
+        if (ev.origin !== location.origin || !ev.data) return;
+        if (ev.data.tipo === 'favu-tema-ao-vivo') {
+            try { aplicarTemaSite(await resolverImagensTema(ev.data.dados || {})); } catch (e) {}
+        }
+        if (ev.data.tipo === 'favu-destacar') {
+            document.querySelectorAll('.favu-destaque').forEach(e => e.classList.remove('favu-destaque'));
+            const abrir = ev.data.abrir || '';
+            const menu = document.getElementById('side-menu');
+            if (menu) menu.classList.toggle('active', abrir === 'menu');
+            const about = document.getElementById('aboutModal');
+            if (about) { if (abrir === 'quemsomos') { about.classList.add('show'); about.style.display = 'flex'; } else { about.classList.remove('show'); about.style.display = ''; } }
+            ['resumo', 'info'].forEach(n => {
+                const pop = document.getElementById(n === 'resumo' ? 'popup-resumo' : 'popup-pedido');
+                if (!pop) return;
+                if (abrir === n) { pop.style.display = 'flex'; pop.classList.add('show'); } else { pop.style.display = 'none'; pop.classList.remove('show'); }
+            });
+            if (!ev.data.seletor) return;
+            setTimeout(() => {
+                const els = document.querySelectorAll(ev.data.seletor);
+                els.forEach(e => e.classList.add('favu-destaque'));
+                if (els[0]) els[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 250);
+        }
+    });
+}
+
 // Prévia (painel > Temas > Prévia): ?tema_previa=<id> carrega o tema da lista,
 // já com o que ele herda do tema Padrão, sem precisar aplicar no site.
 async function obterTemaParaAplicar() {
     const idPrevia = new URLSearchParams(location.search).get('tema_previa');
     if (idPrevia) {
         try {
+            if (new URLSearchParams(location.search).has('ao_vivo')) prepararPreviaAoVivo();
             const snap = await getDoc(doc(db, 'config', 'temas_lista'));
             const lista = snap.exists() ? (snap.data().temas || []) : [];
             const t = lista.find(x => x.id === idPrevia);
@@ -195,7 +239,7 @@ async function resolverImagemTema(valor) {
     } catch (e) { return ''; }
 }
 async function resolverImagensTema(t) {
-    const campos = ['logoPrincipal', 'logoMenu', 'imgTopo', 'imgRodape', 'logoRodape'];
+    const campos = ['logoPrincipal', 'logoMenu', 'imgTopo', 'imgRodape', 'logoRodape', 'imgQuemSomos'];
     const valores = await Promise.all(campos.map(k => resolverImagemTema(t[k])));
     const out = { ...t };
     campos.forEach((k, i) => { out[k] = valores[i]; });
@@ -214,8 +258,8 @@ function hrefAcaoSite(item) {
     const acao = item.acao || 'link';
     const link = String(item.link || '').trim();
     if (acao === 'quem_somos') return { href: '#', abreQuemSomos: true };
-    if (acao === 'cardapio') return { href: 'cardapio.html' };
-    if (acao === 'inicio') return { href: 'index.html' };
+    if (acao === 'cardapio') return { href: link || 'cardapio.html' };
+    if (acao === 'inicio') return { href: link || 'index.html' };
     if (acao === 'whatsapp') { const n = link.replace(/\D/g, ''); return { href: n ? `https://wa.me/${n}` : link, externo: true }; }
     return { href: link || '#', externo: /^https?:/i.test(link) };
 }
