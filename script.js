@@ -92,20 +92,47 @@ window.formatText = function(text) {
 
 
 // =====================================================================
-// TEMA DO SITE (2026-10): cores + imagens do tema aplicado no painel.
-// Campos de imagem vazios mantêm as imagens padrão do site.
+// TEMA DO SITE (2026-10-15): cores + imagens do tema aplicado no painel.
+// Campos em branco mantêm o visual padrão do site.
 // =====================================================================
 function aplicarTemaSite(t) {
     if (!t) return;
     const root = document.documentElement;
-    if (t.bg) root.style.setProperty('--bg-color', t.bg);
+    const ehCardapio = !!document.getElementById('menu-principal');
+    const fundo = ehCardapio ? (t.bgCardapio || t.bg) : t.bg;
+    if (fundo) root.style.setProperty('--bg-color', fundo);
     if (t.card) root.style.setProperty('--card-bg', t.card);
     if (t.txt) root.style.setProperty('--text-dark', t.txt);
     if (t.acc) { root.style.setProperty('--accent-orange', t.acc); root.style.setProperty('--accent-rust', t.acc); }
-    if (t.logoPrincipal) document.querySelectorAll('.hero-logo-big, .menu-logo-img').forEach(img => { img.src = t.logoPrincipal; });
+    if (t.logoPrincipal) document.querySelectorAll('.hero-logo-big').forEach(img => { img.src = t.logoPrincipal; });
+    const logoMenu = t.logoMenu || t.logoPrincipal;
+    if (logoMenu) document.querySelectorAll('.menu-logo-img').forEach(img => { img.src = logoMenu; });
     if (t.logoRodape) document.querySelectorAll('.footer-logo').forEach(img => { img.src = t.logoRodape; });
     if (t.imgTopo) { const h = document.querySelector('header'); if (h) h.style.backgroundImage = `url('${t.imgTopo}')`; }
     if (t.imgRodape) { const f = document.querySelector('footer'); if (f) f.style.backgroundImage = `url('${t.imgRodape}')`; }
+
+    // Cores opcionais: viram regras de CSS só quando foram escolhidas no painel.
+    const r = [];
+    const add = (cor, regra) => { if (cor) r.push(regra.replace(/\$C/g, cor)); };
+    add(t.corMenuLateral, '.side-menu { background: $C !important; }');
+    add(t.corIconesBotoes, '.card-icon, .card-icon i { color: $C !important; }');
+    add(t.corBotoes, '.clean-card, .btn-primary { background: $C !important; }');
+    add(t.corTextoBotoes, '.card-info h3, .btn-primary { color: $C !important; }');
+    add(t.corLegendaBotoes, '.card-info p { color: $C !important; }');
+    add(t.corTituloCategorias, '.categoria-title { color: $C !important; }');
+    add(t.corBotoesCategorias, '#categorias-horizontal a:not(.active-link) { background-color: $C !important; }');
+    add(t.corTextoCategorias, '#categorias-horizontal a:not(.active-link) { color: $C !important; }');
+    add(t.corFundoItens, '.table-card { background: $C !important; }');
+    add(t.corTituloItens, 'td.col-item, td.col-item .item-nome-texto { color: $C !important; }');
+    add(t.corDescricoes, '.descricao, .peso-mobile { color: $C !important; }');
+    add(t.corResumoPedido, '#fixed-summary { background-color: $C !important; }');
+    add(t.corFundoResumo, '#popup-resumo .popup-conteudo, #popup-resumo #cupom-container strong { background-color: $C !important; }');
+    add(t.corBotoesResumo, '#popup-resumo .btn-fazer-pedido, #popup-resumo .btn-primary-large, #popup-resumo #apply-cupom-btn { background-color: $C !important; }');
+    add(t.corFundoInfoPedido, '#popup-pedido .popup-conteudo { background-color: $C !important; }');
+    add(t.corBotoesInfoPedido, '#popup-pedido .btn-primary-large { background-color: $C !important; }');
+    let tag = document.getElementById('tema-dinamico');
+    if (!tag) { tag = document.createElement('style'); tag.id = 'tema-dinamico'; document.head.appendChild(tag); }
+    tag.textContent = r.join('\n');
 }
 
 // As imagens do tema ficam em documentos separados (config/tema_img_...), porque
@@ -123,7 +150,7 @@ async function resolverImagemTema(valor) {
     } catch (e) { return ''; }
 }
 async function resolverImagensTema(t) {
-    const campos = ['logoPrincipal', 'imgTopo', 'imgRodape', 'logoRodape'];
+    const campos = ['logoPrincipal', 'logoMenu', 'imgTopo', 'imgRodape', 'logoRodape'];
     const valores = await Promise.all(campos.map(k => resolverImagemTema(t[k])));
     const out = { ...t };
     campos.forEach((k, i) => { out[k] = valores[i]; });
