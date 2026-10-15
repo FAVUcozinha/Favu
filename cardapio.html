@@ -160,6 +160,18 @@
 }
 </style>
 
+<style>
+/* === CLIENTE 2026-10: carrossel de imagens nos comunicados === */
+.aviso-carousel { position: relative; width: 100%; margin: 0 auto 12px; }
+.aviso-carousel-viewport { width: 100%; overflow: hidden; border-radius: 12px; touch-action: pan-y; }
+.aviso-carousel-track { display: flex; width: 100%; will-change: transform; cursor: grab; user-select: none; -webkit-user-select: none; }
+.aviso-carousel-slide { flex: 0 0 100%; min-width: 100%; display: flex; align-items: center; justify-content: center; }
+.aviso-carousel-slide img { display: block; width: auto; max-width: 100%; max-height: 300px; margin: 0 auto; object-fit: contain; border-radius: 12px; -webkit-user-drag: none; }
+.aviso-carousel-dots { display: flex; justify-content: center; gap: 6px; margin-top: 8px; }
+.aviso-carousel-dots span { width: 8px; height: 8px; border-radius: 50%; background: rgba(29,40,20,.25); cursor: pointer; transition: .2s; }
+.aviso-carousel-dots span.ativo { background: var(--accent-orange, #E09F41); width: 18px; border-radius: 4px; }
+.aviso-janela-retirada { margin: 6px 0 10px; padding: 10px 12px; border-radius: 10px; font-size: 0.85rem; line-height: 1.35; text-align: left; color: #1D2814; background: rgba(224,159,65,0.12); border: 1px solid rgba(224,159,65,0.35); font-family: var(--font-numbers, Arial, sans-serif); }
+</style>
 </head>
 <body>
     <nav id="side-menu" class="side-menu">
@@ -342,6 +354,6 @@
         </div>
     </div>
 
-    <script type="module" src="script-cardapio.js?v=20261014-itens-congelados-1"></script>
+    <script type="module" src="script-cardapio.js?v=20261015-pacote-3"></script>
 </body>
 </html>

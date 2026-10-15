@@ -90,20 +90,52 @@ window.formatText = function(text) {
         .trim();
 };
 
+
+// =====================================================================
+// TEMA DO SITE (2026-10): cores + imagens do tema aplicado no painel.
+// Campos de imagem vazios mantêm as imagens padrão do site.
+// =====================================================================
+function aplicarTemaSite(t) {
+    if (!t) return;
+    const root = document.documentElement;
+    if (t.bg) root.style.setProperty('--bg-color', t.bg);
+    if (t.card) root.style.setProperty('--card-bg', t.card);
+    if (t.txt) root.style.setProperty('--text-dark', t.txt);
+    if (t.acc) { root.style.setProperty('--accent-orange', t.acc); root.style.setProperty('--accent-rust', t.acc); }
+    if (t.logoPrincipal) document.querySelectorAll('.hero-logo-big, .menu-logo-img').forEach(img => { img.src = t.logoPrincipal; });
+    if (t.logoRodape) document.querySelectorAll('.footer-logo').forEach(img => { img.src = t.logoRodape; });
+    if (t.imgTopo) { const h = document.querySelector('header'); if (h) h.style.backgroundImage = `url('${t.imgTopo}')`; }
+    if (t.imgRodape) { const f = document.querySelector('footer'); if (f) f.style.backgroundImage = `url('${t.imgRodape}')`; }
+}
+
+// As imagens do tema ficam em documentos separados (config/tema_img_...), porque
+// juntas passavam do limite de 1 MB do Firestore. O tema guarda "cfgimg:<id>".
+async function resolverImagemTema(valor) {
+    const v = String(valor || '');
+    if (!v.startsWith('cfgimg:')) return v;
+    const id = v.slice(7);
+    try { const c = localStorage.getItem('favu_img_' + id); if (c) return c; } catch (e) {}
+    try {
+        const s = await getDoc(doc(db, 'config', id));
+        const data = s.exists() ? (s.data().data || '') : '';
+        try { if (data) localStorage.setItem('favu_img_' + id, data); } catch (e) {}
+        return data;
+    } catch (e) { return ''; }
+}
+async function resolverImagensTema(t) {
+    const campos = ['logoPrincipal', 'imgTopo', 'imgRodape', 'logoRodape'];
+    const valores = await Promise.all(campos.map(k => resolverImagemTema(t[k])));
+    const out = { ...t };
+    campos.forEach((k, i) => { out[k] = valores[i]; });
+    return out;
+}
+
 document.addEventListener("DOMContentLoaded", async function () {
     
-    // APLICAR TEMA (CORES)
+    // APLICAR TEMA (CORES + IMAGENS)
     try {
         const temaDoc = await getDoc(doc(db, "config", "tema"));
-        if (temaDoc.exists()) {
-            const t = temaDoc.data();
-            const root = document.documentElement;
-            if(t.bg) root.style.setProperty('--bg-color', t.bg);
-            if(t.card) root.style.setProperty('--card-bg', t.card);
-            if(t.txt) root.style.setProperty('--text-dark', t.txt);
-            if(t.acc) root.style.setProperty('--accent-orange', t.acc);
-            if(t.acc) root.style.setProperty('--accent-rust', t.acc);
-        }
+        if (temaDoc.exists()) aplicarTemaSite(await resolverImagensTema(temaDoc.data()));
     } catch(e) {}
 
     // CARREGAR BOTÕES DO MENU LATERAL (SANFONA)
@@ -146,9 +178,11 @@ document.addEventListener("DOMContentLoaded", async function () {
     try {
         const carSnap = await getDocs(collection(db, "carrossel"));
         if (!carSnap.empty) {
-            carSnap.forEach(d => { 
-                arrayImagens.push(`<div class="slide-item"><img src="${d.data().url}" loading="lazy"></div>`); 
-            });
+            // Respeita a ordem definida no painel (Layout > Imagens do Carrossel).
+            const fotos = [];
+            carSnap.forEach(d => fotos.push(d.data()));
+            fotos.sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+            fotos.forEach(f => { if (f.url) arrayImagens.push(`<div class="slide-item"><img src="${f.url}" loading="lazy"></div>`); });
         }
     } catch(e) { console.error("Erro ao carregar carrossel", e); }
 

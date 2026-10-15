@@ -202,19 +202,52 @@ window.filtrarHorariosDisponiveisPorAgora = function(dataISO, horarios) {
 };
 
 
+
+// =====================================================================
+// TEMA DO SITE (2026-10): cores + imagens do tema aplicado no painel.
+// Campos de imagem vazios mantêm as imagens padrão do site.
+// =====================================================================
+function aplicarTemaSite(t) {
+    if (!t) return;
+    const root = document.documentElement;
+    if (t.bg) root.style.setProperty('--bg-color', t.bg);
+    if (t.card) root.style.setProperty('--card-bg', t.card);
+    if (t.txt) root.style.setProperty('--text-dark', t.txt);
+    if (t.acc) { root.style.setProperty('--accent-orange', t.acc); root.style.setProperty('--accent-rust', t.acc); }
+    if (t.logoPrincipal) document.querySelectorAll('.hero-logo-big, .menu-logo-img').forEach(img => { img.src = t.logoPrincipal; });
+    if (t.logoRodape) document.querySelectorAll('.footer-logo').forEach(img => { img.src = t.logoRodape; });
+    if (t.imgTopo) { const h = document.querySelector('header'); if (h) h.style.backgroundImage = `url('${t.imgTopo}')`; }
+    if (t.imgRodape) { const f = document.querySelector('footer'); if (f) f.style.backgroundImage = `url('${t.imgRodape}')`; }
+}
+
+// As imagens do tema ficam em documentos separados (config/tema_img_...), porque
+// juntas passavam do limite de 1 MB do Firestore. O tema guarda "cfgimg:<id>".
+async function resolverImagemTema(valor) {
+    const v = String(valor || '');
+    if (!v.startsWith('cfgimg:')) return v;
+    const id = v.slice(7);
+    try { const c = localStorage.getItem('favu_img_' + id); if (c) return c; } catch (e) {}
+    try {
+        const s = await getDoc(doc(db, 'config', id));
+        const data = s.exists() ? (s.data().data || '') : '';
+        try { if (data) localStorage.setItem('favu_img_' + id, data); } catch (e) {}
+        return data;
+    } catch (e) { return ''; }
+}
+async function resolverImagensTema(t) {
+    const campos = ['logoPrincipal', 'imgTopo', 'imgRodape', 'logoRodape'];
+    const valores = await Promise.all(campos.map(k => resolverImagemTema(t[k])));
+    const out = { ...t };
+    campos.forEach((k, i) => { out[k] = valores[i]; });
+    return out;
+}
+
 document.addEventListener("DOMContentLoaded", async function () {
     
-    // Tema Cores
+    // Tema Cores + Imagens
     try {
         const temaDoc = await getDoc(doc(db, "config", "tema"));
-        if (temaDoc.exists()) {
-            const t = temaDoc.data();
-            const root = document.documentElement;
-            if(t.bg) root.style.setProperty('--bg-color', t.bg);
-            if(t.card) root.style.setProperty('--card-bg', t.card);
-            if(t.txt) root.style.setProperty('--text-dark', t.txt);
-            if(t.acc) { root.style.setProperty('--accent-orange', t.acc); root.style.setProperty('--accent-rust', t.acc); }
-        }
+        if (temaDoc.exists()) aplicarTemaSite(await resolverImagensTema(temaDoc.data()));
     } catch(e) {}
 
     // Agenda de Horários Globais e Exceções
@@ -287,12 +320,88 @@ document.addEventListener("DOMContentLoaded", async function () {
         return imgs;
     }
 
+    // NOVO (2026-10): carrossel do comunicado. Uma imagem por vez, centralizada,
+    // passando sozinha em loop (como o da página inicial). Desliza com o dedo e
+    // tem bolinhas embaixo da imagem. Sem setas por cima da imagem.
+    function iniciarCarrosselAviso(root) {
+        const carrossel = root.querySelector('.aviso-carousel');
+        if (!carrossel) return;
+        const track = carrossel.querySelector('.aviso-carousel-track');
+        const total = Number(carrossel.dataset.total) || 1;
+        if (!track || total < 2) return;
+        const dots = Array.from(carrossel.querySelectorAll('.aviso-carousel-dots span'));
+        // Clone da primeira no fim para o loop não "voltar correndo".
+        const clone = track.firstElementChild.cloneNode(true);
+        clone.setAttribute('aria-hidden', 'true');
+        track.appendChild(clone);
+
+        let atual = 0, pausadoAte = 0, arrastando = false, inicioX = 0, deltaX = 0;
+        const aplicar = (animar) => {
+            track.style.transition = animar ? 'transform .55s ease' : 'none';
+            track.style.transform = `translateX(${-atual * 100}%)`;
+            dots.forEach((d, idx) => d.classList.toggle('ativo', idx === (atual % total)));
+        };
+        const irPara = (i) => {
+            if (i < 0) { atual = total; aplicar(false); void track.offsetWidth; i = total - 1; }
+            atual = i;
+            aplicar(true);
+        };
+        track.addEventListener('transitionend', () => {
+            if (atual >= total) { atual = 0; aplicar(false); }
+        });
+        const pausar = () => { pausadoAte = Date.now() + 6000; };
+
+        const xDe = (e) => (e.touches ? e.touches[0].clientX : e.clientX);
+        const comecar = (e) => { arrastando = true; inicioX = xDe(e); deltaX = 0; pausar(); track.style.transition = 'none'; };
+        const mover = (e) => {
+            if (!arrastando) return;
+            deltaX = xDe(e) - inicioX;
+            const largura = carrossel.clientWidth || 1;
+            track.style.transform = `translateX(calc(${-atual * 100}% + ${deltaX}px))`;
+            if (Math.abs(deltaX) > 8 && e.cancelable) e.preventDefault();
+            if (Math.abs(deltaX) > largura) deltaX = Math.sign(deltaX) * largura;
+        };
+        const terminar = () => {
+            if (!arrastando) return;
+            arrastando = false;
+            const limite = Math.min(60, (carrossel.clientWidth || 300) * 0.15);
+            if (deltaX <= -limite) irPara(atual + 1);
+            else if (deltaX >= limite) irPara(atual - 1);
+            else aplicar(true);
+            if (Math.abs(deltaX) > 8) carrossel.dataset.arrastou = '1';
+            setTimeout(() => { delete carrossel.dataset.arrastou; }, 50);
+        };
+        track.addEventListener('touchstart', comecar, { passive: true });
+        track.addEventListener('touchmove', mover, { passive: false });
+        track.addEventListener('touchend', terminar);
+        track.addEventListener('mousedown', (e) => { e.preventDefault(); comecar(e); });
+        window.addEventListener('mousemove', mover);
+        window.addEventListener('mouseup', terminar);
+        // Não abre o zoom quando o toque foi para deslizar.
+        track.addEventListener('click', (e) => { if (carrossel.dataset.arrastou) { e.stopPropagation(); e.preventDefault(); } }, true);
+        dots.forEach((d, idx) => d.addEventListener('click', () => { pausar(); irPara(idx); }));
+
+        aplicar(false);
+        clearInterval(window.__avisoCarrosselTimer);
+        window.__avisoCarrosselTimer = setInterval(() => {
+            if (!document.body.contains(track)) return clearInterval(window.__avisoCarrosselTimer);
+            if (arrastando || Date.now() < pausadoAte) return;
+            irPara(atual + 1);
+        }, 3500);
+    }
+
     function renderAvisoPopupContent(aviso) {
         const texto = window.formatText(aviso?.texto || '');
         const posicaoImagem = (aviso?.posicaoImagem || 'top').toLowerCase() === 'bottom' ? 'bottom' : 'top';
         const avisoImgs = getAvisoImagensCliente(aviso);
+        // NOVO (2026-10): várias imagens viram um carrossel (uma por vez, passa sozinho
+        // e o cliente pode deslizar para os lados), igual ao da página inicial.
+        const variasImgs = avisoImgs.length > 1;
         const imagemHtml = avisoImgs.length
-            ? `<div class="aviso-popup-image aviso-popup-image-${posicaoImagem} aviso-popup-gallery">${avisoImgs.map((url, idx) => `<img src="${url}" alt="Imagem do comunicado ${idx + 1}" class="imagem-ampliavel" onclick="window.abrirZoomImagem(this.src)">`).join('')}</div>`
+            ? `<div class="aviso-popup-image aviso-popup-image-${posicaoImagem} aviso-carousel" data-total="${avisoImgs.length}">
+                <div class="aviso-carousel-viewport"><div class="aviso-carousel-track">${avisoImgs.map((url, idx) => `<div class="aviso-carousel-slide"><img src="${url}" alt="Imagem do comunicado ${idx + 1}" class="imagem-ampliavel" draggable="false" onclick="window.abrirZoomImagem(this.src)"></div>`).join('')}</div></div>
+                ${variasImgs ? `<div class="aviso-carousel-dots">${avisoImgs.map((_, idx) => `<span class="${idx === 0 ? 'ativo' : ''}"></span>`).join('')}</div>` : ''}
+            </div>`
             : '';
 
         return `
@@ -342,6 +451,7 @@ document.addEventListener("DOMContentLoaded", async function () {
                 textoEl.innerHTML = renderAvisoPopupContent(aviso);
                 popup.style.display = 'flex';
                 setTimeout(() => popup.classList.add('show'), 50);
+                setTimeout(() => iniciarCarrosselAviso(textoEl), 120);
             }
         } catch (e) {
             console.error('Erro ao carregar avisos:', e);
@@ -384,7 +494,11 @@ document.addEventListener("DOMContentLoaded", async function () {
                         idGrupo: `grupo-${c.nome.toLowerCase().replace(/\s/g, '-')}`, 
                         idTabela: `tabela-${c.nome.toLowerCase().replace(/\s/g, '-')}`, 
                         minTotal: c.minTotal || 0, minIndividual: c.minIndividual || false,
-                        tipoColuna: c.tipoColuna || 'Tamanho', mensagemObs: c.mensagemObs || ''
+                        tipoColuna: c.tipoColuna || 'Tamanho', mensagemObs: c.mensagemObs || '',
+                        // Datas permitidas para retirada (AAAA-MM-DD). Em branco = agenda normal.
+                        entregaInicioData: c.entregaInicioData || '',
+                        entregaFimData: c.entregaFimData || '',
+                        entregaMensagem: c.entregaMensagem || ''
                     };
                 }
             });
@@ -420,6 +534,22 @@ document.addEventListener("DOMContentLoaded", async function () {
 
             renderizarCardapio(itensAgrupados);
         } catch (error) { console.error(error); }
+    }
+
+    // ALTERADO (2026-10): o resumo do pedido é sempre "Nome | Tamanho", montado na hora
+    // (sem a descrição), e não depende mais do campo descricaoResumo gravado no produto.
+    function textoPuroCliente(valor) {
+        const d = document.createElement('div');
+        d.innerHTML = String(valor || '');
+        return (d.textContent || '').replace(/\s+/g, ' ').trim();
+    }
+    function resumoProdutoCliente(item) {
+        const nome = textoPuroCliente(item?.nome) || 'Item';
+        const tam = String(item?.tamanho || '').trim();
+        return tam ? `${nome} | ${tam}` : nome;
+    }
+    function escaparAtributoCliente(v) {
+        return String(v || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
     }
 
     function normalizarChaveProduto(value) {
@@ -520,7 +650,9 @@ document.addEventListener("DOMContentLoaded", async function () {
             const config = configCategorias[nomeCategoria];
             navHorizontal.innerHTML += `<a href="#${config.idGrupo}" class="categoria-btn ${primeiraCategoria ? 'active-link' : ''}" data-target="${config.idGrupo}">${nomeCategoria}</a>`;
 
-            const infoBoxHTML = (config.mensagemObs && config.mensagemObs.trim() !== '') ? `<div class="info-box"><div class="info-box-content">${window.formatText(config.mensagemObs)}</div></div>` : '';
+            const msgRetiradaCat = mensagemRetiradaCategoria(nomeCategoria, config);
+            const avisoRetiradaHTML = msgRetiradaCat ? `<div class="info-box info-box-retirada"><div class="info-box-content"><i class="fa-regular fa-calendar"></i> <strong>${window.formatText(msgRetiradaCat)}</strong></div></div>` : '';
+            const infoBoxHTML = avisoRetiradaHTML + ((config.mensagemObs && config.mensagemObs.trim() !== '') ? `<div class="info-box"><div class="info-box-content">${window.formatText(config.mensagemObs)}</div></div>` : '');
             
             let htmlGrupo = `
                 <div class="categoria-group ${primeiraCategoria ? 'active-group' : ''}" id="${config.idGrupo}">
@@ -604,7 +736,7 @@ document.addEventListener("DOMContentLoaded", async function () {
             const inputHtml = `
                 <div class="quantidade-input-group">
                     <button type="button" class="qtd-btn-table" onclick="window.alterarQuantidadeTabela('${itemKey}', -1, ${item.min || 1})">-</button>
-                    <input type="number" value="0" min="0" data-min="${item.min || 1}" data-preco="${item.preco}" data-resumo="${item.descricaoResumo || item.nome}" data-grupo="${nomeGrupo}" data-item-id="${itemId}" data-produto-key="${itemKey}" class="quantidade-input">
+                    <input type="number" value="0" min="0" data-min="${item.min || 1}" data-preco="${item.preco}" data-resumo="${escaparAtributoCliente(resumoProdutoCliente(item))}" data-grupo="${nomeGrupo}" data-item-id="${itemId}" data-produto-key="${itemKey}" class="quantidade-input">
                     <button type="button" class="qtd-btn-table" onclick="window.alterarQuantidadeTabela('${itemKey}', 1, ${item.min || 1})">+</button>
                 </div>`;
 
@@ -768,7 +900,134 @@ document.addEventListener("DOMContentLoaded", async function () {
     const btnCarrinho = document.getElementById("fixed-summary");
     if(btnCarrinho) { btnCarrinho.addEventListener('click', function(e) { e.preventDefault(); e.stopPropagation(); window.abrirResumoPopup(); }); }
     
+    // =====================================================================
+    // DATAS PERMITIDAS PARA RETIRADA POR CATEGORIA (2026-10)
+    // Se o pedido tem itens de uma categoria com período de retirada (ex.: Natal,
+    // 22/12 a 26/12), o calendário só aceita datas dentro desse período.
+    // Com várias categorias restritas, vale o período em comum entre elas.
+    // =====================================================================
+    function formatarDataCurtaRetirada(iso) {
+        const [a, m, d] = String(iso || '').split('-');
+        return a && m && d ? `${d}/${m}` : '';
+    }
+    function formatarDataLongaRetirada(iso) {
+        const [a, m, d] = String(iso || '').split('-');
+        return a && m && d ? `${d}/${m}/${a}` : '';
+    }
+
+    function descreverPeriodoRetirada(ini, fim) {
+        const i = formatarDataLongaRetirada(ini), f = formatarDataLongaRetirada(fim);
+        if (i && f) return i === f ? `no dia ${i}` : `no período de ${i} - ${f}`;
+        if (i) return `a partir de ${i}`;
+        if (f) return `até ${f}`;
+        return '';
+    }
+
+    // Mensagem exibida ao cliente. Se a categoria tiver uma mensagem própria (campo
+    // "Mensagem exibida no site" no painel), usa ela. Senão, monta a mensagem padrão.
+    function mensagemRetiradaCategoria(nomeCat, cfg) {
+        if (!cfg || !(cfg.entregaInicioData || cfg.entregaFimData)) return '';
+        if (cfg.entregaMensagem && String(cfg.entregaMensagem).trim()) return String(cfg.entregaMensagem).trim();
+        return `Pedidos contendo os itens da categoria ${nomeCat} só são permitidos para retirada ${descreverPeriodoRetirada(cfg.entregaInicioData, cfg.entregaFimData)}.`;
+    }
+
+    function mensagemJanelaRetirada(janela) {
+        if (!janela || !janela.restrita) return '';
+        if (janela.categorias.length === 1) {
+            const c = janela.categorias[0];
+            return mensagemRetiradaCategoria(c.nome, c.cfg);
+        }
+        return `Pedidos contendo os itens das categorias ${janela.nomes} só são permitidos para retirada ${descreverPeriodoRetirada(janela.inicio, janela.fim)}.`;
+    }
+
+    function getHojeISOLocal() {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    function normalizarNomeCategoria(v) {
+        return String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+    }
+    function getConfigCategoria(nome) {
+        if (configCategorias[nome]) return configCategorias[nome];
+        const chave = normalizarNomeCategoria(nome);
+        const achada = Object.keys(configCategorias).find(k => normalizarNomeCategoria(k) === chave);
+        return achada ? configCategorias[achada] : null;
+    }
+
+    function calcularJanelaRetiradaCarrinho() {
+        const categorias = new Map();
+        const processados = new Set();
+        document.querySelectorAll(".quantidade-input").forEach(input => {
+            const chave = input.getAttribute("data-produto-key") || input.getAttribute("data-item-id");
+            if (processados.has(chave)) return;
+            processados.add(chave);
+            if ((parseInt(input.value) || 0) <= 0) return;
+            const produto = bancoDeProdutos[input.getAttribute("data-item-id")] || {};
+            const nomes = [produto.categoria, input.getAttribute("data-grupo")].filter(Boolean);
+            for (const nomeCat of nomes) {
+                const cfg = getConfigCategoria(nomeCat);
+                if (cfg && (cfg.entregaInicioData || cfg.entregaFimData)) {
+                    categorias.set(nomeCat, { nome: nomeCat, ini: cfg.entregaInicioData || '', fim: cfg.entregaFimData || '', cfg });
+                    break;
+                }
+            }
+        });
+
+        const lista = [...categorias.values()];
+        let inicio = '', fim = '';
+        lista.forEach(c => {
+            if (c.ini && (!inicio || c.ini > inicio)) inicio = c.ini;
+            if (c.fim && (!fim || c.fim < fim)) fim = c.fim;
+        });
+        const nomes = lista.map(c => c.nome).join(', ');
+        return { restrita: lista.length > 0, inicio, fim, categorias: lista, nomes, conflito: !!(inicio && fim && inicio > fim) };
+    }
+    window.calcularJanelaRetiradaCarrinho = calcularJanelaRetiradaCarrinho;
+
+    function validarDataNaJanelaRetirada(dataISO, janela) {
+        if (!janela || !janela.restrita || !dataISO) return null;
+        if ((janela.inicio && dataISO < janela.inicio) || (janela.fim && dataISO > janela.fim)) {
+            return `⛔ ${mensagemJanelaRetirada(janela)}`;
+        }
+        return null;
+    }
+
+    function verificarJanelaAntesDoPedido(janela) {
+        if (!janela.restrita) return true;
+        if (janela.conflito) {
+            const detalhes = janela.categorias.map(c => `• ${c.nome}: ${descreverPeriodoRetirada(c.ini, c.fim)}`).join('\n');
+            alert(`Os itens do seu pedido têm períodos de retirada diferentes e não dá para retirar tudo na mesma data:\n\n${detalhes}\n\nPor favor, faça pedidos separados.`);
+            return false;
+        }
+        if (janela.fim && janela.fim < getHojeISOLocal()) {
+            alert(`O período de retirada dos itens de ${janela.nomes} já terminou. Remova esses itens para continuar.`);
+            return false;
+        }
+        return true;
+    }
+
+    // Aviso dentro do resumo do pedido, assim que entra um item com período de retirada.
+    function atualizarAvisoJanelaResumo() {
+        const lista = document.getElementById("popup-resumo-itens");
+        if (!lista) return;
+        let aviso = document.getElementById("aviso-janela-resumo");
+        if (!aviso) {
+            aviso = document.createElement("div");
+            aviso.id = "aviso-janela-resumo";
+            aviso.className = "aviso-janela-retirada";
+            lista.insertAdjacentElement('beforebegin', aviso);
+        }
+        const janela = calcularJanelaRetiradaCarrinho();
+        const msg = mensagemJanelaRetirada(janela);
+        aviso.innerHTML = msg ? `<i class="fa-regular fa-calendar"></i> ${window.formatText(msg)}` : '';
+        aviso.style.display = msg ? 'block' : 'none';
+    }
+    window.atualizarAvisoJanelaResumo = atualizarAvisoJanelaResumo;
+
     window.abrirPopup = function() { 
+        const janelaRetirada = calcularJanelaRetiradaCarrinho();
+        if (!verificarJanelaAntesDoPedido(janelaRetirada)) return;
         window.fecharResumoPopup(); 
         const p = document.getElementById("popup-pedido"); 
         if(p) { 
@@ -780,9 +1039,27 @@ document.addEventListener("DOMContentLoaded", async function () {
             const inputHorario = document.getElementById("horario");
             const containerHorario = document.getElementById("horario-entrega-container") || inputHorario.parentNode;
 
-            // Bloqueia dias do passado nativamente no calendário
-            const hoje = new Date().toISOString().split('T')[0];
-            inputData.setAttribute('min', hoje);
+            // Bloqueia dias do passado nativamente no calendário e, se houver itens
+            // com período de retirada, limita o calendário a esse período.
+            const hoje = getHojeISOLocal();
+            const minData = janelaRetirada.inicio && janelaRetirada.inicio > hoje ? janelaRetirada.inicio : hoje;
+            inputData.setAttribute('min', minData);
+            if (janelaRetirada.fim) inputData.setAttribute('max', janelaRetirada.fim);
+            else inputData.removeAttribute('max');
+
+            let avisoJanela = document.getElementById("aviso-janela-retirada");
+            if (!avisoJanela) {
+                avisoJanela = document.createElement("div");
+                avisoJanela.id = "aviso-janela-retirada";
+                avisoJanela.className = "aviso-janela-retirada";
+                inputData.insertAdjacentElement('afterend', avisoJanela);
+            }
+            if (janelaRetirada.restrita) {
+                avisoJanela.innerHTML = `<i class="fa-regular fa-calendar"></i> ${window.formatText(mensagemJanelaRetirada(janelaRetirada))}`;
+                avisoJanela.style.display = 'block';
+            } else {
+                avisoJanela.style.display = 'none';
+            }
 
             // Limpa os campos sempre que abrir o popup novo
             inputData.value = '';
@@ -860,6 +1137,10 @@ document.addEventListener("DOMContentLoaded", async function () {
                 // Esconde a caixa de aviso e REEXIBE a caixa de horário somente após a data ser escolhida e validada
                 if(avisoFechado) avisoFechado.style.display = 'none';
                 containerHorario.style.display = 'block';
+
+                // 0. DATA FORA DO PERÍODO DE RETIRADA DOS ITENS (ex.: cardápio de Natal)
+                const msgJanelaRetirada = validarDataNaJanelaRetirada(dataEscolhida, calcularJanelaRetiradaCarrinho());
+                if (msgJanelaRetirada) return resetarDataInvalida(msgJanelaRetirada);
 
                 // 1. DATA FECHADA MANUALMENTE (Puxa a mensagem customizada que você digitou)
                 if (regraExcecao && regraExcecao.indisponivel) {
@@ -1243,6 +1524,8 @@ document.addEventListener("DOMContentLoaded", async function () {
             }
         });
 
+        try { atualizarAvisoJanelaResumo(); } catch (e) {}
+
         if (totalBruto === 0) {
             resumoTotalPopup.style.display = 'none'; btnContainer.innerHTML = ''; fixedSummary.style.display = 'none'; window.fecharResumoPopup();
         } else {
@@ -1272,6 +1555,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
         const idPedido = gerarIdPedido(); 
         let txt = `Olá, Favu!\nGostaria de encomendar os itens abaixo:\n\n*ID: ${idPedido}*\n\n- *Resumo:*\n\n`;
+        const moedaWA = (v) => (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         let total = 0; 
         const gResumo = {}; 
         let temItens = false; 
@@ -1330,10 +1614,12 @@ document.addEventListener("DOMContentLoaded", async function () {
             return; 
         }
 
+        // ALTERADO (2026-10): igual ao orçamento do painel, cada item mostra o valor
+        // unitário e o total ("Item | P - 1 un. (R$ 100,00 cada) = R$ 100,00").
         for (const grp in gResumo) {
-            txt += `*${grp}*\n`;
+            txt += `*${grp}:*\n`;
             gResumo[grp].forEach(item => {
-                txt += `• ${item.q}x ${item.desc}\n`;
+                txt += `${item.desc} - ${item.q} un. (R$ ${moedaWA(item.p)} cada) = R$ ${moedaWA(item.q * item.p)}\n`;
             });
             txt += `\n`;
         }
@@ -1353,6 +1639,14 @@ document.addEventListener("DOMContentLoaded", async function () {
             alert("Preencha todos os campos obrigatórios!"); 
             btn.textContent = txtOriginal; btn.disabled = false; 
             return; 
+        }
+
+        const janelaFinal = calcularJanelaRetiradaCarrinho();
+        const msgJanelaFinal = janelaFinal.conflito ? 'Os itens do pedido têm períodos de retirada diferentes. Faça pedidos separados.' : validarDataNaJanelaRetirada(dt, janelaFinal);
+        if (msgJanelaFinal) {
+            alert(msgJanelaFinal.replace('⛔ ', ''));
+            btn.textContent = txtOriginal; btn.disabled = false;
+            return;
         }
 
         if (window.regrasAgenda && window.regrasAgenda[dt] && window.regrasAgenda[dt].indisponivel) {
@@ -1383,10 +1677,11 @@ document.addEventListener("DOMContentLoaded", async function () {
         const valorTaxaPagamento = totalLiquido * ((taxaPagamento.percentual || 0) / 100);
         const valorRecebidoPagamento = Math.max(0, totalLiquido - valorTaxaPagamento);
 
+        txt += `Valor dos Itens: R$ ${moedaWA(total)}\n`;
+        if(cupomAplicado.codigo) { txt += `Cupom: ${cupomAplicado.codigo}\n`; txt += `Desconto: -R$ ${moedaWA(cupomAplicado.desconto)}\n`; }
+        txt += `*Total Final: R$ ${moedaWA(totalLiquido)}*\n\n`;
         txt += `- *Informações:*\nNome: ${nm}\nNúmero: ${validarEFormatarTelefone(tel)}\nData: ${dataFormatada}\nHorário: ${hr.substring(0,5)}\nPagamento: ${formatarPagamentoCliente(pag, modalidadeCredito)}\n`;
         if(obs) txt += `Observações: ${obs}\n`;
-        if(cupomAplicado.codigo) { txt += `Cupom: ${cupomAplicado.codigo}\n`; txt += `Desconto: -R$${cupomAplicado.desconto.toFixed(2).replace('.', ',')}\n`; }
-        txt += `*Total Final: R$ ${totalLiquido.toLocaleString('pt-BR',{minimumFractionDigits:2})}*\n`;
 
         const dadosPedido = {
             ID_do_Pedido: idPedido,
