@@ -245,12 +245,15 @@ function aplicarTemaSite(t) {
     if (t.card) root.style.setProperty('--card-bg', t.card);
     if (t.txt) root.style.setProperty('--text-dark', t.txt);
     if (t.acc) { root.style.setProperty('--accent-orange', t.acc); root.style.setProperty('--accent-rust', t.acc); }
-    if (t.logoPrincipal) document.querySelectorAll('.hero-logo-big').forEach(img => { img.src = t.logoPrincipal; });
-    const logoMenu = t.logoMenu || t.logoPrincipal;
-    if (logoMenu) document.querySelectorAll('.menu-logo-img').forEach(img => { img.src = logoMenu; });
-    if (t.logoRodape) document.querySelectorAll('.footer-logo').forEach(img => { img.src = t.logoRodape; });
-    if (t.imgTopo) { const h = document.querySelector('header'); if (h) h.style.backgroundImage = `url('${t.imgTopo}')`; }
-    if (t.imgRodape) { const f = document.querySelector('footer'); if (f) f.style.backgroundImage = `url('${t.imgRodape}')`; }
+    // "__sem__" = o tema pediu para não ter imagem nesse lugar.
+    const SEM = '__sem__';
+    const trocarImg = (sel, v) => { if (!v) return; document.querySelectorAll(sel).forEach(img => { if (v === SEM) img.style.display = 'none'; else { img.style.display = ''; img.src = v; } }); };
+    const trocarFundo = (sel, v) => { if (!v) return; const el = document.querySelector(sel); if (el) el.style.backgroundImage = v === SEM ? 'none' : `url('${v}')`; };
+    trocarImg('.hero-logo-big', t.logoPrincipal);
+    trocarImg('.menu-logo-img', t.logoMenu || t.logoPrincipal);
+    trocarImg('.footer-logo', t.logoRodape);
+    trocarFundo('header', t.imgTopo);
+    trocarFundo('footer', t.imgRodape);
 
     const add = (cor, regra) => { if (cor) r.push(regra.replace(/\$C/g, cor)); };
     add(t.corMenuLateral, '.side-menu { background: $C !important; }');
@@ -299,6 +302,13 @@ async function obterTemaParaAplicar() {
             }
         } catch (e) {}
     }
+    // Tema agendado (painel > Temas > Agendamento): vale dentro do período.
+    try {
+        const ag = await getDoc(doc(db, 'config', 'tema_agendados'));
+        const agora = Date.now();
+        const vigentes = (ag.exists() ? (ag.data().lista || []) : []).filter(x => x && x.dados && (x.inicio == null || agora >= x.inicio) && (x.fim == null || agora < x.fim));
+        if (vigentes.length) return vigentes.sort((a, b) => (b.inicio || 0) - (a.inicio || 0))[0].dados;
+    } catch (e) {}
     const temaDoc = await getDoc(doc(db, "config", "tema"));
     return temaDoc.exists() ? temaDoc.data() : null;
 }
@@ -325,10 +335,81 @@ async function resolverImagensTema(t) {
     return out;
 }
 
+
+// =====================================================================
+// EDITOR DO SITE (painel > Layout > Página inicial / Cardápio) — 2026-10-15
+// Se config/site_inicio ou config/site_cardapio existirem, os botões, links,
+// redes sociais e textos vêm de lá. Senão, o site fica como sempre foi.
+// Ações: link | quem_somos | cardapio | inicio | whatsapp | instagram
+// =====================================================================
+function escSite(v) { return String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function hrefAcaoSite(item) {
+    const acao = item.acao || 'link';
+    const link = String(item.link || '').trim();
+    if (acao === 'quem_somos') return { href: '#', abreQuemSomos: true };
+    if (acao === 'cardapio') return { href: 'cardapio.html' };
+    if (acao === 'inicio') return { href: 'index.html' };
+    if (acao === 'whatsapp') { const n = link.replace(/\D/g, ''); return { href: n ? `https://wa.me/${n}` : link, externo: true }; }
+    return { href: link || '#', externo: /^https?:/i.test(link) };
+}
+function linkSiteHtml(item, classe, conteudo) {
+    const a = hrefAcaoSite(item);
+    const alvo = a.externo ? ' target="_blank" rel="noopener"' : '';
+    const clique = a.abreQuemSomos ? ' onclick="event.preventDefault(); window.openAboutModal && window.openAboutModal();"' : '';
+    return `<a href="${escSite(a.href)}" class="${classe}"${alvo}${clique}>${conteudo}</a>`;
+}
+const visiveisSite = lista => (Array.isArray(lista) ? lista : []).filter(i => i && i.visivel !== false).sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+function aplicarMenuLateralSite(dados) {
+    if (Array.isArray(dados.menuLateral)) {
+        const ul = document.querySelector('#side-menu .nav-links');
+        if (ul) ul.innerHTML = visiveisSite(dados.menuLateral).map(i => `<li>${linkSiteHtml(i, 'menu-link', escSite(i.titulo))}</li>`).join('');
+    }
+    if (Array.isArray(dados.redes)) {
+        const box = document.querySelector('#side-menu .menu-socials');
+        if (box) box.innerHTML = visiveisSite(dados.redes).map(i => linkSiteHtml(i, 'menu-social-link', `<i class="${escSite(i.icone || 'fas fa-link')}"></i> ${escSite(i.titulo)}`)).join('');
+    }
+}
+function aplicarQuemSomosSite(qs) {
+    if (!qs) return;
+    const corpo = document.querySelector('#aboutModal .modal-text');
+    const fmt = v => (window.formatText ? window.formatText(v) : v);
+    if (corpo && (qs.texto || qs.destaque)) corpo.innerHTML = (qs.texto ? fmt(qs.texto) : '') + (qs.destaque ? `<p class="highlight">${fmt(qs.destaque)}</p>` : '');
+    const btn = document.querySelector('#aboutModal .btn-primary');
+    if (btn) {
+        if (qs.botaoVisivel === false) btn.style.display = 'none';
+        else {
+            if (qs.botaoTexto) btn.textContent = qs.botaoTexto;
+            if (qs.botaoLink) { const a = hrefAcaoSite({ acao: qs.botaoAcao || 'link', link: qs.botaoLink }); btn.setAttribute('href', a.href); }
+        }
+    }
+}
+function aplicarRodapeSite(r) {
+    if (!r) return;
+    if (r.copyright) document.querySelectorAll('footer .copy').forEach(p => { p.textContent = r.copyright; });
+    if (r.assinatura) document.querySelectorAll('footer .desktop-signature span').forEach(s => { s.textContent = r.assinatura; });
+}
+async function carregarDadosSite(id) {
+    try { const d = await getDoc(doc(db, 'config', id)); return d.exists() ? d.data() : null; } catch (e) { return null; }
+}
+
+// Textos do cardápio editáveis no painel (Layout > Cardápio).
+window.__textosCardapio = { tituloResumo: 'RESUMO DO PEDIDO', botaoFazerPedido: 'FAZER PEDIDO', tituloInfo: 'INFORMAÇÕES DO PEDIDO', botaoConfirmar: 'CONFIRMAR PEDIDO', saudacaoWhatsapp: 'Olá, Favu!\nGostaria de encomendar os itens abaixo:' };
+async function aplicarSiteCardapio() {
+    const [cardapio, inicio] = await Promise.all([carregarDadosSite('site_cardapio'), carregarDadosSite('site_inicio')]);
+    if (inicio) { aplicarQuemSomosSite(inicio.quemSomos); aplicarRodapeSite(inicio.rodape); }
+    if (!cardapio) return;
+    aplicarMenuLateralSite(cardapio);
+    const t = cardapio.textos || {};
+    Object.keys(window.__textosCardapio).forEach(k => { if (t[k] && String(t[k]).trim()) window.__textosCardapio[k] = String(t[k]); });
+    const h1 = document.querySelector('#popup-resumo h2'); if (h1) h1.textContent = window.__textosCardapio.tituloResumo;
+    const h2 = document.querySelector('#popup-pedido h2'); if (h2) h2.textContent = window.__textosCardapio.tituloInfo;
+    const bc = document.querySelector('#popup-pedido .btn-primary-large'); if (bc) bc.textContent = window.__textosCardapio.botaoConfirmar;
+}
 document.addEventListener("DOMContentLoaded", async function () {
     
     // Tema Cores + Imagens
     try {
+        aplicarSiteCardapio();
         const temaAtual = await obterTemaParaAplicar();
         if (temaAtual) aplicarTemaSite(await resolverImagensTema(temaAtual));
     } catch(e) {}
@@ -1641,7 +1722,7 @@ document.addEventListener("DOMContentLoaded", async function () {
             
             resumoTotalPopup.innerHTML = `TOTAL: R$ ${totalLiquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
             
-            if(temErroMinimo) { btnContainer.innerHTML = '<p style="color:red; text-align:center; font-size:1.1rem; font-family: \'Basic Choice\', cursive;">Ajuste as quantidades mínimas.</p>'; } else { btnContainer.innerHTML = '<button type="button" onclick="window.abrirPopup()" class="btn-fazer-pedido">FAZER PEDIDO</button>'; }
+            if(temErroMinimo) { btnContainer.innerHTML = '<p style="color:red; text-align:center; font-size:1.1rem; font-family: \'Basic Choice\', cursive;">Ajuste as quantidades mínimas.</p>'; } else { btnContainer.innerHTML = `<button type="button" onclick="window.abrirPopup()" class="btn-fazer-pedido">${escSite(window.__textosCardapio.botaoFazerPedido)}</button>`; }
         }
     }
 
@@ -1662,7 +1743,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         }
 
         const idPedido = gerarIdPedido(); 
-        let txt = `Olá, Favu!\nGostaria de encomendar os itens abaixo:\n\n*ID: ${idPedido}*\n\n- *Resumo:*\n\n`;
+        let txt = `${String(window.__textosCardapio.saudacaoWhatsapp).replace(/\\n/g, '\n')}\n\n*ID: ${idPedido}*\n\n- *Resumo:*\n\n`;
         const moedaWA = (v) => (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         let total = 0; 
         const gResumo = {}; 

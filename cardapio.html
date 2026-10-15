@@ -190,8 +190,22 @@
     .table-card table .qtd-btn-table { width: 22px !important; height: 26px !important; font-size: 1.1rem !important; }
     .table-card table .quantidade-input-group { gap: 3px !important; }
 }
+/* 2026-10-15: "Quem somos" igual ao da página inicial */
+#aboutModal .modal-content { background: var(--bg-color) !important; padding: 0 !important; border-radius: 30px !important; width: 90% !important; max-width: 450px !important; max-height: 90vh; overflow: hidden !important; font-family: 'Cocogoose', sans-serif !important; }
+#aboutModal .modal-body-scroll { padding: 40px 30px 50px; overflow-y: auto; max-height: 90vh; scrollbar-width: none; }
+#aboutModal .modal-body-scroll::-webkit-scrollbar { display: none; }
+#aboutModal .close-btn-wrapper { top: 20px; right: 25px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; }
+#aboutModal .modal-img { max-width: 60%; height: auto; border-radius: 15px; margin: 0 auto 20px; display: block; }
+#aboutModal .modal-text { text-align: center; font-family: 'Cocogoose', sans-serif; }
+#aboutModal .modal-text p { font-size: 0.9rem; color: #666; margin-bottom: 15px; line-height: 1.6; font-family: 'Cocogoose', sans-serif; }
+#aboutModal .highlight { color: var(--accent-orange); font-weight: bold; margin-top: 20px; display: block; text-align: center; font-size: 1rem; }
+#aboutModal .btn-primary { background: var(--card-bg) !important; color: #1D2814 !important; box-shadow: 0 4px 20px rgba(0,0,0,0.08); padding: 12px; border-radius: 30px; font-weight: bold; text-align: center; display: block; border: none; margin-top: 20px; text-decoration: none !important; font-family: 'Cocogoose', sans-serif !important; font-size: 1rem; text-transform: none !important; transition: 0.3s; }
+#aboutModal .btn-primary:hover { transform: translateY(-3px); filter: brightness(0.95); }
+/* Observação da categoria com a mesma largura da caixa de itens */
+.categoria-group .info-box { max-width: 850px; margin-left: auto !important; margin-right: auto !important; box-sizing: border-box; }
+/* Abas: largura toda; centralizadas quando cabem, rolam quando não cabem (sem cortar) */
+.categorias-draggable { justify-content: flex-start; justify-content: safe center; }
 .categorias-nav-wrapper { max-width: 100% !important; }
-.categorias-draggable.abas-cabem { justify-content: center; }
 .aviso-janela-retirada.alerta { animation: avisoPeriodoPisca 1.4s ease; }
 @keyframes avisoPeriodoPisca { 0%, 60% { border-color: #E60000; background: #fde8e8; box-shadow: 0 0 0 3px rgba(230,0,0,0.15); } 100% { } }
 .aviso-janela-retirada { margin: 6px 0 10px; padding: 10px 12px; border-radius: 10px; font-size: 0.85rem; line-height: 1.35; text-align: left; color: #1D2814; background: rgba(224,159,65,0.12); border: 1px solid rgba(224,159,65,0.35); font-family: var(--font-numbers, Arial, sans-serif); }
@@ -378,6 +392,6 @@
         </div>
     </div>
 
-    <script type="module" src="script-cardapio.js?v=20261015-pacote-8"></script>
+    <script type="module" src="script-cardapio.js?v=20261015-pacote-9"></script>
 </body>
 </html>
