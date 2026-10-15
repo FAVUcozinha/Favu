@@ -952,6 +952,14 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     function configurarEventosDrag() {
         const categoriesNav = document.getElementById('categorias-horizontal'); if(!categoriesNav) return;
+        // 2026-10-15: quando todas cabem, ficam centralizadas e sem corte; senão, rolam.
+        const ajustarAbasCabem = () => {
+            categoriesNav.classList.remove('abas-cabem');
+            categoriesNav.classList.toggle('abas-cabem', categoriesNav.scrollWidth <= categoriesNav.clientWidth + 1);
+        };
+        ajustarAbasCabem();
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(ajustarAbasCabem);
+        if (!window.__abasResizeOk) { window.__abasResizeOk = true; window.addEventListener('resize', ajustarAbasCabem); }
         let isDown = false; let startX, scrollLeft;
         
         categoriesNav.addEventListener('mousedown', (e) => { isDown = true; startX = e.pageX - categoriesNav.offsetLeft; scrollLeft = categoriesNav.scrollLeft; });
@@ -1226,7 +1234,19 @@ document.addEventListener("DOMContentLoaded", async function () {
 
                 // 0. DATA FORA DO PERÍODO DE RETIRADA DOS ITENS (ex.: cardápio de Natal)
                 const msgJanelaRetirada = validarDataNaJanelaRetirada(dataEscolhida, calcularJanelaRetiradaCarrinho());
-                if (msgJanelaRetirada) return resetarDataInvalida(msgJanelaRetirada);
+                if (msgJanelaRetirada) {
+                    // 2026-10-15: a mensagem do período já está logo abaixo da data. Não repete:
+                    // só limpa a data e destaca a mensagem por um instante.
+                    resetarDataInvalida('');
+                    if (avisoFechado) avisoFechado.style.display = 'none';
+                    const avisoPeriodo = document.getElementById('aviso-janela-retirada');
+                    if (avisoPeriodo) {
+                        avisoPeriodo.classList.remove('alerta');
+                        void avisoPeriodo.offsetWidth;
+                        avisoPeriodo.classList.add('alerta');
+                    }
+                    return;
+                }
 
                 // 1. DATA FECHADA MANUALMENTE (Puxa a mensagem customizada que você digitou)
                 if (regraExcecao && regraExcecao.indisponivel) {

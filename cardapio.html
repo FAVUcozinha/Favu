@@ -170,6 +170,10 @@
 .aviso-carousel-dots { display: flex; justify-content: center; gap: 6px; margin-top: 8px; }
 .aviso-carousel-dots span { width: 8px; height: 8px; border-radius: 50%; background: rgba(29,40,20,.25); cursor: pointer; transition: .2s; }
 .aviso-carousel-dots span.ativo { background: var(--accent-orange, #E09F41); width: 18px; border-radius: 4px; }
+.categorias-nav-wrapper { max-width: 100% !important; }
+.categorias-draggable.abas-cabem { justify-content: center; }
+.aviso-janela-retirada.alerta { animation: avisoPeriodoPisca 1.4s ease; }
+@keyframes avisoPeriodoPisca { 0%, 60% { border-color: #E60000; background: #fde8e8; box-shadow: 0 0 0 3px rgba(230,0,0,0.15); } 100% { } }
 .aviso-janela-retirada { margin: 6px 0 10px; padding: 10px 12px; border-radius: 10px; font-size: 0.85rem; line-height: 1.35; text-align: left; color: #1D2814; background: rgba(224,159,65,0.12); border: 1px solid rgba(224,159,65,0.35); font-family: var(--font-numbers, Arial, sans-serif); }
 </style>
 </head>
@@ -354,6 +358,6 @@
         </div>
     </div>
 
-    <script type="module" src="script-cardapio.js?v=20261015-pacote-6"></script>
+    <script type="module" src="script-cardapio.js?v=20261015-pacote-7"></script>
 </body>
 </html>
