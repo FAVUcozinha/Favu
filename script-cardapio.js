@@ -15,8 +15,29 @@ const db = getFirestore(app);
 
 let configCategorias = {};
 let bancoDeProdutos = {}; 
+Object.defineProperty(window, '__bancoDeProdutosRef', { get: () => bancoDeProdutos });
 window.totalPedidoAtivo = 0; 
 window.regrasAgenda = {}; // Agenda Global
+
+// 2026-10-15: uma data específica (aba Horários) pode valer só para algumas categorias.
+// Sem categorias = vale para todos os pedidos. Com categorias = só quando o carrinho
+// tem itens de alguma delas; senão, o dia segue a agenda normal.
+window.regraExcecaoAplicavel = function(dataISO) {
+    const regra = window.regrasAgenda ? window.regrasAgenda[dataISO] : null;
+    if (!regra) return null;
+    const cats = Array.isArray(regra.categorias) ? regra.categorias.filter(Boolean) : [];
+    if (!cats.length) return regra;
+    const norm = v => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+    const alvo = new Set(cats.map(norm));
+    const noCarrinho = new Set();
+    document.querySelectorAll('.quantidade-input').forEach(input => {
+        if ((parseInt(input.value) || 0) <= 0) return;
+        const prod = (window.__bancoDeProdutosRef || {})[input.getAttribute('data-item-id')] || {};
+        [prod.categoria, input.getAttribute('data-grupo')].forEach(c => { if (c) noCarrinho.add(norm(c)); });
+    });
+    for (const c of noCarrinho) if (alvo.has(c)) return regra;
+    return null;
+};
 
 // ==========================================
 // FORMATADOR DE TEXTO RICO SEGURO
@@ -205,14 +226,22 @@ window.filtrarHorariosDisponiveisPorAgora = function(dataISO, horarios) {
 
 // =====================================================================
 // TEMA DO SITE (2026-10-15): cores + imagens do tema aplicado no painel.
-// Campos em branco mantêm o visual padrão do site.
+// Campos em branco mantêm o visual padrão do site. Fundos aceitam degradê.
 // =====================================================================
 function aplicarTemaSite(t) {
     if (!t) return;
     const root = document.documentElement;
     const ehCardapio = !!document.getElementById('menu-principal');
+    const ehDegrade = v => /gradient\(/i.test(String(v || ''));
+    const primeiraCor = v => (String(v || '').match(/#[0-9a-f]{3,8}|rgba?\([^)]*\)/i) || [''])[0];
+    const r = [];
     const fundo = ehCardapio ? (t.bgCardapio || t.bg) : t.bg;
-    if (fundo) root.style.setProperty('--bg-color', fundo);
+    if (fundo) {
+        if (ehDegrade(fundo)) {
+            const c = primeiraCor(fundo); if (c) root.style.setProperty('--bg-color', c);
+            r.push(`body { background: ${fundo} !important; background-attachment: fixed !important; }`);
+        } else root.style.setProperty('--bg-color', fundo);
+    }
     if (t.card) root.style.setProperty('--card-bg', t.card);
     if (t.txt) root.style.setProperty('--text-dark', t.txt);
     if (t.acc) { root.style.setProperty('--accent-orange', t.acc); root.style.setProperty('--accent-rust', t.acc); }
@@ -223,8 +252,6 @@ function aplicarTemaSite(t) {
     if (t.imgTopo) { const h = document.querySelector('header'); if (h) h.style.backgroundImage = `url('${t.imgTopo}')`; }
     if (t.imgRodape) { const f = document.querySelector('footer'); if (f) f.style.backgroundImage = `url('${t.imgRodape}')`; }
 
-    // Cores opcionais: viram regras de CSS só quando foram escolhidas no painel.
-    const r = [];
     const add = (cor, regra) => { if (cor) r.push(regra.replace(/\$C/g, cor)); };
     add(t.corMenuLateral, '.side-menu { background: $C !important; }');
     add(t.corIconesBotoes, '.card-icon, .card-icon i { color: $C !important; }');
@@ -232,19 +259,48 @@ function aplicarTemaSite(t) {
     add(t.corTextoBotoes, '.card-info h3, .btn-primary { color: $C !important; }');
     add(t.corLegendaBotoes, '.card-info p { color: $C !important; }');
     add(t.corTituloCategorias, '.categoria-title { color: $C !important; }');
-    add(t.corBotoesCategorias, '#categorias-horizontal a:not(.active-link) { background-color: $C !important; }');
+    add(t.corBotoesCategorias, '#categorias-horizontal a:not(.active-link) { background: $C !important; }');
     add(t.corTextoCategorias, '#categorias-horizontal a:not(.active-link) { color: $C !important; }');
     add(t.corFundoItens, '.table-card { background: $C !important; }');
     add(t.corTituloItens, 'td.col-item, td.col-item .item-nome-texto { color: $C !important; }');
     add(t.corDescricoes, '.descricao, .peso-mobile { color: $C !important; }');
-    add(t.corResumoPedido, '#fixed-summary { background-color: $C !important; }');
-    add(t.corFundoResumo, '#popup-resumo .popup-conteudo, #popup-resumo #cupom-container strong { background-color: $C !important; }');
-    add(t.corBotoesResumo, '#popup-resumo .btn-fazer-pedido, #popup-resumo .btn-primary-large, #popup-resumo #apply-cupom-btn { background-color: $C !important; }');
-    add(t.corFundoInfoPedido, '#popup-pedido .popup-conteudo { background-color: $C !important; }');
-    add(t.corBotoesInfoPedido, '#popup-pedido .btn-primary-large { background-color: $C !important; }');
+    add(t.corResumoPedido, '#fixed-summary { background: $C !important; }');
+    add(t.corFundoResumo, '#popup-resumo .popup-conteudo, #popup-resumo #cupom-container strong { background: $C !important; }');
+    add(t.corBotoesResumo, '#popup-resumo .btn-fazer-pedido, #popup-resumo .btn-primary-large, #popup-resumo #apply-cupom-btn { background: $C !important; }');
+    add(t.corFundoInfoPedido, '#popup-pedido .popup-conteudo { background: $C !important; }');
+    add(t.corBotoesInfoPedido, '#popup-pedido .btn-primary-large { background: $C !important; }');
     let tag = document.getElementById('tema-dinamico');
     if (!tag) { tag = document.createElement('style'); tag.id = 'tema-dinamico'; document.head.appendChild(tag); }
     tag.textContent = r.join('\n');
+}
+
+// Prévia (painel > Temas > Prévia): ?tema_previa=<id> carrega o tema da lista,
+// já com o que ele herda do tema Padrão, sem precisar aplicar no site.
+async function obterTemaParaAplicar() {
+    const idPrevia = new URLSearchParams(location.search).get('tema_previa');
+    if (idPrevia) {
+        try {
+            const snap = await getDoc(doc(db, 'config', 'temas_lista'));
+            const lista = snap.exists() ? (snap.data().temas || []) : [];
+            const t = lista.find(x => x.id === idPrevia);
+            const padrao = lista.find(x => x.id === 'padrao') || {};
+            if (t) {
+                const efetivo = {};
+                new Set([...Object.keys(padrao), ...Object.keys(t)]).forEach(k => { efetivo[k] = t[k] || (t.id !== 'padrao' ? padrao[k] : '') || ''; });
+                document.querySelectorAll('a[href]').forEach(a => {
+                    const href = a.getAttribute('href') || '';
+                    if (/(^|\/)(index|cardapio)\.html/.test(href) || href === './') a.setAttribute('href', href + (href.includes('?') ? '&' : '?') + 'tema_previa=' + encodeURIComponent(idPrevia));
+                });
+                const aviso = document.createElement('div');
+                aviso.textContent = `Prévia do tema: ${t.nome || ''}`;
+                aviso.style.cssText = 'position:fixed;left:50%;bottom:12px;transform:translateX(-50%);z-index:99999;background:#1D2814;color:#fff;padding:6px 14px;border-radius:20px;font:12px sans-serif;opacity:.85;pointer-events:none;';
+                document.body.appendChild(aviso);
+                return efetivo;
+            }
+        } catch (e) {}
+    }
+    const temaDoc = await getDoc(doc(db, "config", "tema"));
+    return temaDoc.exists() ? temaDoc.data() : null;
 }
 
 // As imagens do tema ficam em documentos separados (config/tema_img_...), porque
@@ -273,8 +329,8 @@ document.addEventListener("DOMContentLoaded", async function () {
     
     // Tema Cores + Imagens
     try {
-        const temaDoc = await getDoc(doc(db, "config", "tema"));
-        if (temaDoc.exists()) aplicarTemaSite(await resolverImagensTema(temaDoc.data()));
+        const temaAtual = await obterTemaParaAplicar();
+        if (temaAtual) aplicarTemaSite(await resolverImagensTema(temaAtual));
     } catch(e) {}
 
     // Agenda de Horários Globais e Exceções
@@ -769,10 +825,11 @@ document.addEventListener("DOMContentLoaded", async function () {
 
             const imagensProdutoItem = getProdutoImagensCliente(item);
             const temFoto = imagensProdutoItem.length > 0;
-            // 2026-10-15: a descrição da imagem é a própria descrição do produto;
-            // o item só abre a janela quando tem foto.
-            const temDescPopup = false;
-            const isClickable = temFoto;
+            // 2026-10-15: a descrição do produto é a descrição da imagem. Não aparece
+            // embaixo do nome: abre na janela da foto, ou pelo ícone (i) quando não há foto.
+            const textoDescricaoItem = String(item.descricaoItem || item.descricaoPopup || '').trim();
+            const temDescPopup = textoDescricaoItem !== '';
+            const isClickable = temFoto || temDescPopup;
 
             let iconeHint = '';
             if (temFoto) {
@@ -786,7 +843,6 @@ document.addEventListener("DOMContentLoaded", async function () {
 
             const celulaNomeHTML = `
                 <div class="item-nome-texto" style="line-height: 1.2;">${window.formatText(itemNameClean)}</div>
-                ${item.descricaoItem ? `<div class="descricao" style="text-align: left;">${window.formatText(item.descricaoItem)}</div>` : ''}
             `;
             
             let tdSecundaria = '';
@@ -860,13 +916,14 @@ document.addEventListener("DOMContentLoaded", async function () {
 
         const imagensProdutoPopup = getProdutoImagensCliente(itemInfo);
         const temFoto = imagensProdutoPopup.length > 0;
-        const temDescPopup = itemInfo.descricaoPopup && itemInfo.descricaoPopup.trim() !== "";
+        const textoDescricao = String(itemInfo.descricaoItem || itemInfo.descricaoPopup || '').trim();
+        const temDescPopup = textoDescricao !== '';
         
         if(!temFoto && !temDescPopup) return;
 
         const modal = document.getElementById('popup-item-imagem');
         document.getElementById('item-nome-display').textContent = itemInfo.nome;
-        document.getElementById('item-descricao-display').innerHTML = window.formatText(itemInfo.descricaoItem || '');
+        document.getElementById('item-descricao-display').innerHTML = window.formatText(textoDescricao);
         
         window.produtoPopupImagens = imagensProdutoPopup;
         window.produtoPopupImagemAtual = 0;
@@ -1047,10 +1104,9 @@ document.addEventListener("DOMContentLoaded", async function () {
             aviso.className = "aviso-janela-retirada";
             lista.insertAdjacentElement('beforebegin', aviso);
         }
-        const janela = calcularJanelaRetiradaCarrinho();
-        const msg = mensagemJanelaRetirada(janela);
-        aviso.innerHTML = msg ? `<i class="fa-regular fa-calendar"></i> ${window.formatText(msg)}` : '';
-        aviso.style.display = msg ? 'block' : 'none';
+        // 2026-10-15: a mensagem aparece só abaixo do campo de data, não no resumo.
+        aviso.innerHTML = '';
+        aviso.style.display = 'none';
     }
     window.atualizarAvisoJanelaResumo = atualizarAvisoJanelaResumo;
 
@@ -1084,7 +1140,8 @@ document.addEventListener("DOMContentLoaded", async function () {
                 inputData.insertAdjacentElement('afterend', avisoJanela);
             }
             if (janelaRetirada.restrita) {
-                avisoJanela.innerHTML = `<i class="fa-regular fa-calendar"></i> ${window.formatText(mensagemJanelaRetirada(janelaRetirada))}`;
+                // 2026-10-15: só o texto, logo abaixo do campo de data (sem ícone).
+                avisoJanela.innerHTML = window.formatText(mensagemJanelaRetirada(janelaRetirada));
                 avisoJanela.style.display = 'block';
             } else {
                 avisoJanela.style.display = 'none';
@@ -1141,7 +1198,7 @@ document.addEventListener("DOMContentLoaded", async function () {
                 const partesData = dataEscolhida.split('-');
                 const diaDaSemana = new Date(partesData[0], partesData[1] - 1, partesData[2]).getDay();
 
-                const regraExcecao = window.regrasAgenda ? window.regrasAgenda[dataEscolhida] : null;
+                const regraExcecao = window.regraExcecaoAplicavel(dataEscolhida);
                 const regraGeralDoDia = window.configGeralAgenda ? window.configGeralAgenda[diaDaSemana] : null;
 
                 const resetarDataInvalida = (mensagem) => {
@@ -1678,7 +1735,7 @@ document.addEventListener("DOMContentLoaded", async function () {
             return;
         }
 
-        if (window.regrasAgenda && window.regrasAgenda[dt] && window.regrasAgenda[dt].indisponivel) {
+        if (window.regraExcecaoAplicavel(dt)?.indisponivel) {
             alert("A data selecionada está indisponível para entregas. Por favor, escolha outro dia.");
             btn.textContent = txtOriginal; 
             btn.disabled = false; 
