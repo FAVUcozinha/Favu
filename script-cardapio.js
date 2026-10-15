@@ -677,8 +677,8 @@ document.addEventListener("DOMContentLoaded", async function () {
             const config = configCategorias[nomeCategoria];
             navHorizontal.innerHTML += `<a href="#${config.idGrupo}" class="categoria-btn ${primeiraCategoria ? 'active-link' : ''}" data-target="${config.idGrupo}">${nomeCategoria}</a>`;
 
-            const msgRetiradaCat = mensagemRetiradaCategoria(nomeCategoria, config);
-            const avisoRetiradaHTML = msgRetiradaCat ? `<div class="info-box info-box-retirada"><div class="info-box-content"><i class="fa-regular fa-calendar"></i> <strong>${window.formatText(msgRetiradaCat)}</strong></div></div>` : '';
+            // 2026-10-15: a mensagem de retirada não aparece mais na categoria; só no resumo e na data.
+            const avisoRetiradaHTML = '';
             const infoBoxHTML = avisoRetiradaHTML + ((config.mensagemObs && config.mensagemObs.trim() !== '') ? `<div class="info-box"><div class="info-box-content">${window.formatText(config.mensagemObs)}</div></div>` : '');
             
             let htmlGrupo = `
@@ -769,8 +769,10 @@ document.addEventListener("DOMContentLoaded", async function () {
 
             const imagensProdutoItem = getProdutoImagensCliente(item);
             const temFoto = imagensProdutoItem.length > 0;
-            const temDescPopup = item.descricaoPopup && item.descricaoPopup.trim() !== "";
-            const isClickable = temFoto || temDescPopup;
+            // 2026-10-15: a descrição da imagem é a própria descrição do produto;
+            // o item só abre a janela quando tem foto.
+            const temDescPopup = false;
+            const isClickable = temFoto;
 
             let iconeHint = '';
             if (temFoto) {
@@ -864,7 +866,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
         const modal = document.getElementById('popup-item-imagem');
         document.getElementById('item-nome-display').textContent = itemInfo.nome;
-        document.getElementById('item-descricao-display').innerHTML = window.formatText(itemInfo.descricaoPopup || itemInfo.descricaoItem || '');
+        document.getElementById('item-descricao-display').innerHTML = window.formatText(itemInfo.descricaoItem || '');
         
         window.produtoPopupImagens = imagensProdutoPopup;
         window.produtoPopupImagemAtual = 0;
