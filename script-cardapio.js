@@ -242,9 +242,11 @@ function aplicarTemaSite(t) {
             r.push(`body { background: ${fundo} !important; background-attachment: fixed !important; }`);
         } else root.style.setProperty('--bg-color', fundo);
     }
-    if (t.card) root.style.setProperty('--card-bg', t.card); else root.style.removeProperty('--card-bg');
-    if (t.txt) root.style.setProperty('--text-dark', t.txt); else root.style.removeProperty('--text-dark');
-    if (t.acc) { root.style.setProperty('--accent-orange', t.acc); root.style.setProperty('--accent-rust', t.acc); }
+    // Cores gerais com degradê: a variável usa a primeira cor do degradê.
+    const corSolida = v => ehDegrade(v) ? primeiraCor(v) : v;
+    if (t.card) root.style.setProperty('--card-bg', corSolida(t.card)); else root.style.removeProperty('--card-bg');
+    if (t.txt) root.style.setProperty('--text-dark', corSolida(t.txt)); else root.style.removeProperty('--text-dark');
+    if (t.acc) { root.style.setProperty('--accent-orange', corSolida(t.acc)); root.style.setProperty('--accent-rust', corSolida(t.acc)); }
     // "__sem__" = o tema pediu para não ter imagem nesse lugar.
     const SEM = '__sem__';
     // Guarda a imagem original para voltar a ela quando o campo fica vazio (prévia ao vivo).
@@ -316,6 +318,11 @@ function prepararPreviaAoVivo() {
             if (menu) menu.classList.toggle('active', abrir === 'menu');
             const about = document.getElementById('aboutModal');
             if (about) { if (abrir === 'quemsomos') { about.classList.add('show'); about.style.display = 'flex'; } else { about.classList.remove('show'); about.style.display = ''; } }
+            // Janelas do pedido na prévia: coloca um item de exemplo para mostrar itens, total e botões.
+            if ((abrir === 'resumo' || abrir === 'info') && ![...document.querySelectorAll('.quantidade-input')].some(i => (parseInt(i.value) || 0) > 0)) {
+                const exemplo = document.querySelector('.quantidade-input');
+                if (exemplo) { exemplo.value = 1; exemplo.dispatchEvent(new Event('input', { bubbles: true })); exemplo.dispatchEvent(new Event('change', { bubbles: true })); }
+            }
             ['resumo', 'info'].forEach(n => {
                 const pop = document.getElementById(n === 'resumo' ? 'popup-resumo' : 'popup-pedido');
                 if (!pop) return;
