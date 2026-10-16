@@ -349,10 +349,6 @@ async function obterTemaParaAplicar() {
                     const href = a.getAttribute('href') || '';
                     if (/(^|\/)(index|cardapio)\.html/.test(href) || href === './') a.setAttribute('href', href + (href.includes('?') ? '&' : '?') + 'tema_previa=' + encodeURIComponent(idPrevia));
                 });
-                const aviso = document.createElement('div');
-                aviso.textContent = `Prévia do tema: ${t.nome || ''}`;
-                aviso.style.cssText = 'position:fixed;left:50%;bottom:12px;transform:translateX(-50%);z-index:99999;background:#1D2814;color:#fff;padding:6px 14px;border-radius:20px;font:12px sans-serif;opacity:.85;pointer-events:none;';
-                document.body.appendChild(aviso);
                 return efetivo;
             }
         } catch (e) {}
