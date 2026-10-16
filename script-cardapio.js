@@ -258,6 +258,9 @@ function aplicarTemaSite(t) {
     trocarImg('.menu-logo-img', t.logoMenu || t.logoPrincipal);
     trocarImg('.footer-logo', t.logoRodape);
     trocarFundo('header', t.imgTopo);
+    // Sem imagem no topo: tira também a sombra que marcava o espaço.
+    const cab = document.querySelector('header');
+    if (cab) cab.style.boxShadow = t.imgTopo === SEM ? 'none' : '';
     trocarFundo('footer', t.imgRodape);
     trocarImg('#aboutModal .modal-img', t.imgQuemSomos);
     // Regras de cada elemento, já prontas no tema (painel > Temas).
@@ -296,11 +299,19 @@ function prepararPreviaAoVivo() {
     window.addEventListener('message', async (ev) => {
         if (ev.origin !== location.origin || !ev.data) return;
         if (ev.data.tipo === 'favu-tema-ao-vivo') {
-            try { aplicarTemaSite(await resolverImagensTema(ev.data.dados || {})); } catch (e) {}
+            const d = ev.data.dados || {};
+            try { aplicarTemaSite(await resolverImagensTema(d)); } catch (e) {}
+            try {
+                if (typeof aplicarConteudoInicio === 'function' && d.conteudoInicio) aplicarConteudoInicio(d.conteudoInicio);
+                if (typeof aplicarConteudoCardapio === 'function' && d.conteudoCardapio) aplicarConteudoCardapio(d.conteudoCardapio, null);
+            } catch (e) {}
         }
         if (ev.data.tipo === 'favu-destacar') {
             document.querySelectorAll('.favu-destaque').forEach(e => e.classList.remove('favu-destaque'));
             const abrir = ev.data.abrir || '';
+            // Na prévia, o comunicado não fica na frente do que está sendo editado.
+            const aviso = document.getElementById('popup-aviso');
+            if (aviso) { aviso.classList.remove('show'); aviso.style.display = 'none'; }
             const menu = document.getElementById('side-menu');
             if (menu) menu.classList.toggle('active', abrir === 'menu');
             const about = document.getElementById('aboutModal');
@@ -439,7 +450,12 @@ async function carregarDadosSite(id) {
 // Textos do cardápio editáveis no painel (Layout > Cardápio).
 window.__textosCardapio = { tituloResumo: 'RESUMO DO PEDIDO', botaoFazerPedido: 'FAZER PEDIDO', tituloInfo: 'INFORMAÇÕES DO PEDIDO', botaoConfirmar: 'CONFIRMAR PEDIDO', saudacaoWhatsapp: 'Olá, Favu!\nGostaria de encomendar os itens abaixo:' };
 async function aplicarSiteCardapio() {
-    const [cardapio, inicio] = await Promise.all([carregarDadosSite('site_cardapio'), carregarDadosSite('site_inicio')]);
+    const tema = window.__temaAtual || {};
+    const cardapio = tema.conteudoCardapio || await carregarDadosSite('site_cardapio');
+    const inicio = tema.conteudoInicio || await carregarDadosSite('site_inicio');
+    aplicarConteudoCardapio(cardapio, inicio);
+}
+function aplicarConteudoCardapio(cardapio, inicio) {
     if (inicio) { aplicarQuemSomosSite(inicio.quemSomos); aplicarRodapeSite(inicio.rodape); }
     if (!cardapio) return;
     aplicarMenuLateralSite(cardapio);
@@ -453,8 +469,9 @@ document.addEventListener("DOMContentLoaded", async function () {
     
     // Tema Cores + Imagens
     try {
-        aplicarSiteCardapio();
         const temaAtual = await obterTemaParaAplicar();
+        window.__temaAtual = temaAtual;
+        aplicarSiteCardapio();
         if (temaAtual) aplicarTemaSite(await resolverImagensTema(temaAtual));
     } catch(e) {}
 

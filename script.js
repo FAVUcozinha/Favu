@@ -125,6 +125,9 @@ function aplicarTemaSite(t) {
     trocarImg('.menu-logo-img', t.logoMenu || t.logoPrincipal);
     trocarImg('.footer-logo', t.logoRodape);
     trocarFundo('header', t.imgTopo);
+    // Sem imagem no topo: tira também a sombra que marcava o espaço.
+    const cab = document.querySelector('header');
+    if (cab) cab.style.boxShadow = t.imgTopo === SEM ? 'none' : '';
     trocarFundo('footer', t.imgRodape);
     trocarImg('#aboutModal .modal-img', t.imgQuemSomos);
     // Regras de cada elemento, já prontas no tema (painel > Temas).
@@ -163,11 +166,19 @@ function prepararPreviaAoVivo() {
     window.addEventListener('message', async (ev) => {
         if (ev.origin !== location.origin || !ev.data) return;
         if (ev.data.tipo === 'favu-tema-ao-vivo') {
-            try { aplicarTemaSite(await resolverImagensTema(ev.data.dados || {})); } catch (e) {}
+            const d = ev.data.dados || {};
+            try { aplicarTemaSite(await resolverImagensTema(d)); } catch (e) {}
+            try {
+                if (typeof aplicarConteudoInicio === 'function' && d.conteudoInicio) aplicarConteudoInicio(d.conteudoInicio);
+                if (typeof aplicarConteudoCardapio === 'function' && d.conteudoCardapio) aplicarConteudoCardapio(d.conteudoCardapio, null);
+            } catch (e) {}
         }
         if (ev.data.tipo === 'favu-destacar') {
             document.querySelectorAll('.favu-destaque').forEach(e => e.classList.remove('favu-destaque'));
             const abrir = ev.data.abrir || '';
+            // Na prévia, o comunicado não fica na frente do que está sendo editado.
+            const aviso = document.getElementById('popup-aviso');
+            if (aviso) { aviso.classList.remove('show'); aviso.style.display = 'none'; }
             const menu = document.getElementById('side-menu');
             if (menu) menu.classList.toggle('active', abrir === 'menu');
             const about = document.getElementById('aboutModal');
@@ -299,6 +310,17 @@ function aplicarRodapeSite(r) {
     if (r.copyright) document.querySelectorAll('footer .copy').forEach(p => { p.textContent = r.copyright; });
     if (r.assinatura) document.querySelectorAll('footer .desktop-signature span').forEach(s => { s.textContent = r.assinatura; });
 }
+function aplicarConteudoInicio(c) {
+    if (!c) return;
+    if (Array.isArray(c.botoesCapa)) {
+        const grid = document.getElementById('dynamic-grid-links');
+        if (grid) grid.innerHTML = visiveisSite(c.botoesCapa).map(i => linkSiteHtml(i, 'clean-card',
+            `<div class="card-icon"><i class="${escSite(i.icone || 'fas fa-link')}"></i></div><div class="card-info"><h3 class="font-display">${escSite(i.titulo)}</h3><p class="font-body">${window.formatText(i.legenda || '')}</p></div>`)).join('');
+    }
+    aplicarMenuLateralSite(c);
+    aplicarQuemSomosSite(c.quemSomos);
+    aplicarRodapeSite(c.rodape);
+}
 async function carregarDadosSite(id) {
     try { const d = await getDoc(doc(db, 'config', id)); return d.exists() ? d.data() : null; } catch (e) { return null; }
 }
@@ -308,21 +330,13 @@ document.addEventListener("DOMContentLoaded", async function () {
     // APLICAR TEMA (CORES + IMAGENS)
     try {
         const temaAtual = await obterTemaParaAplicar();
+        window.__temaAtual = temaAtual;
         if (temaAtual) aplicarTemaSite(await resolverImagensTema(temaAtual));
     } catch(e) {}
 
-    // EDITOR DO SITE: botões da capa, menu lateral, redes, Quem somos e rodapé
-    const siteInicio = await carregarDadosSite('site_inicio');
-    if (siteInicio) {
-        if (Array.isArray(siteInicio.botoesCapa)) {
-            const grid = document.getElementById('dynamic-grid-links');
-            if (grid) grid.innerHTML = visiveisSite(siteInicio.botoesCapa).map(i => linkSiteHtml(i, 'clean-card',
-                `<div class="card-icon"><i class="${escSite(i.icone || 'fas fa-link')}"></i></div><div class="card-info"><h3 class="font-display">${escSite(i.titulo)}</h3><p class="font-body">${window.formatText(i.legenda || '')}</p></div>`)).join('');
-        }
-        aplicarMenuLateralSite(siteInicio);
-        aplicarQuemSomosSite(siteInicio.quemSomos);
-        aplicarRodapeSite(siteInicio.rodape);
-    }
+    // EDITOR DO SITE: botões e textos vêm do tema no ar (ou do registro antigo do site).
+    const siteInicio = (window.__temaAtual && window.__temaAtual.conteudoInicio) || await carregarDadosSite('site_inicio');
+    if (siteInicio) aplicarConteudoInicio(siteInicio);
 
     // CARREGAR BOTÕES DO MENU LATERAL (SANFONA)
     if (!siteInicio) try {
