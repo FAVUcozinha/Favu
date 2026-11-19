@@ -1,12 +1,15 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, getDocs, getDoc, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, initializeFirestore, collection, getDocs, getDoc, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const app = initializeApp({
     apiKey: "AIzaSyD5JlV7R2w629uiescD4AiixNAr-Qt0qI0",
     authDomain: "favu-app.firebaseapp.com",
     projectId: "favu-app"
 });
-const db = getFirestore(app);
+// 2026-11-19: conexão simples ("long polling"). O modo padrão do Firebase trava no
+// navegador interno do Instagram/Facebook (de onde vem o link da bio) e o cardápio não abria.
+let db;
+try { db = initializeFirestore(app, { experimentalForceLongPolling: true }); } catch (e) { db = getFirestore(app); }
 
 // ==========================================
 // FORMATADOR DE TEXTO RICO SEGURO
@@ -234,14 +237,16 @@ async function obterTemaParaAplicar() {
             }
         } catch (e) {}
     }
-    // Tema agendado (painel > Temas > Agendamento): vale dentro do período.
+    // Tema agendado e tema no ar buscados ao mesmo tempo (antes, um depois do outro).
+    const [ag, temaDoc] = await Promise.all([
+        getDoc(doc(db, 'config', 'tema_agendados')).catch(() => null),
+        getDoc(doc(db, "config", "tema"))
+    ]);
     try {
-        const ag = await getDoc(doc(db, 'config', 'tema_agendados'));
         const agora = Date.now();
-        const vigentes = (ag.exists() ? (ag.data().lista || []) : []).filter(x => x && x.dados && (x.inicio == null || agora >= x.inicio) && (x.fim == null || agora < x.fim));
+        const vigentes = (ag && ag.exists() ? (ag.data().lista || []) : []).filter(x => x && x.dados && (x.inicio == null || agora >= x.inicio) && (x.fim == null || agora < x.fim));
         if (vigentes.length) return vigentes.sort((a, b) => (b.inicio || 0) - (a.inicio || 0))[0].dados;
     } catch (e) {}
-    const temaDoc = await getDoc(doc(db, "config", "tema"));
     return temaDoc.exists() ? temaDoc.data() : null;
 }
 
@@ -358,14 +363,63 @@ async function carregarDadosSite(id) {
     try { const d = await getDoc(doc(db, 'config', id)); return d.exists() ? d.data() : null; } catch (e) { return null; }
 }
 
+
+// =====================================================================
+// CARREGAMENTO RÁPIDO DO TEMA (2026-11-19)
+// - O tema da visita anterior fica guardado no aparelho e é aplicado na hora;
+//   o tema atualizado é buscado em segundo plano e reaplicado se mudou.
+// - As cores entram primeiro; as imagens (documentos grandes) entram depois,
+//   sem segurar o resto da página.
+// =====================================================================
+const CHAVE_CACHE_TEMA = 'favu_tema_cache';
+function semImagensTema(t) {
+    const o = { ...t };
+    Object.keys(o).forEach(k => { if (typeof o[k] === 'string' && o[k].startsWith('cfgimg:')) o[k] = ''; });
+    if (o.porCardapio) {
+        const pc = {};
+        Object.entries(o.porCardapio).forEach(([id, st]) => {
+            const imgs = {};
+            Object.entries((st && st.imgs) || {}).forEach(([k, v]) => { if (!String(v || '').startsWith('cfgimg:')) imgs[k] = v; });
+            pc[id] = { ...st, imgs };
+        });
+        o.porCardapio = pc;
+    }
+    return o;
+}
+async function aplicarTemaComImagens(t, antesDasImagens) {
+    if (!t) return;
+    try { aplicarTemaSite(semImagensTema(t)); } catch (e) {}
+    try {
+        if (antesDasImagens) await antesDasImagens();
+        aplicarTemaSite(await resolverImagensTema(t));
+    } catch (e) {}
+}
+async function obterTemaComCache(aoMudar) {
+    const previa = new URLSearchParams(location.search).has('tema_previa');
+    let cache = null;
+    if (!previa) { try { cache = JSON.parse(localStorage.getItem(CHAVE_CACHE_TEMA) || 'null'); } catch (e) {} }
+    const buscar = obterTemaParaAplicar().then(t => {
+        if (!previa && t) { try { localStorage.setItem(CHAVE_CACHE_TEMA, JSON.stringify(t)); } catch (e) {} }
+        return t;
+    });
+    if (!cache) return buscar;
+    buscar.then(t => { if (t && aoMudar && JSON.stringify(t) !== JSON.stringify(cache)) aoMudar(t); }).catch(() => {});
+    return cache;
+}
+
 document.addEventListener("DOMContentLoaded", async function () {
     document.body.classList.add('pg-inicio');
     
     // APLICAR TEMA (CORES + IMAGENS)
+    // 2026-11-19: tema guardado aplicado na hora; imagens não seguram a página.
     try {
-        const temaAtual = await obterTemaParaAplicar();
+        const temaAtual = await obterTemaComCache(t => {
+            window.__temaAtual = t;
+            aplicarTemaComImagens(t);
+            if (t.conteudoInicio) aplicarConteudoInicio(t.conteudoInicio);
+        });
         window.__temaAtual = temaAtual;
-        if (temaAtual) aplicarTemaSite(await resolverImagensTema(temaAtual));
+        if (temaAtual) aplicarTemaComImagens(temaAtual);
     } catch(e) {}
 
     // EDITOR DO SITE: botões e textos vêm do tema no ar (ou do registro antigo do site).

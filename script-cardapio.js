@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, getDocs, getDoc, doc, query, where, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, initializeFirestore, collection, getDocs, getDoc, doc, query, where, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD5JlV7R2w629uiescD4AiixNAr-Qt0qI0",
@@ -11,7 +11,10 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+// 2026-11-19: conexão simples ("long polling"). O modo padrão do Firebase trava no
+// navegador interno do Instagram/Facebook (de onde vem o link da bio) e o cardápio não abria.
+let db;
+try { db = initializeFirestore(app, { experimentalForceLongPolling: true }); } catch (e) { db = getFirestore(app); }
 
 let configCategorias = {};
 let bancoDeProdutos = {}; 
@@ -379,14 +382,16 @@ async function obterTemaParaAplicar() {
             }
         } catch (e) {}
     }
-    // Tema agendado (painel > Temas > Agendamento): vale dentro do período.
+    // Tema agendado e tema no ar buscados ao mesmo tempo (antes, um depois do outro).
+    const [ag, temaDoc] = await Promise.all([
+        getDoc(doc(db, 'config', 'tema_agendados')).catch(() => null),
+        getDoc(doc(db, "config", "tema"))
+    ]);
     try {
-        const ag = await getDoc(doc(db, 'config', 'tema_agendados'));
         const agora = Date.now();
-        const vigentes = (ag.exists() ? (ag.data().lista || []) : []).filter(x => x && x.dados && (x.inicio == null || agora >= x.inicio) && (x.fim == null || agora < x.fim));
+        const vigentes = (ag && ag.exists() ? (ag.data().lista || []) : []).filter(x => x && x.dados && (x.inicio == null || agora >= x.inicio) && (x.fim == null || agora < x.fim));
         if (vigentes.length) return vigentes.sort((a, b) => (b.inicio || 0) - (a.inicio || 0))[0].dados;
     } catch (e) {}
-    const temaDoc = await getDoc(doc(db, "config", "tema"));
     return temaDoc.exists() ? temaDoc.data() : null;
 }
 
@@ -533,7 +538,7 @@ function carregarCardapioAtual() {
 async function descobrirCardapioAtual() {
     const pedido = (new URLSearchParams(location.search).get('menu') || '').trim().toLowerCase();
     try {
-        const snap = await getDoc(doc(db, 'config', 'cardapios'));
+        const snap = await buscarDocRapido('config', 'cardapios');
         const lista = snap.exists() && Array.isArray(snap.data().lista) ? snap.data().lista : [];
         window.__cardapiosExistentes = new Set(['padrao', ...lista.map(c => c && c.id).filter(Boolean)]);
         const achado = pedido && pedido !== 'padrao' ? lista.find(c => c && c.id === pedido && c.ativo !== false) : null;
@@ -557,18 +562,148 @@ function cardapioDaCategoria(c) {
 }
 function categoriaNoCardapioAtual(c) { return cardapioDaCategoria(c) === window.__cardapioAtual.id; }
 
+
+// =====================================================================
+// CARREGAMENTO RÁPIDO DO TEMA (2026-11-19)
+// - O tema da visita anterior fica guardado no aparelho e é aplicado na hora;
+//   o tema atualizado é buscado em segundo plano e reaplicado se mudou.
+// - As cores entram primeiro; as imagens (documentos grandes) entram depois,
+//   sem segurar o resto da página.
+// =====================================================================
+const CHAVE_CACHE_TEMA = 'favu_tema_cache';
+function semImagensTema(t) {
+    const o = { ...t };
+    Object.keys(o).forEach(k => { if (typeof o[k] === 'string' && o[k].startsWith('cfgimg:')) o[k] = ''; });
+    if (o.porCardapio) {
+        const pc = {};
+        Object.entries(o.porCardapio).forEach(([id, st]) => {
+            const imgs = {};
+            Object.entries((st && st.imgs) || {}).forEach(([k, v]) => { if (!String(v || '').startsWith('cfgimg:')) imgs[k] = v; });
+            pc[id] = { ...st, imgs };
+        });
+        o.porCardapio = pc;
+    }
+    return o;
+}
+async function aplicarTemaComImagens(t, antesDasImagens) {
+    if (!t) return;
+    try { aplicarTemaSite(semImagensTema(t)); } catch (e) {}
+    try {
+        if (antesDasImagens) await antesDasImagens();
+        aplicarTemaSite(await resolverImagensTema(t));
+    } catch (e) {}
+}
+async function obterTemaComCache(aoMudar) {
+    const previa = new URLSearchParams(location.search).has('tema_previa');
+    let cache = null;
+    if (!previa) { try { cache = JSON.parse(localStorage.getItem(CHAVE_CACHE_TEMA) || 'null'); } catch (e) {} }
+    const buscar = obterTemaParaAplicar().then(t => {
+        if (!previa && t) { try { localStorage.setItem(CHAVE_CACHE_TEMA, JSON.stringify(t)); } catch (e) {} }
+        return t;
+    });
+    if (!cache) return buscar;
+    buscar.then(t => { if (t && aoMudar && JSON.stringify(t) !== JSON.stringify(cache)) aoMudar(t); }).catch(() => {});
+    return cache;
+}
+
+// =====================================================================
+// SEGUNDA VIA DE BUSCA (2026-11-19): o mesmo banco, pelo endereço web direto.
+// Categorias, produtos e lista de cardápios são pedidos pelos dois caminhos ao
+// mesmo tempo; vale o que chegar primeiro. Se um travar, o outro resolve.
+// =====================================================================
+const URL_REST_FS = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents`;
+function valorRestFs(v) {
+    if (!v) return null;
+    if ('stringValue' in v) return v.stringValue;
+    if ('integerValue' in v) return Number(v.integerValue);
+    if ('doubleValue' in v) return Number(v.doubleValue);
+    if ('booleanValue' in v) return v.booleanValue;
+    if ('nullValue' in v) return null;
+    if ('timestampValue' in v) return v.timestampValue;
+    if ('mapValue' in v) return camposRestFs(v.mapValue.fields || {});
+    if ('arrayValue' in v) return (v.arrayValue.values || []).map(valorRestFs);
+    return null;
+}
+function camposRestFs(f) { const o = {}; Object.entries(f || {}).forEach(([k, v]) => { o[k] = valorRestFs(v); }); return o; }
+function snapRestFs(docs) {
+    const lista = docs.map(d => { const dados = camposRestFs(d.fields); const id = String(d.name || '').split('/').pop(); return { id, exists: () => true, data: () => dados }; });
+    return { docs: lista, empty: !lista.length, size: lista.length, forEach: fn => lista.forEach(fn) };
+}
+async function colecaoRestFs(nome) {
+    const docs = []; let token = '';
+    for (let n = 0; n < 20; n++) {
+        const r = await fetch(`${URL_REST_FS}/${nome}?pageSize=300&key=${firebaseConfig.apiKey}${token ? `&pageToken=${encodeURIComponent(token)}` : ''}`);
+        if (!r.ok) throw new Error('rest ' + r.status);
+        const j = await r.json();
+        docs.push(...(j.documents || []));
+        if (!j.nextPageToken) break;
+        token = j.nextPageToken;
+    }
+    return snapRestFs(docs);
+}
+async function docRestFs(colecao, id) {
+    const r = await fetch(`${URL_REST_FS}/${colecao}/${encodeURIComponent(id)}?key=${firebaseConfig.apiKey}`);
+    if (r.status === 404) return { id, exists: () => false, data: () => undefined };
+    if (!r.ok) throw new Error('rest ' + r.status);
+    const j = await r.json(); const dados = camposRestFs(j.fields);
+    return { id, exists: () => true, data: () => dados };
+}
+// O primeiro que responder com sucesso vence.
+function primeiroQueChegar(promessas) {
+    return new Promise((ok, falha) => {
+        let erros = 0;
+        promessas.forEach(p => Promise.resolve(p).then(ok, e => { if (++erros === promessas.length) falha(e); }));
+    });
+}
+function buscarColecaoRapido(nome, consultaSdk, filtro) {
+    const viaRest = colecaoRestFs(nome).then(snap => {
+        if (!filtro) return snap;
+        const lista = snap.docs.filter(d => filtro(d.data()));
+        return { docs: lista, empty: !lista.length, size: lista.length, forEach: fn => lista.forEach(fn) };
+    });
+    return primeiroQueChegar([getDocs(consultaSdk), viaRest]);
+}
+function buscarDocRapido(colecao, id) {
+    return primeiroQueChegar([getDoc(doc(db, colecao, id)), docRestFs(colecao, id)]);
+}
+
+// Aviso de carregamento no lugar da tela em branco (2026-11-19).
+function mostrarCarregandoCardapio(lento) {
+    const m = document.getElementById('menu-principal');
+    if (!m || m.querySelector('.categoria-group')) return;
+    m.innerHTML = `<div class="cardapio-carregando"><div class="cardapio-spinner"></div><p>Carregando cardápio…</p>${lento ? '<small>Está demorando mais que o normal. Confira sua internet.</small><button type="button" onclick="location.reload()">Tentar de novo</button>' : ''}</div>`;
+}
+function mostrarErroCardapio() {
+    const m = document.getElementById('menu-principal');
+    if (!m || m.querySelector('.categoria-group')) return;
+    m.innerHTML = '<div class="cardapio-carregando"><p>Não conseguimos carregar o cardápio agora.</p><small>Confira sua internet e tente de novo.</small><button type="button" onclick="location.reload()">Tentar de novo</button></div>';
+}
+
 document.addEventListener("DOMContentLoaded", async function () {
     
-    // Tema Cores + Imagens
-    try {
-        // Página e cardápio aberto marcados no <body> (as regras do tema usam essas marcas).
-        await carregarCardapioAtual();
-        document.body.classList.add('pg-cardapio', `cardapio-${window.__cardapioAtual.id}`);
-        const temaAtual = await obterTemaParaAplicar();
-        window.__temaAtual = temaAtual;
-        aplicarSiteCardapio();
-        if (temaAtual) aplicarTemaSite(await resolverImagensTema(temaAtual));
-    } catch(e) {}
+    // Tema Cores + Imagens — 2026-11-19: roda em paralelo, SEM segurar o cardápio.
+    // Antes o cardápio só começava depois do tema e das imagens (até ~10 s em 4G).
+    const idMenuUrl = (new URLSearchParams(location.search).get('menu') || 'padrao').trim().toLowerCase() || 'padrao';
+    document.body.classList.add('pg-cardapio', `cardapio-${idMenuUrl}`);
+    carregarCardapioAtual().then(() => {
+        if (window.__cardapioAtual.id !== idMenuUrl) {
+            document.body.classList.remove(`cardapio-${idMenuUrl}`);
+            document.body.classList.add(`cardapio-${window.__cardapioAtual.id}`);
+        }
+    }).catch(() => {});
+    (async () => {
+        try {
+            const usar = async t => {
+                window.__temaAtual = t;
+                carregarCardapioAtual().then(() => aplicarSiteCardapio()).catch(() => {});
+                // As imagens do tema (documentos grandes) só começam depois que o cardápio aparece.
+                await aplicarTemaComImagens(t, async () => { await carregarCardapioAtual(); await window.__menuPronto; });
+            };
+            const t = await obterTemaComCache(usar);
+            if (t) await usar(t);
+            else carregarCardapioAtual().then(() => aplicarSiteCardapio()).catch(() => {});
+        } catch (e) {}
+    })();
 
     // Agenda de Horários Globais e Exceções
     window.configGeralAgenda = {}; 
@@ -589,7 +724,8 @@ document.addEventListener("DOMContentLoaded", async function () {
             }
         } catch(e) { console.error("Erro ao carregar agenda", e); }
     }
-    await carregarAgenda();
+    window.__agendaPronta = carregarAgenda(); // em paralelo, não segura o cardápio
+    let avisarMenuPronto; window.__menuPronto = new Promise(r => { avisarMenuPronto = r; setTimeout(r, 15000); });
 
     
     // === CLIENTE 2026-06-21: ampliar imagens de produtos e comunicados ===
@@ -794,9 +930,15 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
 
     async function carregarMenu() {
+        mostrarCarregandoCardapio();
+        clearTimeout(window.__timerLentidao);
+        window.__timerLentidao = setTimeout(() => mostrarCarregandoCardapio(true), 9000);
         try {
-            await carregarCardapioAtual();
-            const catSnapshot = await getDocs(collection(db, "categorias"));
+            const [, catSnapshot, prodSnapshotPronto] = await Promise.all([
+                carregarCardapioAtual(),
+                buscarColecaoRapido('categorias', collection(db, "categorias")),
+                buscarColecaoRapido('produtos', query(collection(db, "produtos"), where("ativo", "==", true)), d => d.ativo === true)
+            ]);
             const categoriasAtivas = []; 
             
             catSnapshot.forEach(doc => {
@@ -830,8 +972,7 @@ document.addEventListener("DOMContentLoaded", async function () {
                 }
             });
 
-            const q = query(collection(db, "produtos"), where("ativo", "==", true));
-            const querySnapshot = await getDocs(q);
+            const querySnapshot = prodSnapshotPronto;
             const itensAgrupados = {};
 
             querySnapshot.forEach((doc) => {
@@ -859,8 +1000,18 @@ document.addEventListener("DOMContentLoaded", async function () {
                 itensAgrupados[nomeCategoria].push(item);
             });
 
+            clearTimeout(window.__timerLentidao);
             renderizarCardapio(itensAgrupados);
-        } catch (error) { console.error(error); }
+            if (typeof avisarMenuPronto === 'function') avisarMenuPronto();
+            if (!Object.keys(itensAgrupados).length) {
+                const main = document.getElementById('menu-principal');
+                if (main) main.innerHTML = '<div class="cardapio-carregando"><p>No momento não há itens disponíveis neste cardápio.</p></div>';
+            }
+        } catch (error) {
+            console.error(error);
+            clearTimeout(window.__timerLentidao);
+            mostrarErroCardapio();
+        }
     }
 
     // ALTERADO (2026-10): o resumo do pedido é sempre "Nome | Tamanho", montado na hora
