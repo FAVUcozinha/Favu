@@ -538,8 +538,16 @@ function carregarCardapioAtual() {
 async function descobrirCardapioAtual() {
     const pedido = (new URLSearchParams(location.search).get('menu') || '').trim().toLowerCase();
     try {
-        const snap = await buscarDocRapido('config', 'cardapios');
-        const lista = snap.exists() && Array.isArray(snap.data().lista) ? snap.data().lista : [];
+        // Lista de cardápios guardada no aparelho: usada na hora e conferida em segundo plano.
+        let guardada = null;
+        try { guardada = JSON.parse(localStorage.getItem('favu_cardapios_cache') || 'null'); } catch (e) {}
+        const doBanco = buscarDocRapido('config', 'cardapios').then(snap => {
+            const l = snap.exists() && Array.isArray(snap.data().lista) ? snap.data().lista : [];
+            try { localStorage.setItem('favu_cardapios_cache', JSON.stringify(l)); } catch (e) {}
+            return l;
+        });
+        doBanco.catch(() => {});
+        const lista = Array.isArray(guardada) ? guardada : await doBanco;
         window.__cardapiosExistentes = new Set(['padrao', ...lista.map(c => c && c.id).filter(Boolean)]);
         const achado = pedido && pedido !== 'padrao' ? lista.find(c => c && c.id === pedido && c.ativo !== false) : null;
         if (achado) window.__cardapioAtual = { id: achado.id, nome: achado.nome || achado.id };
@@ -631,10 +639,15 @@ function snapRestFs(docs) {
 }
 async function colecaoRestFs(nome) {
     const docs = []; let token = '';
+    const pre = preCarregado(nome);
     for (let n = 0; n < 20; n++) {
-        const r = await fetch(`${URL_REST_FS}/${nome}?pageSize=300&key=${firebaseConfig.apiKey}${token ? `&pageToken=${encodeURIComponent(token)}` : ''}`);
-        if (!r.ok) throw new Error('rest ' + r.status);
-        const j = await r.json();
+        let j;
+        if (n === 0 && pre) j = await pre;
+        else {
+            const r = await fetch(`${URL_REST_FS}/${nome}?pageSize=300&key=${firebaseConfig.apiKey}${token ? `&pageToken=${encodeURIComponent(token)}` : ''}`);
+            if (!r.ok) throw new Error('rest ' + r.status);
+            j = await r.json();
+        }
         docs.push(...(j.documents || []));
         if (!j.nextPageToken) break;
         token = j.nextPageToken;
@@ -642,12 +655,33 @@ async function colecaoRestFs(nome) {
     return snapRestFs(docs);
 }
 async function docRestFs(colecao, id) {
+    const pre = colecao === 'config' && id === 'cardapios' ? preCarregado('cardapios') : null;
+    if (pre) { const j = await pre; if (!j || !j.fields) return { id, exists: () => false, data: () => undefined }; const dados = camposRestFs(j.fields); return { id, exists: () => true, data: () => dados }; }
     const r = await fetch(`${URL_REST_FS}/${colecao}/${encodeURIComponent(id)}?key=${firebaseConfig.apiKey}`);
     if (r.status === 404) return { id, exists: () => false, data: () => undefined };
     if (!r.ok) throw new Error('rest ' + r.status);
     const j = await r.json(); const dados = camposRestFs(j.fields);
     return { id, exists: () => true, data: () => dados };
 }
+// ---------- Cardápio guardado no aparelho (2026-11-19) ----------
+const CHAVE_CACHE_MENU = 'favu_menu_cache_v1';
+function serializarMenu([cat, prod]) {
+    const lista = snap => (snap.docs || []).map(d => ({ id: d.id, d: d.data() }));
+    return { cat: lista(cat), prod: lista(prod) };
+}
+function desserializarMenu(o) {
+    const snap = arr => { const docs = (arr || []).map(x => ({ id: x.id, exists: () => true, data: () => JSON.parse(JSON.stringify(x.d)) })); return { docs, empty: !docs.length, size: docs.length, forEach: fn => docs.forEach(fn) }; };
+    return [snap(o.cat), snap(o.prod)];
+}
+function lerCacheMenu() { try { const o = JSON.parse(localStorage.getItem(CHAVE_CACHE_MENU) || 'null'); return o && Array.isArray(o.cat) && o.cat.length ? o : null; } catch (e) { return null; } }
+function salvarCacheMenu(o) { try { localStorage.setItem(CHAVE_CACHE_MENU, JSON.stringify(o)); } catch (e) {} }
+// Pedidos já disparados pelo cardápio.html antes deste arquivo baixar (window.__preFS).
+function preCarregado(nome) {
+    const p = window.__preFS && window.__preFS[nome];
+    if (p) delete window.__preFS[nome];
+    return p || null;
+}
+
 // O primeiro que responder com sucesso vence.
 function primeiroQueChegar(promessas) {
     return new Promise((ok, falha) => {
@@ -929,16 +963,45 @@ document.addEventListener("DOMContentLoaded", async function () {
         }
     }
 
-    async function carregarMenu() {
-        mostrarCarregandoCardapio();
-        clearTimeout(window.__timerLentidao);
-        window.__timerLentidao = setTimeout(() => mostrarCarregandoCardapio(true), 9000);
+    // Busca categorias e produtos no banco (dois caminhos ao mesmo tempo).
+    async function buscarDadosMenu() {
+        const [, cat, prod] = await Promise.all([
+            carregarCardapioAtual(),
+            buscarColecaoRapido('categorias', collection(db, "categorias")),
+            buscarColecaoRapido('produtos', query(collection(db, "produtos"), where("ativo", "==", true)), d => d.ativo === true)
+        ]);
+        return [cat, prod];
+    }
+    // 2026-11-19: com o cardápio guardado no aparelho, ele aparece na hora e é
+    // conferido com o banco em segundo plano; se mudou, atualiza mantendo as quantidades.
+    async function iniciarCardapio() {
+        const guardado = lerCacheMenu();
+        if (!guardado) { await carregarMenu(); return; }
+        await carregarMenu(desserializarMenu(guardado));
         try {
-            const [, catSnapshot, prodSnapshotPronto] = await Promise.all([
-                carregarCardapioAtual(),
-                buscarColecaoRapido('categorias', collection(db, "categorias")),
-                buscarColecaoRapido('produtos', query(collection(db, "produtos"), where("ativo", "==", true)), d => d.ativo === true)
-            ]);
+            const novo = serializarMenu(await buscarDadosMenu());
+            if (JSON.stringify(novo) === JSON.stringify(guardado)) return;
+            salvarCacheMenu(novo);
+            const qtds = {};
+            document.querySelectorAll('.quantidade-input').forEach(i => { const v = parseInt(i.value) || 0; if (v > 0) qtds[i.getAttribute('data-item-id')] = v; });
+            await carregarMenu(desserializarMenu(novo));
+            Object.entries(qtds).forEach(([id, v]) => {
+                const i = document.querySelector(`.quantidade-input[data-item-id="${CSS.escape(id)}"]`);
+                if (i) { i.value = v; i.dispatchEvent(new Event('input', { bubbles: true })); }
+            });
+        } catch (e) { console.warn('Atualização do cardápio:', e); }
+    }
+
+    async function carregarMenu(snapsProntos) {
+        if (!snapsProntos) {
+            mostrarCarregandoCardapio();
+            clearTimeout(window.__timerLentidao);
+            window.__timerLentidao = setTimeout(() => mostrarCarregandoCardapio(true), 9000);
+        }
+        try {
+            let catSnapshot, prodSnapshotPronto;
+            if (snapsProntos) { await carregarCardapioAtual(); [catSnapshot, prodSnapshotPronto] = snapsProntos; }
+            else { [catSnapshot, prodSnapshotPronto] = await buscarDadosMenu(); salvarCacheMenu(serializarMenu([catSnapshot, prodSnapshotPronto])); }
             const categoriasAtivas = []; 
             
             catSnapshot.forEach(doc => {
@@ -2237,5 +2300,5 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
     
     // Inicia o cardápio!
-    carregarMenu();
+    iniciarCardapio();
 });

@@ -1,6 +1,29 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+    <!-- 2026-11-19: carregamento rápido — conexões abertas e dados pedidos antes do resto -->
+    <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js">
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js">
+    <script>
+    (function () {
+        try {
+            var base = 'https://firestore.googleapis.com/v1/projects/favu-app/databases/(default)/documents/';
+            var chave = 'AIzaSyD5JlV7R2w629uiescD4AiixNAr-Qt0qI0';
+            var pegar = function (url, vazioEm404) {
+                var p = fetch(url).then(function (r) { if (vazioEm404 && r.status === 404) return {}; if (!r.ok) throw new Error(r.status); return r.json(); });
+                p.catch(function () {});
+                return p;
+            };
+            window.__preFS = {
+                categorias: pegar(base + 'categorias?pageSize=300&key=' + chave),
+                produtos: pegar(base + 'produtos?pageSize=300&key=' + chave),
+                cardapios: pegar(base + 'config/cardapios?key=' + chave, true)
+            };
+        } catch (e) {}
+    })();
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" href="images/favu.png">
@@ -399,6 +422,6 @@
         </div>
     </div>
 
-    <script type="module" src="script-cardapio.js?v=20261119-rapido-2"></script>
+    <script type="module" src="script-cardapio.js?v=20261119-rapido-3"></script>
 </body>
 </html>
