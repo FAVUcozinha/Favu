@@ -1,5 +1,8 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, initializeFirestore, collection, getDocs, getDoc, doc, query, where, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+// 2026-11-19: o Firebase NÃO segura mais a abertura do cardápio. Ele é carregado em
+// segundo plano; o cardápio aparece com os dados pedidos pelo endereço web do banco
+// (rápido e funciona no navegador do Instagram). O Firebase só é esperado por quem
+// precisa dele (enviar pedido, cupom, tema, comunicados).
+const SDK_FIREBASE = "https://www.gstatic.com/firebasejs/10.7.1/";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD5JlV7R2w629uiescD4AiixNAr-Qt0qI0",
@@ -10,11 +13,25 @@ const firebaseConfig = {
   appId: "1:793414871188:web:07ab447df44d742e022c81"
 };
 
-const app = initializeApp(firebaseConfig);
-// 2026-11-19: conexão simples ("long polling"). O modo padrão do Firebase trava no
-// navegador interno do Instagram/Facebook (de onde vem o link da bio) e o cardápio não abria.
-let db;
-try { db = initializeFirestore(app, { experimentalForceLongPolling: true }); } catch (e) { db = getFirestore(app); }
+// Conexão simples ("long polling"): o modo padrão do Firebase trava no navegador
+// interno do Instagram/Facebook (de onde vem o link da bio).
+const sdkPronto = Promise.all([import(SDK_FIREBASE + "firebase-app.js"), import(SDK_FIREBASE + "firebase-firestore.js")]).then(([modApp, f]) => {
+    const app = modApp.initializeApp(firebaseConfig);
+    let banco;
+    try { banco = f.initializeFirestore(app, { experimentalForceLongPolling: true }); } catch (e) { banco = f.getFirestore(app); }
+    return { f, db: banco };
+});
+sdkPronto.catch(e => console.warn('Firebase:', e));
+// Mesmas funções de antes; cada uma espera o Firebase só quando é chamada.
+const db = {};
+function collection(_db, ...partes) { return sdkPronto.then(s => s.f.collection(s.db, ...partes)); }
+function doc(_db, ...partes) { return sdkPronto.then(s => s.f.doc(s.db, ...partes)); }
+function where(...args) { return { __where: args }; }
+function query(base, ...filtros) { return sdkPronto.then(async s => s.f.query(await base, ...filtros.map(c => (c && c.__where) ? s.f.where(...c.__where) : c))); }
+async function getDocs(q) { const s = await sdkPronto; return s.f.getDocs(await q); }
+async function getDoc(r) { const s = await sdkPronto; return s.f.getDoc(await r); }
+async function setDoc(r, ...resto) { const s = await sdkPronto; return s.f.setDoc(await r, ...resto); }
+async function updateDoc(r, ...resto) { const s = await sdkPronto; return s.f.updateDoc(await r, ...resto); }
 
 let configCategorias = {};
 let bancoDeProdutos = {}; 
@@ -384,8 +401,8 @@ async function obterTemaParaAplicar() {
     }
     // Tema agendado e tema no ar buscados ao mesmo tempo (antes, um depois do outro).
     const [ag, temaDoc] = await Promise.all([
-        getDoc(doc(db, 'config', 'tema_agendados')).catch(() => null),
-        getDoc(doc(db, "config", "tema"))
+        buscarDocRapido('config', 'tema_agendados').catch(() => null),
+        buscarDocRapido('config', 'tema')
     ]);
     try {
         const agora = Date.now();
@@ -403,7 +420,7 @@ async function resolverImagemTema(valor) {
     const id = v.slice(7);
     try { const c = localStorage.getItem('favu_img_' + id); if (c) return c; } catch (e) {}
     try {
-        const s = await getDoc(doc(db, 'config', id));
+        const s = await buscarDocRapido('config', id);
         const data = s.exists() ? (s.data().data || '') : '';
         try { if (data) localStorage.setItem('favu_img_' + id, data); } catch (e) {}
         return data;
@@ -492,7 +509,7 @@ function aplicarRodapeSite(r) {
     if (r.assinatura) document.querySelectorAll('footer .desktop-signature span').forEach(s => { s.textContent = r.assinatura; });
 }
 async function carregarDadosSite(id) {
-    try { const d = await getDoc(doc(db, 'config', id)); return d.exists() ? d.data() : null; } catch (e) { return null; }
+    try { const d = await buscarDocRapido('config', id); return d.exists() ? d.data() : null; } catch (e) { return null; }
 }
 
 // Textos do cardápio editáveis no painel (Layout > Cardápio).
@@ -655,8 +672,14 @@ async function colecaoRestFs(nome) {
     return snapRestFs(docs);
 }
 async function docRestFs(colecao, id) {
-    const pre = colecao === 'config' && id === 'cardapios' ? preCarregado('cardapios') : null;
-    if (pre) { const j = await pre; if (!j || !j.fields) return { id, exists: () => false, data: () => undefined }; const dados = camposRestFs(j.fields); return { id, exists: () => true, data: () => dados }; }
+    const pre = preCarregado(`${colecao}/${id}`);
+    if (pre) {
+        try {
+            const j = await pre;
+            if (!j || !j.fields) return { id, exists: () => false, data: () => undefined };
+            const dados = camposRestFs(j.fields); return { id, exists: () => true, data: () => dados };
+        } catch (e) { /* segue para o pedido normal abaixo */ }
+    }
     const r = await fetch(`${URL_REST_FS}/${colecao}/${encodeURIComponent(id)}?key=${firebaseConfig.apiKey}`);
     if (r.status === 404) return { id, exists: () => false, data: () => undefined };
     if (!r.ok) throw new Error('rest ' + r.status);
@@ -680,6 +703,35 @@ function preCarregado(nome) {
     const p = window.__preFS && window.__preFS[nome];
     if (p) delete window.__preFS[nome];
     return p || null;
+}
+
+// ---------- Gravação do pedido com segunda via (2026-11-19) ----------
+// O pedido também é gravado pelo endereço web do banco (funciona mesmo se o
+// Firebase travar no navegador do Instagram).
+function valorParaRestFs(v) {
+    if (v === null || v === undefined) return { nullValue: null };
+    if (typeof v === 'boolean') return { booleanValue: v };
+    if (typeof v === 'number') return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+    if (Array.isArray(v)) return { arrayValue: { values: v.map(valorParaRestFs) } };
+    if (typeof v === 'object') { const fields = {}; Object.entries(v).forEach(([k, x]) => { if (x !== undefined) fields[k] = valorParaRestFs(x); }); return { mapValue: { fields } }; }
+    return { stringValue: String(v) };
+}
+async function gravarPedidoRestFs(id, dados) {
+    const r = await fetch(`${URL_REST_FS}/pedidos?documentId=${encodeURIComponent(id)}&key=${firebaseConfig.apiKey}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: valorParaRestFs(dados).mapValue.fields })
+    });
+    if (r.status === 409) return; // já gravado pelo Firebase com o mesmo número
+    if (!r.ok) throw new Error('rest ' + r.status);
+}
+// Grava pelos dois caminhos ao mesmo tempo; vale o primeiro que confirmar.
+// Mesmo número de pedido nos dois, então não duplica.
+async function gravarPedidoSeguro(id, dados) {
+    const viaFirebase = setDoc(doc(db, "pedidos", id), dados);
+    const viaWeb = gravarPedidoRestFs(id, dados);
+    viaFirebase.catch(() => {}); viaWeb.catch(() => {});
+    const limite = new Promise((_, falha) => setTimeout(() => falha(new Error('tempo')), 20000));
+    await Promise.race([primeiroQueChegar([viaFirebase, viaWeb]), limite]);
 }
 
 // O primeiro que responder com sucesso vence.
@@ -746,13 +798,13 @@ document.addEventListener("DOMContentLoaded", async function () {
     async function carregarAgenda() {
         try {
             // 1. Puxa a Regra Geral (Dias da semana padrão: Dom a Sáb)
-            const docGeral = await getDoc(doc(db, "config", "agenda_geral"));
+            const docGeral = await buscarDocRapido("config", "agenda_geral");
             if (docGeral.exists()) {
                 window.configGeralAgenda = docGeral.data();
             }
 
             // 2. Puxa as Exceções (Dias específicos fechados ou com horário diferente)
-            const docExcecoes = await getDoc(doc(db, "config", "agenda_excecoes"));
+            const docExcecoes = await buscarDocRapido("config", "agenda_excecoes");
             if (docExcecoes.exists()) {
                 window.regrasAgenda = docExcecoes.data(); 
             }
@@ -906,7 +958,7 @@ document.addEventListener("DOMContentLoaded", async function () {
     async function carregarAvisos() {
         try {
             await carregarCardapioAtual();
-            const avisosSnap = await getDocs(collection(db, "avisos"));
+            const avisosSnap = await buscarColecaoRapido('avisos', collection(db, "avisos"));
             const agora = Date.now();
             const avisosAtivos = [];
 
@@ -2277,8 +2329,9 @@ document.addEventListener("DOMContentLoaded", async function () {
         };
         
         try {
-            await setDoc(doc(db, "pedidos", idPedido), dadosPedido);
-            if (cupomAplicado.codigo) await registrarUsoCupomCliente(cupomAplicado.codigo);
+            await gravarPedidoSeguro(idPedido, dadosPedido);
+            // O registro do cupom nunca segura o envio do pedido.
+            if (cupomAplicado.codigo) await Promise.race([registrarUsoCupomCliente(cupomAplicado.codigo).catch(() => {}), new Promise(r => setTimeout(r, 5000))]);
         } catch (error) {
             console.error("Erro ao salvar pedido no Firestore:", error);
             alert("Erro de conexão ao salvar pedido.");
