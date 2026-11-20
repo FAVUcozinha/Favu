@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Teste de velocidade · FAVU</title>
+<style>
+  :root { --tinta:#1D2814; --oliva:#5B5E4E; --coral:#ED704F; --linha:#E8E5DE; --fundo:#F6F3EE; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--fundo); color: var(--tinta); font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; padding: 16px; }
+  .caixa { max-width: 640px; margin: 0 auto; background: #fff; border: 1px solid var(--linha); border-radius: 16px; padding: 18px; }
+  h1 { font-size: 1.15rem; margin: 0 0 4px; }
+  p { margin: 0 0 12px; color: var(--oliva); font-size: .85rem; line-height: 1.5; }
+  table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+  th { text-align: left; font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; color: var(--oliva); border-bottom: 1px solid var(--linha); padding: 8px 4px; }
+  td { padding: 8px 4px; border-bottom: 1px solid var(--linha); font-variant-numeric: tabular-nums; }
+  td.n { text-align: right; white-space: nowrap; }
+  tr.ruim td { color: #C0392B; font-weight: 600; }
+  .total { margin-top: 14px; font-size: .9rem; font-weight: 600; }
+  .info { margin-top: 10px; font-size: .72rem; color: var(--oliva); word-break: break-all; }
+  button { margin-top: 14px; width: 100%; padding: 13px; border: none; border-radius: 999px; background: var(--coral); color: #fff; font-size: .95rem; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="caixa">
+  <h1>Teste de velocidade do cardápio</h1>
+  <p>Mede quanto tempo cada parte do cardápio leva para chegar neste aparelho e o tamanho de cada uma. Só lê os dados; não altera nada. Tire um print do resultado.</p>
+  <table>
+    <thead><tr><th>Parte</th><th class="n">Tempo</th><th class="n">Tamanho</th><th class="n">Fotos no banco</th></tr></thead>
+    <tbody id="linhas"><tr><td colspan="4">Medindo…</td></tr></tbody>
+  </table>
+  <div class="total" id="total"></div>
+  <div class="info" id="info"></div>
+  <button onclick="location.reload()">Medir de novo</button>
+</div>
+<script>
+(async () => {
+  const KEY = 'AIzaSyD5JlV7R2w629uiescD4AiixNAr-Qt0qI0';
+  const BASE = 'https://firestore.googleapis.com/v1/projects/favu-app/databases/(default)/documents/';
+  const partes = [
+    ['Itens (produtos)', 'produtos', true], ['Categorias', 'categorias', true], ['Comunicados', 'avisos', true],
+    ['Lista de cardápios', 'config/cardapios'], ['Tema', 'config/tema'], ['Temas agendados', 'config/tema_agendados'],
+    ['Horários', 'config/agenda_geral'], ['Datas específicas', 'config/agenda_excecoes']
+  ];
+  const kb = n => n >= 1048576 ? (n / 1048576).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+  async function medir(caminho, colecao) {
+    const t0 = performance.now(); let bytes = 0, fotos = 0, fotosBytes = 0, docs = 0, token = '', erro = '';
+    try {
+      do {
+        const url = BASE + caminho + '?key=' + KEY + (colecao ? '&pageSize=300' + (token ? '&pageToken=' + encodeURIComponent(token) : '') : '');
+        const r = await fetch(url, { cache: 'no-store' });
+        const txt = await r.text(); bytes += txt.length;
+        if (!r.ok && r.status !== 404) { erro = 'erro ' + r.status; break; }
+        const achados = txt.match(/data:image\/[a-z+]+;base64,[A-Za-z0-9+\/=]+/g) || [];
+        fotos += achados.length; achados.forEach(a => fotosBytes += a.length);
+        let j = {}; try { j = JSON.parse(txt); } catch (e) {}
+        docs += colecao ? (j.documents || []).length : (r.ok ? 1 : 0);
+        token = colecao ? (j.nextPageToken || '') : '';
+      } while (token);
+    } catch (e) { erro = 'sem conexão'; }
+    return { ms: Math.round(performance.now() - t0), bytes, fotos, fotosBytes, docs, erro };
+  }
+  const t0 = performance.now();
+  const res = await Promise.all(partes.map(([, c, col]) => medir(c, col)));
+  const total = Math.round(performance.now() - t0);
+  const linhas = document.getElementById('linhas'); linhas.innerHTML = '';
+  let soma = 0, fotosTotal = 0, fotosBytesTotal = 0;
+  res.forEach((r, i) => {
+    soma += r.bytes; fotosTotal += r.fotos; fotosBytesTotal += r.fotosBytes;
+    const tr = document.createElement('tr'); if (r.bytes > 300000 || r.ms > 2500) tr.className = 'ruim';
+    tr.innerHTML = `<td>${partes[i][0]}${partes[i][2] ? ` <small>(${r.docs})</small>` : ''}</td><td class="n">${r.erro || (r.ms / 1000).toFixed(1).replace('.', ',') + ' s'}</td><td class="n">${kb(r.bytes)}</td><td class="n">${r.fotos ? r.fotos + ' (' + kb(r.fotosBytes) + ')' : '—'}</td>`;
+    linhas.appendChild(tr);
+  });
+  document.getElementById('total').textContent = `Tudo junto: ${(total / 1000).toFixed(1).replace('.', ',')} s · ${kb(soma)}${fotosTotal ? ` · ${fotosTotal} fotos guardadas dentro do banco (${kb(fotosBytesTotal)})` : ''}`;
+  const c = navigator.connection || {};
+  document.getElementById('info').textContent = `Navegador: ${navigator.userAgent}${c.effectiveType ? ' · rede: ' + c.effectiveType + (c.downlink ? ' ' + c.downlink + ' Mb/s' : '') : ''}`;
+})();
+</script>
+</body>
+</html>
