@@ -1,8 +1,8 @@
-const CACHE_NAME = 'favu-client-v125-dominio-1';
+const CACHE_NAME = 'favu-client-v125-pedido-1';
 const urlsToCache = [
   './',
   './index.html',
-  './cardapio.html',
+  './pedido.html',
   './style.css',
   './style-cardapio.css',
   './script.js',

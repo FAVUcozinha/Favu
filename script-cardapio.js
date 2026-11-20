@@ -455,7 +455,7 @@ function hrefAcaoSite(item) {
     const acao = item.acao || 'link';
     const link = String(item.link || '').trim();
     if (acao === 'quem_somos') return { href: '#', abreQuemSomos: true };
-    if (acao === 'cardapio') return { href: link || (item.cardapio && item.cardapio !== 'padrao' ? `cardapio.html?menu=${encodeURIComponent(item.cardapio)}` : 'cardapio.html') };
+    if (acao === 'cardapio') return { href: link.replace(/^(\.\/)?cardapio\.html/i, 'pedido.html') || (item.cardapio && item.cardapio !== 'padrao' ? `pedido.html?menu=${encodeURIComponent(item.cardapio)}` : 'pedido.html') };
     if (acao === 'inicio') return { href: link || 'index.html' };
     if (acao === 'whatsapp') { const n = link.replace(/\D/g, ''); return { href: n ? `https://wa.me/${n}` : link, externo: true }; }
     return { href: link || '#', externo: /^https?:/i.test(link) };
