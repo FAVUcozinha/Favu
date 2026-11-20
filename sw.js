@@ -1,4 +1,4 @@
-const CACHE_NAME = 'favu-client-v128-pedido-leve-1';
+const CACHE_NAME = 'favu-client-v130-pedido-leve-2';
 const urlsToCache = [
   './',
   './index.html',
@@ -27,7 +27,7 @@ self.addEventListener('activate', event => {
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME) return caches.delete(cacheName);
+          if (cacheName !== CACHE_NAME && cacheName.startsWith('favu-client')) return caches.delete(cacheName);
         })
       );
     }).then(() => self.clients.claim())
@@ -41,6 +41,9 @@ self.addEventListener('fetch', event => {
 
   // Nunca intercepte upload, POST, PUT, PATCH, DELETE etc.
   if (req.method !== 'GET') return;
+
+  // O painel (pasta FAVUAdmin) tem o seu próprio controle; o do site não interfere nele.
+  if (new URL(url).pathname.startsWith('/FAVUAdmin/')) return;
 
   // Nunca intercepte Firebase/Google APIs. Isso evita conflito com Auth, Firestore e Storage.
   if (
