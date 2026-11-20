@@ -654,14 +654,17 @@ function snapRestFs(docs) {
     const lista = docs.map(d => { const dados = camposRestFs(d.fields); const id = String(d.name || '').split('/').pop(); return { id, exists: () => true, data: () => dados }; });
     return { docs: lista, empty: !lista.length, size: lista.length, forEach: fn => lista.forEach(fn) };
 }
+// 2026-11-20: os itens vêm sem as fotos (as fotos guardadas no banco somavam 16 MB).
+const MASCARA_PRODUTOS = '&mask.fieldPaths=nome&mask.fieldPaths=categoria&mask.fieldPaths=categoriaAnterior&mask.fieldPaths=min&mask.fieldPaths=minimo&mask.fieldPaths=minimoExigido&mask.fieldPaths=descricaoItem&mask.fieldPaths=descricaoPopup&mask.fieldPaths=descricaoResumo&mask.fieldPaths=ativo&mask.fieldPaths=tamanho&mask.fieldPaths=preco&mask.fieldPaths=ordem&mask.fieldPaths=cardapio&mask.fieldPaths=cardapios&mask.fieldPaths=peso&mask.fieldPaths=unidade&mask.fieldPaths=visivel&mask.fieldPaths=oculto&mask.fieldPaths=destaque&mask.fieldPaths=temFoto';
 async function colecaoRestFs(nome) {
     const docs = []; let token = '';
+    const mascara = nome === 'produtos' ? MASCARA_PRODUTOS : '';
     const pre = preCarregado(nome);
     for (let n = 0; n < 20; n++) {
         let j;
         if (n === 0 && pre) j = await pre;
         else {
-            const r = await fetch(`${URL_REST_FS}/${nome}?pageSize=300&key=${firebaseConfig.apiKey}${token ? `&pageToken=${encodeURIComponent(token)}` : ''}`);
+            const r = await fetch(`${URL_REST_FS}/${nome}?pageSize=300&key=${firebaseConfig.apiKey}${mascara}${token ? `&pageToken=${encodeURIComponent(token)}` : ''}`);
             if (!r.ok) throw new Error('rest ' + r.status);
             j = await r.json();
         }
@@ -741,13 +744,20 @@ function primeiroQueChegar(promessas) {
         promessas.forEach(p => Promise.resolve(p).then(ok, e => { if (++erros === promessas.length) falha(e); }));
     });
 }
-function buscarColecaoRapido(nome, consultaSdk, filtro) {
+function buscarColecaoRapido(nome, consultaSdk, filtro, opcoes) {
     const viaRest = colecaoRestFs(nome).then(snap => {
         if (!filtro) return snap;
         const lista = snap.docs.filter(d => filtro(d.data()));
         return { docs: lista, empty: !lista.length, size: lista.length, forEach: fn => lista.forEach(fn) };
     });
-    return primeiroQueChegar([getDocs(consultaSdk), viaRest]);
+    if (!opcoes || !opcoes.sdkSoSeDemorar) return primeiroQueChegar([getDocs(consultaSdk), viaRest]);
+    const viaSdk = new Promise((ok, falha) => {
+        let iniciou = false;
+        const iniciar = () => { if (iniciou) return; iniciou = true; getDocs(consultaSdk).then(ok, falha); };
+        const espera = setTimeout(iniciar, opcoes.sdkSoSeDemorar);
+        viaRest.then(() => clearTimeout(espera), () => { clearTimeout(espera); iniciar(); });
+    });
+    return primeiroQueChegar([viaSdk, viaRest]);
 }
 function buscarDocRapido(colecao, id) {
     return primeiroQueChegar([getDoc(doc(db, colecao, id)), docRestFs(colecao, id)]);
@@ -958,7 +968,9 @@ document.addEventListener("DOMContentLoaded", async function () {
     async function carregarAvisos() {
         try {
             await carregarCardapioAtual();
-            const avisosSnap = await buscarColecaoRapido('avisos', collection(db, "avisos"));
+            // 2026-11-20: os comunicados têm fotos pesadas; esperam o cardápio aparecer.
+            if (window.__menuPronto) await window.__menuPronto;
+            const avisosSnap = await buscarColecaoRapido('avisos', collection(db, "avisos"), null, { sdkSoSeDemorar: 7000 });
             const agora = Date.now();
             const avisosAtivos = [];
 
@@ -1020,7 +1032,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         const [, cat, prod] = await Promise.all([
             carregarCardapioAtual(),
             buscarColecaoRapido('categorias', collection(db, "categorias")),
-            buscarColecaoRapido('produtos', query(collection(db, "produtos"), where("ativo", "==", true)), d => d.ativo === true)
+            buscarColecaoRapido('produtos', query(collection(db, "produtos"), where("ativo", "==", true)), d => d.ativo === true, { sdkSoSeDemorar: 7000 })
         ]);
         return [cat, prod];
     }
@@ -1334,7 +1346,7 @@ document.addEventListener("DOMContentLoaded", async function () {
                 </div>`;
 
             const imagensProdutoItem = getProdutoImagensCliente(item);
-            const temFoto = imagensProdutoItem.length > 0;
+            const temFoto = imagensProdutoItem.length > 0 || Number(item.temFoto) > 0;
             // 2026-10-15: a descrição do produto é a descrição da imagem. Não aparece
             // embaixo do nome: abre na janela da foto, ou pelo ícone (i) quando não há foto.
             const textoDescricaoItem = String(item.descricaoItem || item.descricaoPopup || '').trim();
@@ -1425,7 +1437,8 @@ document.addEventListener("DOMContentLoaded", async function () {
         if(!itemInfo) return;
 
         const imagensProdutoPopup = getProdutoImagensCliente(itemInfo);
-        const temFoto = imagensProdutoPopup.length > 0;
+        const fotoPendente = !imagensProdutoPopup.length && Number(itemInfo.temFoto) > 0;
+        const temFoto = imagensProdutoPopup.length > 0 || fotoPendente;
         const textoDescricao = String(itemInfo.descricaoItem || itemInfo.descricaoPopup || '').trim();
         const temDescPopup = textoDescricao !== '';
         
@@ -1438,6 +1451,23 @@ document.addEventListener("DOMContentLoaded", async function () {
         window.produtoPopupImagens = imagensProdutoPopup;
         window.produtoPopupImagemAtual = 0;
         window.renderProdutoImagemPopup();
+        if (fotoPendente) {
+            // A foto vem do banco só agora, quando o cliente pede para ver.
+            const carrossel = document.getElementById('item-imagem-carousel');
+            if (carrossel) { carrossel.style.display = 'block'; carrossel.classList.add('foto-carregando'); }
+            const idFoto = itemInfo.id || itemId;
+            window.__fotoPedida = idFoto;
+            docRestFs('produtos', idFoto).catch(() => getDoc(doc(db, 'produtos', idFoto))).then(snap => {
+                const d = snap && snap.exists() ? snap.data() : {};
+                itemInfo.imagensUrls = Array.isArray(d.imagensUrls) ? d.imagensUrls : [];
+                itemInfo.imagemUrl = d.imagemUrl || '';
+                if (window.__fotoPedida !== idFoto) return;
+                if (carrossel) carrossel.classList.remove('foto-carregando');
+                window.produtoPopupImagens = getProdutoImagensCliente(itemInfo);
+                window.produtoPopupImagemAtual = 0;
+                window.renderProdutoImagemPopup();
+            }).catch(() => { if (carrossel) { carrossel.classList.remove('foto-carregando'); carrossel.style.display = 'none'; } });
+        }
         
         modal.style.display = 'flex'; 
         modal.classList.add('show'); 
