@@ -32,6 +32,21 @@
             .clean-card .card-info { min-width: 0; }
             .clean-card .card-info p { white-space: normal !important; }
         }
+        /* Assinatura e direitos numa linha só, dentro de uma etiqueta (computador). */
+        @media (min-width: 1024px) {
+            footer .footer-container-center { flex-direction: row !important; align-items: center !important; gap: 10px !important; background: rgba(255, 248, 239, .9); border-radius: 999px; padding: 5px 16px !important; width: fit-content; margin: 0 auto 8px !important; }
+            footer .footer-container-center .desktop-signature, footer .footer-container-center .copy { background: none !important; padding: 0 !important; margin: 0 !important; }
+            footer .footer-container-center .copy::before { content: "·"; margin-right: 10px; }
+        }
+        /* Computador com janela baixa: o logo encolhe para caber, sem passar por cima dos botões. */
+        @media (min-width: 1024px) {
+            .hero { overflow: hidden; }
+            .hero > .container, .hero .hero-image-wrapper { height: 100%; display: flex; align-items: center; justify-content: center; min-height: 0; }
+            .hero-logo-big { height: 100% !important; max-height: 50vh !important; width: auto !important; max-width: 90vw !important; object-fit: contain; }
+        }
+        /* Rodapé só com a frase (sem o logo), em todos os tamanhos de tela. */
+        footer .footer-logo { display: none !important; }
+        footer { min-height: 64px !important; justify-content: center !important; padding: 10px 0 !important; }
     </style>
 </head>
 <body>

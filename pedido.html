@@ -272,6 +272,15 @@
             .clean-card .card-info { min-width: 0; }
             .clean-card .card-info p { white-space: normal !important; }
         }
+        /* Assinatura e direitos numa linha só, dentro de uma etiqueta (computador). */
+        @media (min-width: 601px) {
+            footer .footer-container-center { flex-direction: row !important; align-items: center !important; gap: 10px !important; background: rgba(255, 248, 239, .9); border-radius: 999px; padding: 5px 16px !important; width: fit-content; margin: 0 auto 8px !important; }
+            footer .footer-container-center .desktop-signature, footer .footer-container-center .copy { background: none !important; padding: 0 !important; margin: 0 !important; }
+            footer .footer-container-center .copy::before { content: "·"; margin-right: 10px; }
+        }
+        /* Rodapé só com a frase (sem o logo), em todos os tamanhos de tela. */
+        footer .footer-logo { display: none !important; }
+        footer { min-height: 64px !important; justify-content: center !important; padding: 10px 0 !important; }
     </style>
 </head>
 <body>
