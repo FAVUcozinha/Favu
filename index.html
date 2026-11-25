@@ -19,6 +19,20 @@
     <link rel="icon" type="image/png" href="images/favu.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css?v=20261014-fontes-1">
+    <style id="rodape-legivel">
+        /* 2026-11-25: assinatura do rodapé sempre legível, mesmo sobre imagens cheias de detalhes (ex.: tema de Natal). */
+        footer .desktop-signature, footer .copy { background: rgba(255, 248, 239, .9); border-radius: 999px; padding: 4px 12px !important; width: fit-content; margin-left: auto !important; margin-right: auto !important; opacity: 1 !important; }
+        footer .copy { margin-top: 4px !important; }
+        /* 2026-11-25: o rodapé usa a imagem no tamanho real, igual ao cabeçalho (sem esticar). */
+        footer { background-size: auto !important; background-repeat: repeat !important; background-position: center top !important; }
+        /* Botões da página inicial: todos com a mesma largura, numa linha só no computador. */
+        @media (min-width: 1024px) {
+            .grid-links { grid-template-columns: none !important; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+            .clean-card { min-width: 0; }
+            .clean-card .card-info { min-width: 0; }
+            .clean-card .card-info p { white-space: normal !important; }
+        }
+    </style>
 </head>
 <body>
 
