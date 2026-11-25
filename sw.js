@@ -1,8 +1,12 @@
-const CACHE_NAME = 'favu-app-v175-pedido-9';
+const CACHE_NAME = 'favu-client-v137-pedido-leve-9';
 const urlsToCache = [
   './',
   './index.html',
-  './admin.js',
+  './pedido.html',
+  './style.css',
+  './style-cardapio.css',
+  './script.js',
+  './script-cardapio.js',
   './manifest.json',
   './images/favu.png'
 ];
@@ -23,7 +27,7 @@ self.addEventListener('activate', event => {
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME && cacheName.startsWith('favu-app')) return caches.delete(cacheName);
+          if (cacheName !== CACHE_NAME && cacheName.startsWith('favu-client')) return caches.delete(cacheName);
         })
       );
     }).then(() => self.clients.claim())
@@ -37,6 +41,9 @@ self.addEventListener('fetch', event => {
 
   // Nunca intercepte upload, POST, PUT, PATCH, DELETE etc.
   if (req.method !== 'GET') return;
+
+  // O painel (pasta FAVUAdmin) tem o seu próprio controle; o do site não interfere nele.
+  if (new URL(url).pathname.startsWith('/FAVUAdmin/')) return;
 
   // Nunca intercepte Firebase/Google APIs. Isso evita conflito com Auth, Firestore e Storage.
   if (

@@ -280,12 +280,13 @@ function aplicarTemaSite(t) {
         else { img.style.display = ''; img.src = v; } }); };
     const trocarFundo = (sel, v) => { const el = document.querySelector(sel); if (!el) return; el.style.backgroundImage = !v ? '' : (v === SEM ? 'none' : `url('${v}')`); };
     // 2026-10-15: o cardápio tem topo, rodapé e logo do menu próprios (e cada cardápio pode ter os seus).
+    // 2026-11-25: em branco no cardápio = imagem padrão do site (não copia mais a da página inicial).
     const idCardImg = ehCardapio && window.__cardapioAtual ? window.__cardapioAtual.id : 'padrao';
     const doCard = (t.porCardapio && t.porCardapio[idCardImg] && t.porCardapio[idCardImg].imgs) || {};
-    const imgTopoUsar = ehCardapio ? (doCard.imgTopoCardapio || t.imgTopoCardapio || t.imgTopo) : t.imgTopo;
-    const imgRodapeUsar = ehCardapio ? (doCard.imgRodapeCardapio || t.imgRodapeCardapio || t.imgRodape) : t.imgRodape;
+    const imgTopoUsar = ehCardapio ? (doCard.imgTopoCardapio || t.imgTopoCardapio) : t.imgTopo;
+    const imgRodapeUsar = ehCardapio ? (doCard.imgRodapeCardapio || t.imgRodapeCardapio) : t.imgRodape;
     trocarImg('.hero-logo-big', t.logoPrincipal);
-    trocarImg('.menu-logo-img', ehCardapio ? (doCard.logoMenuCardapio || t.logoMenuCardapio || t.logoMenu || t.logoPrincipal) : (t.logoMenu || t.logoPrincipal));
+    trocarImg('.menu-logo-img', ehCardapio ? (doCard.logoMenuCardapio || t.logoMenuCardapio) : (t.logoMenu || t.logoPrincipal));
     trocarImg('.footer-logo', t.logoRodape);
     trocarFundo('header', imgTopoUsar);
     // Sem imagem no topo: tira também a sombra que marcava o espaço.
