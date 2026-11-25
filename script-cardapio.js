@@ -454,10 +454,11 @@ async function resolverImagensTema(t) {
 function escSite(v) { return String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 function hrefAcaoSite(item) {
     const acao = item.acao || 'link';
-    const link = String(item.link || '').trim();
+    // 2026-11-25: "index.html" vira "./" (o endereço principal do site), para abrir sempre a página inicial atual.
+    const link = String(item.link || '').trim().replace(/^(\.\/)?index\.html(?=$|[?#])/i, './');
     if (acao === 'quem_somos') return { href: '#', abreQuemSomos: true };
     if (acao === 'cardapio') return { href: link.replace(/^(\.\/)?cardapio\.html/i, 'pedido.html') || (item.cardapio && item.cardapio !== 'padrao' ? `pedido.html?menu=${encodeURIComponent(item.cardapio)}` : 'pedido.html') };
-    if (acao === 'inicio') return { href: link || 'index.html' };
+    if (acao === 'inicio') return { href: link || './' };
     if (acao === 'whatsapp') { const n = link.replace(/\D/g, ''); return { href: n ? `https://wa.me/${n}` : link, externo: true }; }
     return { href: link || '#', externo: /^https?:/i.test(link) };
 }
