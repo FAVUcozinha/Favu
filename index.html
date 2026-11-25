@@ -32,12 +32,6 @@
             .clean-card .card-info { min-width: 0; }
             .clean-card .card-info p { white-space: normal !important; }
         }
-        /* Assinatura e direitos numa linha só, dentro de uma etiqueta (computador). */
-        @media (min-width: 1024px) {
-            footer .footer-container-center { flex-direction: row !important; align-items: center !important; gap: 10px !important; background: rgba(255, 248, 239, .9); border-radius: 999px; padding: 5px 16px !important; width: fit-content; margin: 0 auto 8px !important; }
-            footer .footer-container-center .desktop-signature, footer .footer-container-center .copy { background: none !important; padding: 0 !important; margin: 0 !important; }
-            footer .footer-container-center .copy::before { content: "·"; margin-right: 10px; }
-        }
         /* Computador com janela baixa: o logo encolhe para caber, sem passar por cima dos botões. */
         @media (min-width: 1024px) {
             .hero { overflow: hidden; }
@@ -47,6 +41,19 @@
         /* Rodapé só com a frase (sem o logo), em todos os tamanhos de tela. */
         footer .footer-logo { display: none !important; }
         footer { min-height: 64px !important; justify-content: center !important; padding: 10px 0 !important; }
+        /* Rodapé: uma frase só, numa etiqueta, em qualquer tela:
+           "FAVU Cozinha Afetiva © 2026 Todos os direitos reservados." */
+        footer .footer-container-center { flex-direction: row !important; flex-wrap: wrap; justify-content: center !important; align-items: baseline !important; gap: 0 4px !important; background: rgba(255, 248, 239, .9); border-radius: 999px; padding: 5px 14px !important; width: fit-content; max-width: 92vw; margin: 0 auto !important; }
+        footer .footer-container-center .desktop-signature { display: inline-flex !important; background: none !important; padding: 0 !important; margin: 0 !important; opacity: 1 !important; width: auto !important; }
+        footer .desktop-signature img { display: none !important; }
+        footer .footer-container-center .desktop-signature span, footer .footer-container-center .copy { font-family: Helvetica, Arial, sans-serif !important; font-size: .72rem !important; font-weight: bold !important; color: #1D2814 !important; opacity: 1 !important; background: none !important; padding: 0 !important; margin: 0 !important; line-height: 1.35 !important; width: auto !important; }
+        footer .footer-container-center .copy::before { content: none !important; }
+        /* 2026-11-25: rodapé só com a faixa de imagem, sem textos (mesma altura do cabeçalho). */
+        footer .footer-container-center { display: none !important; }
+        footer { min-height: 56px !important; height: 56px; padding: 0 !important; }
+        /* Rodapé só com a imagem (sem logo e sem textos), em todos os tamanhos de tela. */
+        footer .footer-container-center { display: none !important; }
+        footer { min-height: 56px !important; height: 56px; padding: 0 !important; }
     </style>
 </head>
 <body>
