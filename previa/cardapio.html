@@ -2,6 +2,35 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
+    <title>Cardápio | FAVU Cozinha Afetiva</title>
+    <meta name="description" content="Escolha seus itens no cardápio da FAVU e envie o pedido pelo WhatsApp.">
+    <!-- 2026-11-19: carregamento rápido — conexões abertas e dados pedidos antes do resto -->
+    <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js">
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js">
+    <script>
+    (function () {
+        try {
+            var base = 'https://firestore.googleapis.com/v1/projects/favu-app/databases/(default)/documents/';
+            var chave = 'AIzaSyD5JlV7R2w629uiescD4AiixNAr-Qt0qI0';
+            var pegar = function (url, vazioEm404) {
+                var p = fetch(url).then(function (r) { if (vazioEm404 && r.status === 404) return {}; if (!r.ok) throw new Error(r.status); return r.json(); });
+                p.catch(function () {});
+                return p;
+            };
+            window.__preFS = {
+                'categorias': pegar(base + 'categorias?pageSize=300&key=' + chave),
+                'produtos': pegar(base + 'produtos?pageSize=300&key=' + chave + '&mask.fieldPaths=nome&mask.fieldPaths=categoria&mask.fieldPaths=categoriaAnterior&mask.fieldPaths=min&mask.fieldPaths=minimo&mask.fieldPaths=minimoExigido&mask.fieldPaths=descricaoItem&mask.fieldPaths=descricaoPopup&mask.fieldPaths=descricaoResumo&mask.fieldPaths=ativo&mask.fieldPaths=tamanho&mask.fieldPaths=preco&mask.fieldPaths=ordem&mask.fieldPaths=cardapio&mask.fieldPaths=cardapios&mask.fieldPaths=peso&mask.fieldPaths=unidade&mask.fieldPaths=visivel&mask.fieldPaths=oculto&mask.fieldPaths=destaque&mask.fieldPaths=temFoto'),
+                'config/cardapios': pegar(base + 'config/cardapios?key=' + chave, true),
+                'config/tema': pegar(base + 'config/tema?key=' + chave, true),
+                'config/tema_agendados': pegar(base + 'config/tema_agendados?key=' + chave, true),
+                'config/agenda_geral': pegar(base + 'config/agenda_geral?key=' + chave, true),
+                'config/agenda_excecoes': pegar(base + 'config/agenda_excecoes?key=' + chave, true)
+            };
+        } catch (e) {}
+    })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" href="images/favu.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -205,11 +234,50 @@
 .categoria-group .info-box { max-width: 850px; margin-left: auto !important; margin-right: auto !important; box-sizing: border-box; }
 /* Abas: largura toda; centralizadas quando cabem, rolam quando não cabem (sem cortar) */
 .categorias-draggable { justify-content: flex-start; justify-content: safe center; }
+/* 2026-11-19: aviso de carregamento do cardápio */
+.cardapio-carregando { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 45vh; padding: 40px 20px; text-align: center; color: var(--text-dark, #1D2814); font-family: 'Basic Choice', cursive; }
+.cardapio-carregando p { font-size: 1.2rem; margin: 0; text-transform: uppercase; }
+.cardapio-carregando small { font-family: 'Segoe UI', sans-serif; font-size: 0.9rem; opacity: 0.75; max-width: 320px; }
+.cardapio-carregando button { margin-top: 6px; background: var(--accent-orange, #E09F41); color: #fff; border: none; border-radius: 30px; padding: 10px 22px; font-family: 'Basic Choice', cursive; font-size: 1rem; text-transform: uppercase; cursor: pointer; }
+.cardapio-spinner { width: 42px; height: 42px; border-radius: 50%; border: 4px solid rgba(224,159,65,0.25); border-top-color: var(--accent-orange, #E09F41); animation: cardapioGira 0.9s linear infinite; }
+@keyframes cardapioGira { to { transform: rotate(360deg); } }
 .categorias-nav-wrapper { max-width: 100% !important; }
 .aviso-janela-retirada.alerta { animation: avisoPeriodoPisca 1.4s ease; }
 @keyframes avisoPeriodoPisca { 0%, 60% { border-color: #E60000; background: #fde8e8; box-shadow: 0 0 0 3px rgba(230,0,0,0.15); } 100% { } }
 .aviso-janela-retirada { margin: 6px 0 10px; padding: 10px 12px; border-radius: 10px; font-size: 0.85rem; line-height: 1.35; text-align: left; color: #1D2814; background: rgba(224,159,65,0.12); border: 1px solid rgba(224,159,65,0.35); font-family: var(--font-numbers, Arial, sans-serif); }
 </style>
+
+    <style id="foto-carregando">#item-imagem-carousel.foto-carregando{min-height:220px;border-radius:16px;background:linear-gradient(90deg,#f1ece4 0%,#faf6f0 50%,#f1ece4 100%);background-size:200% 100%;animation:fotoCarregando 1.1s linear infinite}#item-imagem-carousel.foto-carregando img{opacity:0}@keyframes fotoCarregando{to{background-position:-200% 0}}</style>
+    <style id="rodape-legivel">
+        /* 2026-11-25: assinatura do rodapé sempre legível, mesmo sobre imagens cheias de detalhes (ex.: tema de Natal). */
+        footer .desktop-signature, footer .copy { background: rgba(255, 248, 239, .9); border-radius: 999px; padding: 4px 12px !important; width: fit-content; margin-left: auto !important; margin-right: auto !important; opacity: 1 !important; }
+        footer .copy { margin-top: 4px !important; }
+        /* 2026-11-25: o rodapé usa a imagem no tamanho real, igual ao cabeçalho (sem esticar). */
+        footer { background-size: auto !important; background-repeat: repeat !important; background-position: center top !important; }
+        /* Botões da página inicial: todos com a mesma largura, numa linha só no computador. */
+        @media (min-width: 1024px) {
+            .grid-links { grid-template-columns: none !important; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+            .clean-card { min-width: 0; }
+            .clean-card .card-info { min-width: 0; }
+            .clean-card .card-info p { white-space: normal !important; }
+        }
+        /* Rodapé só com a frase (sem o logo), em todos os tamanhos de tela. */
+        footer .footer-logo { display: none !important; }
+        footer { min-height: 64px !important; justify-content: center !important; padding: 10px 0 !important; }
+        /* Rodapé: uma frase só, numa etiqueta, em qualquer tela:
+           "FAVU Cozinha Afetiva © 2026 Todos os direitos reservados." */
+        footer .footer-container-center { flex-direction: row !important; flex-wrap: wrap; justify-content: center !important; align-items: baseline !important; gap: 0 4px !important; background: rgba(255, 248, 239, .9); border-radius: 999px; padding: 5px 14px !important; width: fit-content; max-width: 92vw; margin: 0 auto !important; }
+        footer .footer-container-center .desktop-signature { display: inline-flex !important; background: none !important; padding: 0 !important; margin: 0 !important; opacity: 1 !important; width: auto !important; }
+        footer .desktop-signature img { display: none !important; }
+        footer .footer-container-center .desktop-signature span, footer .footer-container-center .copy { font-family: Helvetica, Arial, sans-serif !important; font-size: .72rem !important; font-weight: bold !important; color: #1D2814 !important; opacity: 1 !important; background: none !important; padding: 0 !important; margin: 0 !important; line-height: 1.35 !important; width: auto !important; }
+        footer .footer-container-center .copy::before { content: none !important; }
+        /* 2026-11-25: rodapé só com a faixa de imagem, sem textos (mesma altura do cabeçalho). */
+        footer .footer-container-center { display: none !important; }
+        footer { min-height: 56px !important; height: 56px; padding: 0 !important; }
+        /* Rodapé só com a imagem (sem logo e sem textos), em todos os tamanhos de tela. */
+        footer .footer-container-center { display: none !important; }
+        footer { min-height: 56px !important; height: 56px; padding: 0 !important; }
+    </style>
 </head>
 <body>
     <nav id="side-menu" class="side-menu">
@@ -246,7 +314,7 @@
     </nav>
 
     <div class="container">
-        <main class="menu-content" id="menu-principal"></main>
+        <main class="menu-content" id="menu-principal"><div class="cardapio-carregando"><div class="cardapio-spinner"></div><p>Carregando cardápio…</p></div></main>
         
         <div id="popup-resumo" class="popup">
             <div class="popup-conteudo">
@@ -392,6 +460,6 @@
         </div>
     </div>
 
-    <script type="module" src="script-cardapio.js?v=20261015-pacote-19"></script>
+    <script type="module" src="script-cardapio.js?v=20261125-previa-2"></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
@@ -12,7 +12,13 @@ const app = initializeApp({
     appId: "1:793414871188:web:07ab447df44d742e022c81"
 });
 
-const db = getFirestore(app);
+// 2026-11-20: o painel guarda uma cópia dos dados neste aparelho. Ao abrir de novo, pedidos,
+// cupons e gastos aparecem na hora e só o que mudou é baixado do banco.
+function iniciarBancoComCache() {
+    try { return initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) }); }
+    catch (e) { console.warn('Cópia local indisponível; usando o banco direto.', e); return getFirestore(app); }
+}
+const db = iniciarBancoComCache();
 const auth = getAuth(app);
 const storage = getStorage(app);
 // CORREÇÃO (upload travando): por padrão o SDK do Storage fica tentando reenviar
@@ -1700,7 +1706,8 @@ function formatarDataEntregaCat(iso) {
 // Linhas "Retirada início/fim" da categoria, com os horários da data específica
 // (aba Horários) ligada a ela naquele dia — ou a agenda normal do dia da semana.
 function horariosResumoDia(dataISO, nomeCategoria) {
-    const regra = (window.cacheExcecoesAgenda || {})[dataISO];
+    const cat = globalCategories.find(c => c.nome === nomeCategoria);
+    const regra = (window.cacheExcecoesAgenda || {})[chaveExcecao(dataISO, cat ? cardapioDaCategoriaAdmin(cat) : 'padrao')];
     let texto = '';
     if (regra && (!Array.isArray(regra.categorias) || !regra.categorias.length || regra.categorias.includes(nomeCategoria))) {
         if (regra.indisponivel) return 'fechado';
@@ -2336,7 +2343,7 @@ if (!window.__catFimAutoTimer) {
 
 document.getElementById('form-add-cat').onsubmit = async(e) => {
     e.preventDefault(); 
-    const nm = document.getElementById('ac-nome').value.trim();
+    const nm = chaveCategoria(document.getElementById('ac-nome').value, lerCardapiosCategoria('ac')[0]);
     const repetida = nomeCategoriaEmUso(nm);
     if (repetida) return avisoNomeCategoriaRepetido(repetida, nm);
     const schedule = getCatScheduleFromForm('ac');
@@ -2391,7 +2398,7 @@ document.getElementById('form-edit-cat').onsubmit = async(e) => {
     const agendar = !!(schedule.inicioData || schedule.inicioHora || schedule.fimData || schedule.fimHora);
     const idCatEditada = document.getElementById('ec-id').value;
     const nomeAntigoCat = (globalCategories.find(c => c.id === idCatEditada) || {}).nome || '';
-    const nomeNovoCat = document.getElementById('ec-nome').value.trim();
+    const nomeNovoCat = chaveCategoria(document.getElementById('ec-nome').value, lerCardapiosCategoria('ec')[0]);
     const repetidaEdit = nomeCategoriaEmUso(nomeNovoCat, idCatEditada);
     if (repetidaEdit) return avisoNomeCategoriaRepetido(repetidaEdit, nomeNovoCat);
 
@@ -2524,7 +2531,7 @@ window.copyCat = function(id) {
         <div class="modal-header"><h3>Copiar categoria</h3><button class="close-modal" onclick="window.closeModal('modal-copiar-cat')">&times;</button></div>
         <div class="modal-body">
             <div style="margin-bottom:12px;"><label>Copiar para o cardápio</label><select id="copiar-cat-destino" onchange="window.atualizarNomeCopiaCat('${id}')">${window.__cardapios.map(c => `<option value="${c.id}" ${c.id === destinoPadrao ? 'selected' : ''}>${escapeHtmlPedido(c.nome)}</option>`).join('')}</select></div>
-            <div style="margin-bottom:12px;"><label>Nome da nova categoria</label><input type="text" id="copiar-cat-nome" value="${escapeHtmlPedido(origem.nome + (destinoPadrao === atual ? ' (cópia)' : ' — ' + nomeDest))}" oninput="this.dataset.auto='0'"></div>
+            <div style="margin-bottom:12px;"><label>Nome da nova categoria</label><input type="text" id="copiar-cat-nome" value="${escapeHtmlPedido(baseNomeCategoria(origem.nome) + (destinoPadrao === atual ? ' (cópia)' : ''))}" oninput="this.dataset.auto='0'"></div>
             <label class="cat-cardapio-opcao" style="margin-bottom:6px !important;"><input type="checkbox" id="copiar-cat-produtos" checked> <span>Copiar também os ${qtd} produto(s)</span></label>
             <small class="campo-ajuda">A cópia fica totalmente separada: mudar preços ou itens nela não muda a categoria original.</small>
             <div style="display:flex; gap:10px; margin-top:14px;">
@@ -2540,26 +2547,26 @@ window.atualizarNomeCopiaCat = function(id) {
     if (!sel || !campo || campo.dataset.auto === '0') return;
     const atual = cardapioDaCategoriaAdmin(origem) || 'padrao';
     const nomeDest = sel.options[sel.selectedIndex]?.text || '';
-    campo.value = origem.nome + (sel.value === atual ? ' (cópia)' : ' — ' + nomeDest);
+    campo.value = baseNomeCategoria(origem.nome) + (sel.value === atual ? ' (cópia)' : '');
 };
 window.confirmarCopiaCategoria = async function(id) {
     const origem = globalCategories.find(c => c.id === id);
     const destino = document.getElementById('copiar-cat-destino')?.value || 'padrao';
-    const novoNome = String(document.getElementById('copiar-cat-nome')?.value || '').trim();
+    const novoNome = chaveCategoria(document.getElementById('copiar-cat-nome')?.value || '', document.getElementById('copiar-cat-destino')?.value || 'padrao');
     const comProdutos = !!document.getElementById('copiar-cat-produtos')?.checked;
     if (!origem || !novoNome) return window.showToast('Informe o nome da nova categoria.', true);
     const repetida = nomeCategoriaEmUso(novoNome);
-    if (repetida) return avisoNomeCategoriaRepetido(repetida, novoNome);
+    if (repetida) return avisoNomeCategoriaRepetido(repetida);
     window.mostrarLoading?.(true);
     try {
         const snap = await getDoc(doc(db, 'categorias', id));
         const dados = snap.exists() ? snap.data() : { ...origem };
         delete dados.id;
         const ordem = orderedCategoriesList().length;
-        await setDoc(doc(db, 'categorias', novoNome.toLowerCase().replace(/\s/g, '-')), { ...dados, nome: novoNome, ordem, cardapios: [destino] });
+        await setDoc(doc(db, 'categorias', `${baseNomeCategoria(novoNome).toLowerCase().replace(/\s/g, '-')}${destino === 'padrao' ? '' : '--' + destino}`), { ...dados, nome: novoNome, ordem, cardapios: [destino] });
         if (comProdutos) {
             const produtos = allProducts.filter(p => (p.categoria || '') === origem.nome);
-            for (const p of produtos) { const { id: _ignora, ...resto } = p; await addDoc(collection(db, 'produtos'), { ...resto, categoria: novoNome }); }
+            for (const p of produtos) { const snapP = await getDoc(doc(db, 'produtos', p.id)); const { id: _ignora, __fotos, __fotosCarregadas, ...resto } = snapP.exists() ? { ...snapP.data() } : p; await addDoc(collection(db, 'produtos'), { ...resto, categoria: novoNome }); }
         }
         window.closeModal('modal-copiar-cat');
         customAlert(`Categoria copiada para ${(window.__cardapios.find(c => c.id === destino) || {}).nome || 'o cardápio'}!`);
@@ -2719,8 +2726,10 @@ window.saveBulkItems = async() => {
                     categoria: r.querySelector('.b-cat').value, 
                     min: parseInt(r.querySelector('.b-min').value)||1, 
                     descricaoItem: r.querySelector('.b-dmenu').value.trim(), 
+ 
                     descricaoPopup: '', 
                     imagemUrl: url, 
+                    temFoto: url ? 1 : 0,
                     ativo: true, 
                     tamanho: vr.querySelector('.b-tam').value.trim(), 
                     preco: parseFloat(vr.querySelector('.b-preco').value)||0, 
@@ -2749,9 +2758,107 @@ window.saveBulkItems = async() => {
 
 document.getElementById('search-prod').addEventListener('input', () => { window.renderProdsTable(); });
 
+// 2026-11-20: o cardápio dos clientes baixa os itens SEM as fotos (que ficam guardadas no banco
+// e somavam 16 MB). Para ele saber quais itens têm foto, cada item guarda "temFoto" (quantas fotos).
+// O painel confere isso sozinho sempre que carrega os itens e corrige o que estiver diferente.
+// 2026-11-20: a lista de itens vem SEM as fotos (elas ficam no banco e somam ~16 MB).
+// Cada foto é buscada só quando aparece na tela (ver observarFotosProdutos) ou ao editar o item.
+const MASCARA_PRODUTOS_ADMIN = '&mask.fieldPaths=nome&mask.fieldPaths=categoria&mask.fieldPaths=categoriaAnterior&mask.fieldPaths=min&mask.fieldPaths=minimo&mask.fieldPaths=minimoExigido&mask.fieldPaths=descricaoItem&mask.fieldPaths=descricaoPopup&mask.fieldPaths=descricaoResumo&mask.fieldPaths=ativo&mask.fieldPaths=tamanho&mask.fieldPaths=preco&mask.fieldPaths=ordem&mask.fieldPaths=cardapio&mask.fieldPaths=cardapios&mask.fieldPaths=peso&mask.fieldPaths=unidade&mask.fieldPaths=visivel&mask.fieldPaths=oculto&mask.fieldPaths=destaque&mask.fieldPaths=temFoto';
+function valorRestAdmin(v) {
+    if (!v) return null;
+    if ('stringValue' in v) return v.stringValue;
+    if ('integerValue' in v) return Number(v.integerValue);
+    if ('doubleValue' in v) return v.doubleValue;
+    if ('booleanValue' in v) return v.booleanValue;
+    if ('nullValue' in v) return null;
+    if ('timestampValue' in v) return v.timestampValue;
+    if ('arrayValue' in v) return (v.arrayValue.values || []).map(valorRestAdmin);
+    if ('mapValue' in v) { const o = {}; Object.entries(v.mapValue.fields || {}).forEach(([k, x]) => o[k] = valorRestAdmin(x)); return o; }
+    return null;
+}
+async function carregarProdutosLeve() {
+    try {
+        const lista = []; let token = '';
+        for (let n = 0; n < 30; n++) {
+            const r = await fetch(`https://firestore.googleapis.com/v1/projects/${(app.options || {}).projectId || 'favu-app'}/databases/(default)/documents/produtos?pageSize=300&key=${(app.options || {}).apiKey || 'AIzaSyD5JlV7R2w629uiescD4AiixNAr-Qt0qI0'}${MASCARA_PRODUTOS_ADMIN}${token ? '&pageToken=' + encodeURIComponent(token) : ''}`);
+            if (!r.ok) throw new Error('rest ' + r.status);
+            const j = await r.json();
+            (j.documents || []).forEach(d => { const o = { id: d.name.split('/').pop() }; Object.entries(d.fields || {}).forEach(([k, v]) => o[k] = valorRestAdmin(v)); lista.push(o); });
+            if (!j.nextPageToken) break; token = j.nextPageToken;
+        }
+        window.__produtosSemFotos = true;
+        return lista;
+    } catch (e) {
+        console.warn('Lista leve indisponível; carregando completa.', e);
+        window.__produtosSemFotos = false;
+        const snap = await getDocs(collection(db, "produtos"));
+        const lista = []; snap.forEach(d => lista.push({ id: d.id, ...d.data() })); return lista;
+    }
+}
+// Busca as fotos de um item (com cache) quando ele aparece na tela.
+const fotosProdutoCache = {};
+window.buscarFotosProduto = async function(id) {
+    if (fotosProdutoCache[id]) return fotosProdutoCache[id];
+    fotosProdutoCache[id] = getDoc(doc(db, "produtos", id)).then(snap => {
+        const d = snap.exists() ? snap.data() : {};
+        const p = allProducts.find(x => x.id === id);
+        if (p) { p.imagensUrls = Array.isArray(d.imagensUrls) ? d.imagensUrls : []; p.imagemUrl = d.imagemUrl || ''; p.__fotosCarregadas = true; }
+        return window.getProdutoImagens(d);
+    }).catch(e => { delete fotosProdutoCache[id]; throw e; });
+    return fotosProdutoCache[id];
+};
+// Foto do item na lista: mostra na hora se já tem; senão, um quadrinho que busca a foto ao aparecer.
+window.fotoProdutoAdmin = function(grupo, classe, htmlSemFoto) {
+    const comFoto = grupo.find(x => window.getProdutoImagens(x).length) || grupo.find(x => Number(x.temFoto) > 0 && !x.__fotosCarregadas);
+    const imgs = comFoto ? window.getProdutoImagens(comFoto) : [];
+    if (imgs.length) return window.renderAutoCarouselAdmin(imgs, classe);
+    if (comFoto) return `<div class="foto-lazy-admin img-preview admin-auto-carousel-empty ${classe}" data-foto-id="${comFoto.id}" data-foto-classe="${classe}" style="background:#f1ece4; display:flex; align-items:center; justify-content:center;"><i class="fas fa-spinner fa-spin" style="color:#c9c2b4;"></i></div>`;
+    return htmlSemFoto != null ? htmlSemFoto : window.renderAutoCarouselAdmin([], classe);
+};
+let observadorFotosProdutos = null;
+window.observarFotosProdutos = function(escopo = document) {
+    const caixas = escopo.querySelectorAll('.foto-lazy-admin[data-foto-id]:not([data-observada])');
+    if (!caixas.length) return;
+    const carregar = async el => {
+        try {
+            const imgs = await window.buscarFotosProduto(el.dataset.fotoId);
+            const temp = document.createElement('div');
+            temp.innerHTML = window.renderAutoCarouselAdmin(imgs, el.dataset.fotoClasse || '');
+            const novo = temp.firstElementChild; if (!novo || !el.isConnected) return;
+            el.replaceWith(novo);
+            window.iniciarCarrosseisAutomaticosAdmin?.(novo.parentElement || document);
+        } catch (e) { el.innerHTML = '<i class="fas fa-image" style="color:#ccc;"></i>'; }
+    };
+    if (!('IntersectionObserver' in window)) { caixas.forEach(carregar); return; }
+    if (!observadorFotosProdutos) observadorFotosProdutos = new IntersectionObserver(ents => ents.forEach(en => { if (en.isIntersecting) { observadorFotosProdutos.unobserve(en.target); carregar(en.target); } }), { rootMargin: '300px' });
+    caixas.forEach(el => { el.dataset.observada = '1'; observadorFotosProdutos.observe(el); });
+};
+async function sincronizarMarcaFotos(lista) {
+    try {
+        let mudar;
+        if (window.__produtosSemFotos) {
+            // Lista leve: só os itens que ainda não têm a marca são conferidos (uma vez).
+            mudar = [];
+            const semMarca = (lista || []).filter(x => x.temFoto === undefined || x.temFoto === null);
+            for (let i = 0; i < semMarca.length; i += 8) {
+                await Promise.all(semMarca.slice(i, i + 8).map(async p => {
+                    try { const snap = await getDoc(doc(db, "produtos", p.id)); const d = snap.exists() ? snap.data() : {}; p.__fotos = new Set([...(Array.isArray(d.imagensUrls) ? d.imagensUrls : []), d.imagemUrl].filter(Boolean)).size; mudar.push(p); } catch (e) {}
+                }));
+            }
+        } else mudar = (lista || []).filter(p => {
+            const fotos = new Set([...(Array.isArray(p.imagensUrls) ? p.imagensUrls : []), p.imagemUrl].filter(Boolean)).size;
+            p.__fotos = fotos;
+            return (Number(p.temFoto) || 0) !== fotos || p.temFoto === undefined;
+        });
+        for (let i = 0; i < mudar.length; i += 20) {
+            await Promise.all(mudar.slice(i, i + 20).map(p => updateDoc(doc(db, "produtos", p.id), { temFoto: p.__fotos }).then(() => { p.temFoto = p.__fotos; }).catch(e => console.warn('temFoto', p.id, e))));
+        }
+        if (mudar.length) { console.log(`Marca de fotos atualizada em ${mudar.length} item(ns).`); try { window.renderProdsTable?.(); } catch (e) {} }
+    } catch (e) { console.warn('sincronizarMarcaFotos', e); }
+}
 async function loadProds() {
-    const s = await getDocs(collection(db, "produtos"));
-    allProducts = []; s.forEach(d => allProducts.push({id: d.id, ...d.data()}));
+    allProducts = await carregarProdutosLeve();
+    sincronizarMarcaFotos(allProducts);
     renderProdTabs(); window.renderProdsTable(); window.renderOrcamentoMenu(); 
 }
 
@@ -2863,6 +2970,7 @@ function isCategoriaDoProdutoVisivel(p) {
 }
 
 window.renderProdsTable = function() {
+    setTimeout(() => window.observarFotosProdutos?.(), 0);
     const searchTerm = document.getElementById('search-prod').value.toLowerCase();
     const tb = document.querySelector("#tbl-produtos tbody"); tb.innerHTML = "";
     
@@ -2897,8 +3005,7 @@ window.renderProdsTable = function() {
         window.__prodsModoCartao = true;
         grupos.forEach(grupo => {
             const base = grupo[0];
-            const imagensProduto = window.getProdutoImagens(grupo.find(x => window.getProdutoImagens(x).length) || base);
-            const imgTag = imagensProduto.length ? window.renderAutoCarouselAdmin(imagensProduto, 'prod-table-carousel prod-card-carousel') : `<div class="prod-card-sem-foto"><i class="fas fa-image"></i></div>`;
+            const imgTag = window.fotoProdutoAdmin(grupo, 'prod-table-carousel prod-card-carousel', `<div class="prod-card-sem-foto"><i class="fas fa-image"></i></div>`);
             const categoriaVisivel = isCategoriaDoProdutoVisivel(base);
             const algumVisivel = grupo.some(p => p.ativo) && categoriaVisivel;
             const todosAtivos = grupo.every(p => p.ativo);
@@ -2946,8 +3053,7 @@ window.renderProdsTable = function() {
     // os tamanhos do mesmo produto.
     grupos.forEach(grupo => {
         const base = grupo[0];
-        const imagensProduto = window.getProdutoImagens(grupo.find(x => window.getProdutoImagens(x).length) || base);
-        const imgTag = window.renderAutoCarouselAdmin(imagensProduto, 'prod-table-carousel');
+        const imgTag = window.fotoProdutoAdmin(grupo, 'prod-table-carousel');
         const rs = grupo.length;
         const categoriaVisivel = isCategoriaDoProdutoVisivel(base);
 
@@ -3007,7 +3113,7 @@ document.getElementById('form-add-prod').onsubmit = async(e) => {
             await addDoc(collection(db, "produtos"), {
                 nome: nomeBase, categoria: categoriaBase, min: minVariation, 
                 descricaoItem: descMenuBase, descricaoPopup: descPopupBase, 
-                imagemUrl: url, imagensUrls: urlsProduto, ativo: true, tamanho: v.querySelector('.v-tam').value.trim(), 
+                imagemUrl: url, imagensUrls: urlsProduto, temFoto: new Set([url, ...(urlsProduto || [])].filter(Boolean)).size, ativo: true, tamanho: v.querySelector('.v-tam').value.trim(), 
                 preco: parseFloat(v.querySelector('.v-preco').value)||0,
                 descricaoResumo: gerarDescricaoResumoProduto(nomeBase, descMenuBase, v.querySelector('.v-tam').value.trim()) || descResumoBase
             });
@@ -3140,9 +3246,11 @@ document.getElementById('form-edit-prod').onsubmit = async(e) => {
         if (urlsEditProduto.length) {
             comuns.imagemUrl = urlsEditProduto[0] || "";
             comuns.imagensUrls = urlsEditProduto;
+            comuns.temFoto = urlsEditProduto.length;
         } else if (document.getElementById('e-remove-img').value === 'true') {
             comuns.imagemUrl = "";
             comuns.imagensUrls = [];
+            comuns.temFoto = 0;
         }
 
         const tamAtual = document.getElementById('e-tam').value.trim();
@@ -3166,12 +3274,13 @@ document.getElementById('form-edit-prod').onsubmit = async(e) => {
             };
             if (t.id && t.removido) ops.push(deleteDoc(doc(db, "produtos", t.id)));
             else if (t.id) ops.push(updateDoc(doc(db, "produtos", t.id), dadosTam));
-            else if (dadosTam.tamanho) ops.push(addDoc(collection(db, "produtos"), {
-                ...dadosTam,
-                imagemUrl: comuns.imagemUrl ?? produtoAtual.imagemUrl ?? '',
-                imagensUrls: comuns.imagensUrls ?? produtoAtual.imagensUrls ?? [],
-                ativo: true
-            }));
+            else if (dadosTam.tamanho) ops.push((async () => {
+                let fotosBase = produtoAtual;
+                if (comuns.imagensUrls === undefined && window.__produtosSemFotos && !produtoAtual.__fotosCarregadas) { try { const sp = await getDoc(doc(db, "produtos", idAtual)); if (sp.exists()) fotosBase = sp.data(); } catch (e) {} }
+                const imgsNovas = comuns.imagensUrls ?? fotosBase.imagensUrls ?? [];
+                const imgNova = comuns.imagemUrl ?? fotosBase.imagemUrl ?? '';
+                return addDoc(collection(db, "produtos"), { ...dadosTam, imagemUrl: imgNova, imagensUrls: imgsNovas, temFoto: new Set([imgNova, ...imgsNovas].filter(Boolean)).size, ativo: true });
+            })());
         });
 
         await Promise.all(ops);
@@ -3506,7 +3615,7 @@ window.renderOrcamentoMenu = function() {
 
         listaItens.forEach((p, index) => {
             const inputHtml = `<div class="quantidade-input-group"><button type="button" class="qtd-btn-table" onclick="window.alterarQtdOrcamento('${p.id}', -1)">-</button><input type="number" value="${window.getOrcQtd(p.id)}" oninput="window.inputQtdOrcamento(this, '${p.id}')" class="quantidade-input orc-qtd-input" data-item-id="${p.id}"><button type="button" class="qtd-btn-table" onclick="window.alterarQtdOrcamento('${p.id}', 1)">+</button></div>`;
-            const iconeHint = p.imagemUrl ? `<i class="fas fa-camera foto-hint"></i>` : '';
+            const iconeHint = (p.imagemUrl || Number(p.temFoto) > 0) ? `<i class="fas fa-camera foto-hint"></i>` : '';
             const celulaNomeHTML = `<div class="item-nome-texto" style="line-height: 1.2;">${window.formatText((p.nome || 'Sem Nome').trim())}</div>${p.descricaoItem ? `<div class="descricao descricao-orc" style="text-align: left;">${window.formatText(p.descricaoItem)}</div>` : ''}`;
             
             // Mantém a mesma apresentação do Cardápio: tamanho em duas linhas quando houver peso, ex.: P / (1 kg).
@@ -3877,7 +3986,7 @@ window.handleDragEnd = function(e) { this.classList.remove('dragging'); }
 // images/S01.jpg ... S23.jpg do próprio site — que não dava para editar.
 // O botão "Trazer fotos atuais" cadastra essas fotos na lista para editar.
 // =====================================================================
-window.URL_SITE_CLIENTES = window.URL_SITE_CLIENTES || 'https://favucozinha.github.io/';
+window.URL_SITE_CLIENTES = window.URL_SITE_CLIENTES || 'https://favucozinha.com.br/';
 let carrosselLista = [];
 
 async function loadCarrossel() {
@@ -8921,7 +9030,10 @@ window.calcularDivisaoFechamento = function() {
 
     const totalGasto = gCaixa + gAra + gFla;
 
-    const lucroLiquido = totalBase - totalGasto;
+    // 2026-11-19: saldo positivo = "Lucro"; negativo ou zero = "Prejuízo" (vermelho, com "-").
+    // A divisão entre as pessoas usa só o lucro positivo (prejuízo divide R$ 0,00).
+    const saldoFechamento = totalBase - totalGasto;
+    const lucroLiquido = Math.max(0, saldoFechamento);
     document.getElementById('fechamento-lucro-liquido').textContent = lucroLiquido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
     const lucroCaixa = lucroLiquido * (percCaixa / 100);
@@ -8937,7 +9049,10 @@ window.calcularDivisaoFechamento = function() {
     const corTaxas = totalTaxasPagamento > 0 ? 'color: #c0392b;' : '';
     const corFaturamento = totalBase > 0 ? 'color: #27ae60;' : totalBase < 0 ? 'color: #c0392b;' : '';
     const corGastos = totalGasto > 0 ? 'color: #c0392b;' : '';
-    const corLucro = lucroLiquido > 0 ? 'color: #27ae60;' : lucroLiquido < 0 ? 'color: #c0392b;' : '';
+    const corLucro = saldoFechamento > 0 ? 'color: #27ae60;' : 'color: #c0392b;';
+    const linhaResultado = saldoFechamento > 0
+        ? `Lucro: <strong style="${corLucro}">${saldoFechamento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>`
+        : `Prejuízo: <strong style="${corLucro}">- ${Math.abs(saldoFechamento).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>`;
 
     const corCaixa = finalCaixa > 0 ? 'color: #27ae60;' : finalCaixa < 0 ? 'color: #c0392b;' : '';
     const corAra = finalAra > 0 ? 'color: #27ae60;' : finalAra < 0 ? 'color: #c0392b;' : '';
@@ -8953,7 +9068,7 @@ window.calcularDivisaoFechamento = function() {
             Total de Vendas: <strong style="${corVendas}">${totalVendasBruto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong><br>
             Total Taxas: <strong style="${corTaxas}">- ${totalTaxasPagamento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong><br>
             Total de Gastos: <strong style="${corGastos}">- ${totalGasto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong><br><br>
-            Lucro: <strong style="${corLucro}">${lucroLiquido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>
+            ${linhaResultado}
             
             <div style="margin: 15px 0; border-top: 1px dashed rgba(0, 0, 0, 0.15);"></div>
             
@@ -8980,6 +9095,7 @@ window.calcularDivisaoFechamento = function() {
         totalFaturamento: totalBase,
         totalGasto: totalGasto,
         lucroLiquido: lucroLiquido,
+        saldoFechamento: saldoFechamento,
         gCaixa: gCaixa,
         gAra: gAra,
         gFla: gFla,
@@ -9033,7 +9149,9 @@ window.enviarFechamentoWA = function(destinatario) {
     const gAra = parseFloat(document.getElementById('gasto-manual-ara').value || 0);
     const gFla = parseFloat(document.getElementById('gasto-manual-fla').value || 0);
     const totalGasto = gCaixa + gAra + gFla;
-    const lucroLiquido = totalFaturamento - totalGasto;
+    // 2026-11-19: saldo positivo = "Lucro"; negativo ou zero = "Prejuízo" com "-".
+    const saldoFechamento = totalFaturamento - totalGasto;
+    const lucroLiquido = Math.max(0, saldoFechamento);
 
     const pCaixa = parseFloat(document.getElementById('perc-caixa').value || 30) / 100;
     const pAra = parseFloat(document.getElementById('perc-ara').value || 35) / 100;
@@ -9048,7 +9166,7 @@ window.enviarFechamentoWA = function(destinatario) {
     const finalFla = lucroFla + gFla;
 
     const dados = {
-        periodo, totalVendido, totalTaxas, totalFaturamento, totalGasto, lucroLiquido,
+        periodo, totalVendido, totalTaxas, totalFaturamento, totalGasto, lucroLiquido, saldoFechamento,
         gCaixa, gAra, gFla,
         finalCaixa, finalAra, finalFla,
         lucroAra, lucroFla
@@ -9061,7 +9179,9 @@ window.enviarFechamentoWA = function(destinatario) {
     txt += `*Total Taxas:* - ${dados.totalTaxas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}\n`;
     txt += `*Faturamento:* ${dados.totalFaturamento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}\n`;
     txt += `*Total de Gastos:* - ${dados.totalGasto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}\n`;
-    txt += `*Lucro:* ${dados.lucroLiquido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}\n\n`;
+    txt += dados.saldoFechamento > 0
+        ? `*Lucro:* ${dados.saldoFechamento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}\n\n`
+        : `*Prejuízo:* - ${Math.abs(dados.saldoFechamento).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}\n\n`;
     txt += `*-------------------------------------*\n\n`;
 
     txt += `*Divisão Detalhada:*\n\n`;
@@ -12829,83 +12949,128 @@ const CORES_MARCA = ['#FFF5EB', '#1D2814', '#46493A', '#F4E6CB', '#7FB1C8', '#ED
 // área: geral | inicio | menu | quemsomos | cardapio | resumo | info
 // abrir: o que a prévia ao vivo abre para mostrar o elemento (menu, quemsomos, resumo, info)
 const ELEMENTOS_TEMA = [
-    ['acc', 'Cor de destaque', '#E09F41', 'geral', 'solida', 'Cores gerais', 'Usada em botões e destaques', '', '', ''],
-    ['txt', 'Textos gerais', '#2C2C2C', 'geral', 'solida', 'Cores gerais', 'Textos comuns dos sites', '', '', ''],
-    ['card', 'Caixas e menus — fundo', '#FFF5EB', 'geral', 'solida', 'Cores gerais', 'Fundo de caixas e cartões', '', '', ''],
-    ['bg', 'Página — fundo', '#F4E6CB', 'inicio', 'fundo', 'Página', 'Fundo da página inicial', 'body', '', ''],
-    ['menuBotaoFundo', 'Botão ☰ — fundo', '#FFF5EB', 'inicio', 'fundo', 'Topo', 'Botão que abre o menu', '.menu-btn', 'background', ''],
-    ['menuBotaoIcone', 'Botão ☰ — ícone', '#1D2814', 'inicio', 'solida', 'Topo', 'As três linhas do botão', '.menu-btn', 'color', ''],
-    ['corBotoes', 'Botões da capa — fundo', '#FFF5EB', 'inicio', 'fundo', 'Botões da capa', 'Fundo de cada cartão', '.clean-card', 'background', ''],
-    ['corIconesBotoes', 'Botões da capa — ícone', '#1D2814', 'inicio', 'solida', 'Botões da capa', 'Ícone de cada cartão', '.card-icon, .card-icon i', 'color', ''],
-    ['corTextoBotoes', 'Botões da capa — título', '#1D2814', 'inicio', 'solida', 'Botões da capa', 'Ex.: QUEM SOMOS', '.card-info h3', 'color', ''],
-    ['corLegendaBotoes', 'Botões da capa — legenda', '#46493A', 'inicio', 'solida', 'Botões da capa', 'Ex.: Nossa história e essência', '.card-info p', 'color', ''],
-    ['rodapeTexto', 'Rodapé — texto', '#000000', 'inicio', 'solida', 'Rodapé', 'Assinatura e direitos', 'footer .copy, footer .desktop-signature span', 'color', ''],
-    ['corMenuLateral', 'Menu — fundo', '#FFF5EB', 'menu', 'fundo', 'Menu lateral', 'Fundo do menu ☰', '.side-menu', 'background', 'menu'],
-    ['menuFechar', 'Menu — botão fechar (×)', '#999999', 'menu', 'solida', 'Menu lateral', 'O × no canto', '.close-menu-btn', 'color', 'menu'],
-    ['menuLinks', 'Menu — links (texto)', '#1D2814', 'menu', 'solida', 'Menu lateral', 'Quem somos, Cardápio…', '.menu-link', 'color', 'menu'],
-    ['menuLinhas', 'Menu — linhas entre links', '#F0F0F0', 'menu', 'solida', 'Menu lateral', 'Divisória dos links', '.nav-links li', 'border-bottom-color', 'menu'],
-    ['menuRedesIcone', 'Redes — ícone', '#1D2814', 'menu', 'solida', 'Redes sociais', 'Instagram, WhatsApp…', '.menu-social-link i', 'color', 'menu'],
-    ['menuRedesTexto', 'Redes — texto', '#1D2814', 'menu', 'solida', 'Redes sociais', 'Nos siga, Falar com o Favu', '.menu-social-link', 'color', 'menu'],
-    ['qsFundo', 'Janela — fundo', '#F4E6CB', 'quemsomos', 'fundo', 'Janela Quem somos', 'Fundo da janela', '#aboutModal .modal-content', 'background', 'quemsomos'],
-    ['qsTexto', 'Janela — texto', '#666666', 'quemsomos', 'solida', 'Janela Quem somos', 'Parágrafos da história', '#aboutModal .modal-text p:not(.highlight)', 'color', 'quemsomos'],
-    ['qsDestaque', 'Frase em destaque — texto', '#E09F41', 'quemsomos', 'solida', 'Janela Quem somos', 'Última frase', '#aboutModal .modal-text p.highlight, #aboutModal .highlight', 'color', 'quemsomos'],
-    ['qsBotaoFundo', 'Botão — fundo', '#FFF5EB', 'quemsomos', 'fundo', 'Janela Quem somos', '"Falar com o Favu"', '#aboutModal .btn-primary', 'background', 'quemsomos'],
-    ['qsBotaoTexto', 'Botão — texto', '#1D2814', 'quemsomos', 'solida', 'Janela Quem somos', '"Falar com o Favu"', '#aboutModal .btn-primary', 'color', 'quemsomos'],
-    ['bgCardapio', 'Página — fundo', '#F4E6CB', 'cardapio', 'fundo', 'Página', 'Fundo do cardápio', 'body', '', ''],
-    ['abasBarra', 'Barra das abas — fundo', '#F4E6CB', 'cardapio', 'fundo', 'Abas de categoria', 'Faixa atrás das abas', '#categorias-nav', 'background', ''],
-    ['corBotoesCategorias', 'Botões aba — fundo', '#FFFFFF', 'cardapio', 'fundo', 'Abas de categoria', 'Abas não selecionadas', '#categorias-horizontal a:not(.active-link)', 'background', ''],
-    ['corTextoCategorias', 'Botões aba — texto', '#1D2814', 'cardapio', 'solida', 'Abas de categoria', 'Abas não selecionadas', '#categorias-horizontal a:not(.active-link)', 'color', ''],
-    ['abaAtivaFundo', 'Botão aba ativa — fundo', '#E09F41', 'cardapio', 'fundo', 'Abas de categoria', 'Aba selecionada', '#categorias-horizontal a.active-link', 'background', ''],
-    ['abaAtivaTexto', 'Botão aba ativa — texto', '#FFFFFF', 'cardapio', 'solida', 'Abas de categoria', 'Aba selecionada', '#categorias-horizontal a.active-link', 'color', ''],
-    ['corTituloCategorias', 'Título da categoria — texto', '#E09F41', 'cardapio', 'solida', 'Título', 'Ex.: BOLOS ESPECIAIS', '.categoria-title', 'color', ''],
-    ['corFundoItens', 'Tabela — fundo', '#FFF5EB', 'cardapio', 'fundo', 'Tabela de itens', 'Caixa com os itens', '.table-card', 'background', ''],
-    ['tabCabecalho', 'Tabela — cabeçalhos', '#1D2814', 'cardapio', 'solida', 'Tabela de itens', 'Item, Tamanho, Unidade…', '.table-card th', 'color', ''],
-    ['tabLinhas', 'Tabela — linhas', '#E9C998', 'cardapio', 'solida', 'Tabela de itens', 'Divisórias entre itens', '.table-card tr', 'border-bottom-color', ''],
-    ['corTituloItens', 'Item — nome', '#1D2814', 'cardapio', 'solida', 'Tabela de itens', 'Ex.: BOLO DE BEM-CASADO', 'td.col-item, td.col-item .item-nome-texto', 'color', ''],
-    ['tabTamanho', 'Item — tamanho', '#1D2814', 'cardapio', 'solida', 'Tabela de itens', 'P, M, G…', '.table-card td.col-sec', 'color', ''],
-    ['corDescricoes', 'Item — peso', '#46493A', 'cardapio', 'solida', 'Tabela de itens', '(1.5 kg)', '.descricao, .peso-mobile', 'color', ''],
-    ['tabPreco', 'Item — preço', '#1D2814', 'cardapio', 'solida', 'Tabela de itens', 'R$ 100,00', '.table-card td.col-unid, .table-card td.col-unid span', 'color', ''],
-    ['tabIconeFoto', 'Item — ícone foto / (i)', '#E09F41', 'cardapio', 'solida', 'Tabela de itens', 'Abre a foto ou a descrição', '.foto-hint', 'color', ''],
-    ['tabBotoesQtd', 'Quantidade — botões − e +', '#E09F41', 'cardapio', 'solida', 'Tabela de itens', 'Mudar a quantidade', '.qtd-btn-table', 'color', ''],
-    ['tabCampoQtd', 'Quantidade — campo (fundo)', '#FFFFFF', 'cardapio', 'fundo', 'Tabela de itens', 'Caixinha com o número', '.table-card input[type="number"]', 'background', ''],
-    ['obsFundo', 'Observação — fundo', '#F8E7C9', 'cardapio', 'fundo', 'Observação da categoria', 'Caixa abaixo da tabela', '.info-box', 'background', ''],
-    ['obsTexto', 'Observação — texto', '#1D2814', 'cardapio', 'solida', 'Observação da categoria', 'Texto da caixa', '.info-box, .info-box-content', 'color', ''],
-    ['corResumoPedido', 'Barra do resumo — fundo', '#1D2814', 'cardapio', 'fundo', 'Barra do resumo', 'Barra fixa com o total', '#fixed-summary', 'background', ''],
-    ['resumoBarraTexto', 'Barra do resumo — texto', '#FFFFFF', 'cardapio', 'solida', 'Barra do resumo', 'Total e quantidade de itens', '#fixed-summary #summary-text, #fixed-summary #summary-text span', 'color', ''],
-    ['resumoBarraCarrinho', 'Barra do resumo — carrinho', '#FFFFFF', 'cardapio', 'solida', 'Barra do resumo', 'Ícone do carrinho', '#fixed-summary #summary-button, #fixed-summary #summary-button i', 'color', ''],
-    ['corFundoResumo', 'Janela — fundo', '#FFF5EB', 'resumo', 'fundo', 'Janela do resumo', 'Fundo da janela', '#popup-resumo .popup-conteudo', 'background', 'resumo'],
-    ['resumoTitulo', 'Título — texto', '#E09F41', 'resumo', 'solida', 'Janela do resumo', 'RESUMO DO PEDIDO', '#popup-resumo h2', 'color', 'resumo'],
-    ['resumoCategoria', 'Categoria — texto', '#1D2814', 'resumo', 'solida', 'Itens do resumo', 'Ex.: BOLOS ESPECIAIS:', '#popup-resumo .resumo-grupo-titulo', 'color', 'resumo'],
-    ['resumoItem', 'Item — nome', '#1D2814', 'resumo', 'solida', 'Itens do resumo', 'Nome e tamanho', '#popup-resumo .resumo-item-name', 'color', 'resumo'],
-    ['resumoItemTotal', 'Item — valor', '#46493A', 'resumo', 'solida', 'Itens do resumo', 'R$ do item', '#popup-resumo .resumo-item-name small', 'color', 'resumo'],
-    ['resumoBotoesQtd', 'Item — botões − e +', '#E09F41', 'resumo', 'solida', 'Itens do resumo', 'Mudar a quantidade', '#popup-resumo .resumo-qtd-btn', 'color', 'resumo'],
-    ['resumoLixeira', 'Item — lixeira', '#E60000', 'resumo', 'solida', 'Itens do resumo', 'Tirar o item', '#popup-resumo .btn-excluir', 'color', 'resumo'],
-    ['resumoCupomBotao', 'Botão do cupom — fundo', '#7FB1C8', 'resumo', 'fundo', 'Cupom', 'APLICAR', '#apply-cupom-btn', 'background', 'resumo'],
-    ['resumoCupomTexto', 'Botão do cupom — texto', '#FFFFFF', 'resumo', 'solida', 'Cupom', 'APLICAR', '#apply-cupom-btn', 'color', 'resumo'],
-    ['resumoTotal', 'Total — texto', '#1D2814', 'resumo', 'solida', 'Total e botão', 'TOTAL: R$', '#popup-resumo-total', 'color', 'resumo'],
-    ['corBotoesResumo', 'Botão "Fazer pedido" — fundo', '#E09F41', 'resumo', 'fundo', 'Total e botão', 'FAZER PEDIDO', '#popup-resumo .btn-fazer-pedido', 'background', 'resumo'],
-    ['resumoBotaoTexto', 'Botão "Fazer pedido" — texto', '#FFFFFF', 'resumo', 'solida', 'Total e botão', 'FAZER PEDIDO', '#popup-resumo .btn-fazer-pedido', 'color', 'resumo'],
-    ['corFundoInfoPedido', 'Janela — fundo', '#FFF5EB', 'info', 'fundo', 'Janela', 'Fundo da janela', '#popup-pedido .popup-conteudo', 'background', 'info'],
-    ['infoTitulo', 'Título — texto', '#E09F41', 'info', 'solida', 'Janela', 'INFORMAÇÕES DO PEDIDO', '#popup-pedido h2', 'color', 'info'],
-    ['infoRotulos', 'Rótulos — texto', '#1D2814', 'info', 'solida', 'Campos', 'Nome, Número, Data…', '#popup-pedido label', 'color', 'info'],
-    ['infoCampos', 'Campos — fundo', '#FFFFFF', 'info', 'fundo', 'Campos', 'Onde o cliente digita', '#popup-pedido input, #popup-pedido select, #popup-pedido textarea', 'background', 'info'],
-    ['infoEditarFundo', 'Botão "Editar pedido" — fundo', '#7FB1C8', 'info', 'fundo', 'Botões', 'EDITAR PEDIDO', '#popup-pedido .btn-secondary[onclick*="editarPedido"]', 'background', 'info'],
-    ['infoEditarTexto', 'Botão "Editar pedido" — texto', '#FFFFFF', 'info', 'solida', 'Botões', 'EDITAR PEDIDO', '#popup-pedido .btn-secondary[onclick*="editarPedido"]', 'color', 'info'],
-    ['infoAdicionarFundo', 'Botão "Adicionar itens" — fundo', '#7FB1C8', 'info', 'fundo', 'Botões', 'ADICIONAR ITENS', '#popup-pedido .btn-secondary[onclick*="fecharPopup"]', 'background', 'info'],
-    ['infoAdicionarTexto', 'Botão "Adicionar itens" — texto', '#FFFFFF', 'info', 'solida', 'Botões', 'ADICIONAR ITENS', '#popup-pedido .btn-secondary[onclick*="fecharPopup"]', 'color', 'info'],
-    ['corBotoesInfoPedido', 'Botão "Confirmar pedido" — fundo', '#E09F41', 'info', 'fundo', 'Botões', 'CONFIRMAR PEDIDO', '#popup-pedido .btn-primary-large', 'background', 'info'],
-    ['infoBotaoTexto', 'Botão "Confirmar pedido" — texto', '#FFFFFF', 'info', 'solida', 'Botões', 'CONFIRMAR PEDIDO', '#popup-pedido .btn-primary-large', 'color', 'info']
+    // ---- Página inicial ----
+    ['bg', 'Tela — fundo', '#F4E6CB', 'inicio', 'fundo', 'Tela', 'Fundo da página inicial (4)', 'body', '', '', 'i'],
+    ['menuBotaoFundo', 'Botão ☰ — fundo', '#FFF5EB', 'inicio', 'fundo', 'Topo', 'Botão do menu (1)', '.menu-btn', 'background', '', 'i'],
+    ['menuBotaoIcone', 'Botão ☰ — ícone', '#1D2814', 'inicio', 'solida', 'Topo', 'Ícone do botão do menu (2)', '.menu-btn, .menu-btn i', 'color', '', 'i'],
+    ['corBotoes', 'Botões — fundo (todos)', '#FFF5EB', 'inicio', 'fundo', 'Botões da capa', 'Cor de todos; cada botão pode ter a sua (6)', '.clean-card', 'background', '', 'i'],
+    ['corIconesBotoes', 'Botões — ícone (todos)', '#1D2814', 'inicio', 'solida', 'Botões da capa', 'Cor de todos; cada botão pode ter a sua (7)', '.card-icon, .card-icon i', 'color', '', 'i'],
+    ['corTextoBotoes', 'Botões — nome (todos)', '#1D2814', 'inicio', 'solida', 'Botões da capa', 'Cor de todos; cada botão pode ter a sua (8)', '.card-info h3', 'color', '', 'i'],
+    ['corLegendaBotoes', 'Botões — legenda (todos)', '#46493A', 'inicio', 'solida', 'Botões da capa', 'Cor de todos; cada botão pode ter a sua (9)', '.card-info p', 'color', '', 'i'],
+    ['rodapeTexto', 'Rodapé — texto', '#000000', 'inicio', 'solida', 'Rodapé', 'Mensagem do rodapé (11)', 'footer .copy, footer .desktop-signature span', 'color', '', 'i'],
+    // ---- Menu lateral da página inicial ----
+    ['corMenuLateral', 'Menu — fundo', '#FFF5EB', 'menu', 'fundo', 'Menu lateral', 'Fundo do menu (14)', '.side-menu', 'background', 'menu', 'i'],
+    ['menuFechar', 'Menu — botão ×', '#999999', 'menu', 'solida', 'Menu lateral', 'Fechar o menu (13)', '.close-menu-btn', 'color', 'menu', 'i'],
+    ['menuLinks', 'Links — texto (todos)', '#1D2814', 'menu', 'solida', 'Menu lateral', 'Cada link pode ter a sua (15)', '.menu-link', 'color', 'menu', 'i'],
+    ['menuLinhas', 'Links — linhas', '#F0F0F0', 'menu', 'solida', 'Menu lateral', 'Divisória entre os links (16)', '.nav-links li', 'border-bottom-color', 'menu', 'i'],
+    ['menuRedesIcone', 'Redes — ícone (todas)', '#1D2814', 'menu', 'solida', 'Redes sociais', 'Cada rede pode ter a sua (17)', '.menu-social-link i', 'color', 'menu', 'i'],
+    ['menuRedesTexto', 'Redes — texto (todas)', '#1D2814', 'menu', 'solida', 'Redes sociais', 'Cada rede pode ter a sua (18)', '.menu-social-link', 'color', 'menu', 'i'],
+    // ---- Quem somos (vale nas duas páginas) ----
+    ['qsFundo', 'Janela — fundo', '#F4E6CB', 'quemsomos', 'fundo', 'Janela Quem somos', 'Fundo da janela (20)', '#aboutModal .modal-content', 'background', 'quemsomos', ''],
+    ['qsFechar', 'Janela — botão ×', '#999999', 'quemsomos', 'solida', 'Janela Quem somos', 'Fechar a janela (21)', '#aboutModal .close-btn-icon', 'color', 'quemsomos', ''],
+    ['qsTexto', 'Mensagem — texto', '#666666', 'quemsomos', 'solida', 'Janela Quem somos', 'Texto da história (22)', '#aboutModal .modal-text p:not(.highlight)', 'color', 'quemsomos', ''],
+    ['qsDestaque', 'Destaque — texto', '#E09F41', 'quemsomos', 'solida', 'Janela Quem somos', 'Frase em destaque (23)', '#aboutModal .modal-text p.highlight, #aboutModal .highlight', 'color', 'quemsomos', ''],
+    ['qsBotaoFundo', 'Botão — fundo', '#FFF5EB', 'quemsomos', 'fundo', 'Janela Quem somos', '"Falar com o Favu" (24)', '#aboutModal .btn-primary', 'background', 'quemsomos', ''],
+    ['qsBotaoTexto', 'Botão — texto', '#1D2814', 'quemsomos', 'solida', 'Janela Quem somos', '"Falar com o Favu" (26)', '#aboutModal .btn-primary', 'color', 'quemsomos', ''],
+    // ---- Cardápio aberto ----
+    ['bgCardapio', 'Tela — fundo', '#F4E6CB', 'cardapio', 'fundo', 'Tela', 'Fundo do cardápio (28)', 'body', '', '', 'c'],
+    ['menuBotaoFundoC', 'Botão ☰ — fundo', '#FFF5EB', 'cardapio', 'fundo', 'Topo', 'Botão do menu (44)', '.menu-btn', 'background', '', 'c'],
+    ['menuBotaoIconeC', 'Botão ☰ — ícone', '#1D2814', 'cardapio', 'solida', 'Topo', 'Ícone do botão do menu (45)', '.menu-btn, .menu-btn i', 'color', '', 'c'],
+    ['abasBarra', 'Barra das abas — fundo', '#F4E6CB', 'cardapio', 'fundo', 'Abas de categoria', 'Faixa atrás das abas', '#categorias-nav', 'background', '', 'c'],
+    ['corBotoesCategorias', 'Abas — fundo', '#FFFFFF', 'cardapio', 'fundo', 'Abas de categoria', 'Abas não selecionadas (31)', '#categorias-horizontal a:not(.active-link)', 'background', '', 'c'],
+    ['corTextoCategorias', 'Abas — texto', '#1D2814', 'cardapio', 'solida', 'Abas de categoria', 'Abas não selecionadas (32)', '#categorias-horizontal a:not(.active-link)', 'color', '', 'c'],
+    ['abaAtivaFundo', 'Aba selecionada — fundo', '#E09F41', 'cardapio', 'fundo', 'Abas de categoria', 'Aba selecionada (33)', '#categorias-horizontal a.active-link', 'background', '', 'c'],
+    ['abaAtivaTexto', 'Aba selecionada — texto', '#FFFFFF', 'cardapio', 'solida', 'Abas de categoria', 'Aba selecionada', '#categorias-horizontal a.active-link', 'color', '', 'c'],
+    ['corTituloCategorias', 'Título da categoria — texto', '#E09F41', 'cardapio', 'solida', 'Título da categoria', 'Ex.: DOCES (34)', '.categoria-title', 'color', '', 'c'],
+    ['corFundoItens', 'Tabela — fundo', '#FFF5EB', 'cardapio', 'fundo', 'Tabela de itens', 'Caixa dos itens (35)', '.table-card', 'background', '', 'c'],
+    ['tabCabecalho', 'Tabela — títulos', '#1D2814', 'cardapio', 'solida', 'Tabela de itens', 'Item, Unidade… (36)', '.table-card th', 'color', '', 'c'],
+    ['tabLinhas', 'Tabela — linhas', '#E9C998', 'cardapio', 'solida', 'Tabela de itens', 'Divisórias (37)', '.table-card tr', 'border-bottom-color', '', 'c'],
+    ['tabIconeFoto', 'Item — ícone', '#E09F41', 'cardapio', 'solida', 'Tabela de itens', 'Foto / (i) (38)', '.foto-hint', 'color', '', 'c'],
+    ['corTituloItens', 'Item — nome', '#1D2814', 'cardapio', 'solida', 'Tabela de itens', 'Nome dos itens (39)', 'td.col-item, td.col-item .item-nome-texto', 'color', '', 'c'],
+    ['tabTamanho', 'Item — tamanho', '#1D2814', 'cardapio', 'solida', 'Tabela de itens', 'P, M, G…', '.table-card td.col-sec', 'color', '', 'c'],
+    ['corDescricoes', 'Item — peso', '#46493A', 'cardapio', 'solida', 'Tabela de itens', '(1.5 kg)', '.descricao, .peso-mobile', 'color', '', 'c'],
+    ['tabPreco', 'Item — preço', '#1D2814', 'cardapio', 'solida', 'Tabela de itens', 'R$ 100,00', '.table-card td.col-unid, .table-card td.col-unid span', 'color', '', 'c'],
+    ['tabBotaoMenos', 'Botão "−"', '#E09F41', 'cardapio', 'solida', 'Quantidade', 'Diminuir (40)', '.quantidade-input-group .qtd-btn-table:first-child', 'color', '', 'c'],
+    ['tabBotaoMais', 'Botão "+"', '#E09F41', 'cardapio', 'solida', 'Quantidade', 'Aumentar (41)', '.quantidade-input-group .qtd-btn-table:last-child', 'color', '', 'c'],
+    ['tabCampoQtd', 'Campo — fundo', '#FFFFFF', 'cardapio', 'fundo', 'Quantidade', 'Caixinha do número (42)', '.table-card input[type="number"]', 'background', '', 'c'],
+    ['tabCampoQtdTexto', 'Campo — número', '#1D2814', 'cardapio', 'solida', 'Quantidade', 'Número escolhido (43)', '.table-card input[type="number"]', 'color', '', 'c'],
+    ['obsFundo', 'Comunicado — fundo', '#F8E7C9', 'cardapio', 'fundo', 'Comunicado da categoria', 'Balão abaixo da tabela (47)', '.info-box', 'background', '', 'c'],
+    ['obsTexto', 'Comunicado — texto', '#1D2814', 'cardapio', 'solida', 'Comunicado da categoria', 'Texto do balão (48)', '.info-box, .info-box-content', 'color', '', 'c'],
+    ['itemPopupFundo', 'Janela da foto — fundo', '#FFF5EB', 'cardapio', 'fundo', 'Janela da foto do item', 'Abre no ícone do item (49)', '#popup-item-imagem .modal-content', 'background', 'itemfoto', 'c'],
+    ['itemPopupTitulo', 'Janela da foto — título', '#1D2814', 'cardapio', 'solida', 'Janela da foto do item', 'Nome do item (50)', '#item-nome-display', 'color', 'itemfoto', 'c'],
+    ['itemPopupDescricao', 'Janela da foto — descrição', '#2C2C2C', 'cardapio', 'solida', 'Janela da foto do item', 'Descrição do item (51)', '#item-descricao-display', 'color', 'itemfoto', 'c'],
+    ['corResumoPedido', 'Carrinho — fundo', '#1D2814', 'cardapio', 'fundo', 'Botão do carrinho', 'Barra do carrinho (52)', '#fixed-summary', 'background', '', 'c'],
+    ['resumoBarraCarrinho', 'Carrinho — ícone', '#FFFFFF', 'cardapio', 'solida', 'Botão do carrinho', 'Ícone do carrinho (53)', '#fixed-summary #summary-button, #fixed-summary #summary-button i', 'color', '', 'c'],
+    ['resumoBarraTexto', 'Carrinho — valor e itens', '#FFFFFF', 'cardapio', 'solida', 'Botão do carrinho', 'Total e itens (54)', '#fixed-summary #summary-text, #fixed-summary #summary-text span', 'color', '', 'c'],
+    ['rodapeTextoCardapio', 'Rodapé — texto', '#000000', 'cardapio', 'solida', 'Rodapé', 'Mensagem do rodapé (30)', 'footer .copy, footer .desktop-signature span', 'color', '', 'c'],
+    // ---- Menu lateral do cardápio (separado da página inicial) ----
+    ['corMenuLateralC', 'Menu — fundo', '#FFF5EB', 'menuc', 'fundo', 'Menu lateral', 'Fundo do menu', '.side-menu', 'background', 'menu', 'c'],
+    ['menuFecharC', 'Menu — botão ×', '#999999', 'menuc', 'solida', 'Menu lateral', 'Fechar o menu', '.close-menu-btn', 'color', 'menu', 'c'],
+    ['menuLinksC', 'Links — texto (todos)', '#1D2814', 'menuc', 'solida', 'Menu lateral', 'Cada link pode ter a sua', '.menu-link', 'color', 'menu', 'c'],
+    ['menuLinhasC', 'Links — linhas', '#F0F0F0', 'menuc', 'solida', 'Menu lateral', 'Divisória entre os links', '.nav-links li', 'border-bottom-color', 'menu', 'c'],
+    ['menuRedesIconeC', 'Redes — ícone (todas)', '#1D2814', 'menuc', 'solida', 'Redes sociais', 'Cada rede pode ter a sua', '.menu-social-link i', 'color', 'menu', 'c'],
+    ['menuRedesTextoC', 'Redes — texto (todas)', '#1D2814', 'menuc', 'solida', 'Redes sociais', 'Cada rede pode ter a sua', '.menu-social-link', 'color', 'menu', 'c'],
+    // ---- Resumo do pedido ----
+    ['corFundoResumo', 'Janela — fundo', '#FFF5EB', 'resumo', 'fundo', 'Janela', 'Fundo do resumo (55)', '#popup-resumo .popup-conteudo, #popup-resumo #cupom-container strong', 'background', 'resumo', 'c'],
+    ['resumoTitulo', 'Título — texto', '#E09F41', 'resumo', 'solida', 'Janela', 'RESUMO DO PEDIDO (56)', '#popup-resumo h2', 'color', 'resumo', 'c'],
+    ['resumoLinhaTitulo', 'Linha abaixo do título', '#F3E1C3', 'resumo', 'solida', 'Janela', 'Divisória do título', '#popup-resumo .popup-conteudo h2', 'border-bottom-color', 'resumo', 'c'],
+    ['resumoFechar', 'Botão ×', '#999999', 'resumo', 'solida', 'Janela', 'Fechar (57)', '#popup-resumo .fechar', 'color', 'resumo', 'c'],
+    ['resumoCategoria', 'Categoria — texto', '#1D2814', 'resumo', 'solida', 'Itens', 'Ex.: BOLOS ESPECIAIS (58)', '#popup-resumo .resumo-grupo-titulo', 'color', 'resumo', 'c'],
+    ['resumoItem', 'Item — dados', '#1D2814', 'resumo', 'solida', 'Itens', 'Nome, tamanho e valor (59)', '#popup-resumo .resumo-item-name, #popup-resumo .resumo-item-name small', 'color', 'resumo', 'c'],
+    ['resumoBotaoMenos', 'Botão "−"', '#E09F41', 'resumo', 'solida', 'Itens', 'Diminuir (60)', '#popup-resumo .resumo-qtd-btn:first-child', 'color', 'resumo', 'c'],
+    ['resumoBotaoMais', 'Botão "+"', '#E09F41', 'resumo', 'solida', 'Itens', 'Aumentar (61)', '#popup-resumo .resumo-qtd-btn:last-child', 'color', 'resumo', 'c'],
+    ['resumoCampoQtd', 'Quantidade — fundo', '#FFFFFF', 'resumo', 'fundo', 'Itens', 'Caixinha do número (62)', '#popup-resumo .resumo-item-line input', 'background', 'resumo', 'c'],
+    ['resumoNumeroQtd', 'Quantidade — número', '#1D2814', 'resumo', 'solida', 'Itens', 'Número escolhido (63)', '#popup-resumo .resumo-item-line input', 'color', 'resumo', 'c'],
+    ['resumoLixeira', 'Lixeira', '#E60000', 'resumo', 'solida', 'Itens', 'Tirar o item (64)', '#popup-resumo .btn-excluir, #popup-resumo .btn-excluir i', 'color', 'resumo', 'c'],
+    ['resumoLinhaItens', 'Tracejado entre os itens', '#D2D4D0', 'resumo', 'solida', 'Itens', 'Divisória dos itens (66)', '#popup-resumo .resumo-item-line', 'border-bottom-color', 'resumo', 'c'],
+    ['resumoCupomTitulo', 'Cupom — título', '#2C2C2C', 'resumo', 'solida', 'Cupom', 'CUPOM DE DESCONTO (65)', '#cupom-container strong', 'color', 'resumo', 'c'],
+    ['resumoCupomBorda', 'Cupom — tracejado', '#BBBFB9', 'resumo', 'solida', 'Cupom', 'Contorno do cupom (67)', '#cupom-container', 'border-color', 'resumo', 'c'],
+    ['resumoCupomCampo', 'Cupom — campo (fundo)', '#FFFFFF', 'resumo', 'fundo', 'Cupom', 'Onde digita o código (72)', '#cupom-input', 'background', 'resumo', 'c'],
+    ['resumoCupomCampoTexto', 'Cupom — campo (texto)', '#2C2C2C', 'resumo', 'solida', 'Cupom', 'Texto do código (70)', '#cupom-input', 'color', 'resumo', 'c'],
+    ['resumoCupomBotao', 'Botão "Aplicar" — fundo', '#7FB1C8', 'resumo', 'fundo', 'Cupom', 'APLICAR (68)', '#apply-cupom-btn', 'background', 'resumo', 'c'],
+    ['resumoCupomTexto', 'Botão "Aplicar" — texto', '#FFFFFF', 'resumo', 'solida', 'Cupom', 'APLICAR (69)', '#apply-cupom-btn', 'color', 'resumo', 'c'],
+    ['resumoLinhaRodape', 'Linha acima do total', '#F3E1C3', 'resumo', 'solida', 'Total e botão', 'Divisória do total', '#popup-resumo .resumo-footer-area', 'border-top-color', 'resumo', 'c'],
+    ['resumoTotal', 'Total — texto', '#1D2814', 'resumo', 'solida', 'Total e botão', 'TOTAL: R$ (71)', '#popup-resumo-total', 'color', 'resumo', 'c'],
+    ['corBotoesResumo', 'Botão "Fazer pedido" — fundo', '#E09F41', 'resumo', 'fundo', 'Total e botão', 'FAZER PEDIDO (73)', '#popup-resumo .btn-fazer-pedido', 'background', 'resumo', 'c'],
+    ['resumoBotaoTexto', 'Botão "Fazer pedido" — texto', '#FFFFFF', 'resumo', 'solida', 'Total e botão', 'FAZER PEDIDO (74)', '#popup-resumo .btn-fazer-pedido', 'color', 'resumo', 'c'],
+    // ---- Informações do pedido ----
+    ['corFundoInfoPedido', 'Janela — fundo', '#FFF5EB', 'info', 'fundo', 'Janela', 'Fundo (76)', '#popup-pedido .popup-conteudo', 'background', 'info', 'c'],
+    ['infoTitulo', 'Título — texto', '#E09F41', 'info', 'solida', 'Janela', 'INFORMAÇÕES DO PEDIDO (75)', '#popup-pedido h2', 'color', 'info', 'c'],
+    ['infoLinhaTitulo', 'Linha abaixo do título', '#F3E1C3', 'info', 'solida', 'Janela', 'Divisória (78)', '#popup-pedido .popup-conteudo h2', 'border-bottom-color', 'info', 'c'],
+    ['infoFechar', 'Botão ×', '#999999', 'info', 'solida', 'Janela', 'Fechar (77)', '#popup-pedido .fechar', 'color', 'info', 'c'],
+    ['infoRotuloNome', 'Rótulo "Nome"', '#1D2814', 'info', 'solida', 'Títulos dos campos', '(79)', '#popup-pedido label[for="nome"]', 'color', 'info', 'c'],
+    ['infoRotuloTelefone', 'Rótulo "Número"', '#1D2814', 'info', 'solida', 'Títulos dos campos', '(79)', '#popup-pedido label[for="telefone"]', 'color', 'info', 'c'],
+    ['infoRotuloData', 'Rótulo "Data"', '#1D2814', 'info', 'solida', 'Títulos dos campos', '(79)', '#popup-pedido label[for="data"]', 'color', 'info', 'c'],
+    ['infoRotuloPagamento', 'Rótulo "Pagamento"', '#1D2814', 'info', 'solida', 'Títulos dos campos', '(79)', '#popup-pedido label[for="pagamento"]', 'color', 'info', 'c'],
+    ['infoRotuloObs', 'Rótulo "Observações"', '#1D2814', 'info', 'solida', 'Títulos dos campos', '(79)', '#popup-pedido label[for="observacoes"]', 'color', 'info', 'c'],
+    ['infoCampos', 'Campos — fundo', '#FFFFFF', 'info', 'fundo', 'Campos', 'Onde o cliente digita (80)', '#popup-pedido input, #popup-pedido select, #popup-pedido textarea', 'background', 'info', 'c'],
+    ['infoCampoTexto', 'Campos — texto', '#2C2C2C', 'info', 'solida', 'Campos', 'Texto digitado (81)', '#popup-pedido input, #popup-pedido select, #popup-pedido textarea', 'color', 'info', 'c'],
+    ['infoAvisoFundo', 'Aviso — fundo', '#FDF1F1', 'info', 'fundo', 'Aviso de data', 'Caixa do aviso (88)', '#aviso-data-fechada, #popup-pedido .aviso-janela-retirada', 'background', 'info', 'c'],
+    ['infoAvisoTexto', 'Aviso — texto', '#E60000', 'info', 'solida', 'Aviso de data', 'Texto do aviso (88)', '#aviso-data-fechada, #popup-pedido .aviso-janela-retirada', 'color', 'info', 'c'],
+    ['infoEditarFundo', 'Botão "Editar pedido" — fundo', '#7FB1C8', 'info', 'fundo', 'Botões', '(82)', '#popup-pedido .btn-secondary[onclick*="editarPedido"]', 'background', 'info', 'c'],
+    ['infoEditarTexto', 'Botão "Editar pedido" — texto', '#FFFFFF', 'info', 'solida', 'Botões', '(83)', '#popup-pedido .btn-secondary[onclick*="editarPedido"]', 'color', 'info', 'c'],
+    ['infoAdicionarFundo', 'Botão "Adicionar itens" — fundo', '#7FB1C8', 'info', 'fundo', 'Botões', '(84)', '#popup-pedido .btn-secondary[onclick*="fecharPopup"]', 'background', 'info', 'c'],
+    ['infoAdicionarTexto', 'Botão "Adicionar itens" — texto', '#FFFFFF', 'info', 'solida', 'Botões', '(85)', '#popup-pedido .btn-secondary[onclick*="fecharPopup"]', 'color', 'info', 'c'],
+    ['corBotoesInfoPedido', 'Botão "Confirmar" — fundo', '#E09F41', 'info', 'fundo', 'Botões', '(86)', '#popup-pedido .btn-primary-large', 'background', 'info', 'c'],
+    ['infoBotaoTexto', 'Botão "Confirmar" — texto', '#FFFFFF', 'info', 'solida', 'Botões', '(87)', '#popup-pedido .btn-primary-large', 'color', 'info', 'c'],
+    // ---- Gerais (base; ficam fora do editor para não repetir opções) ----
+    ['acc', 'Cor de destaque', '#E09F41', 'geral', 'solida', 'Cores gerais', '', '', '', '', ''],
+    ['txt', 'Textos gerais', '#2C2C2C', 'geral', 'solida', 'Cores gerais', '', '', '', '', ''],
+    ['card', 'Caixas — fundo', '#FFF5EB', 'geral', 'solida', 'Cores gerais', '', '', '', '', '']
 ];
 const AREAS_TEMA = [
     ['geral', 'Geral', 'Vale para a página inicial e para o cardápio.'],
     ['inicio', 'Página inicial', ''],
-    ['menu', 'Menu lateral', 'O menu ☰ da página inicial e do cardápio.'],
+    ['menu', 'Menu lateral', 'O menu ☰ da página inicial.'],
+    ['menuc', 'Menu lateral', 'O menu ☰ do cardápio (separado do da página inicial).'],
     ['quemsomos', 'Quem somos', 'A janela "Quem somos" dos dois sites.'],
     ['cardapio', 'Cardápio', ''],
     ['resumo', 'Janela do resumo', 'Abre ao tocar na barra do resumo.'],
     ['info', 'Informações do pedido', 'Abre ao tocar em "Fazer pedido".']
 ];
 const CAMPOS_COR_TEMA = ELEMENTOS_TEMA.map(e => [e[0], e[1], e[2], e[3], e[4]]);
+// Áreas do cardápio aberto: podem ter valores próprios em cada cardápio (padrão, Natal…).
+const AREAS_POR_CARDAPIO = ['cardapio', 'menuc', 'resumo', 'info'];
 const META_ELEMENTO = Object.fromEntries(ELEMENTOS_TEMA.map(e => [e[0], { grupo: e[5], ajuda: e[6], seletor: e[7], prop: e[8], abrir: e[9] }]));
 const CHAVES_COR_TEMA = CAMPOS_COR_TEMA.map(c => c[0]);
 const ROTULO_COR_TEMA = Object.fromEntries(ELEMENTOS_TEMA.map(e => [e[0], [e[1], e[6]]]));
@@ -12919,12 +13084,15 @@ const SITE_PADRAO_TEMA = Object.fromEntries(CAMPOS_COR_TEMA.map(c => [c[0], c[2]
 // [campo, rótulo, ajuda, seção, largura ideal, altura ideal]
 // [campo, rótulo, ajuda, área, largura ideal, altura ideal, grupo, seletor, abrir, imagem padrão]
 const CAMPOS_IMG_TEMA = [
-    ['imgTopo', 'Topo — faixa (imagem)', 'Cabeçalho dos dois sites', 'inicio', 1376, 196, 'Topo', 'header', '', 'topo.png'],
-    ['logoPrincipal', 'Logo principal — imagem', 'Logo grande da página inicial', 'inicio', 800, 471, 'Logo', '.hero-logo-big', '', 'favu.png'],
-    ['imgRodape', 'Rodapé — faixa (imagem)', 'Rodapé dos dois sites', 'inicio', 1376, 196, 'Rodapé', 'footer', '', 'roda.png'],
+    ['imgTopo', 'Topo — faixa (imagem)', 'Cabeçalho da página inicial (3)', 'inicio', 1376, 196, 'Topo', 'header', '', 'topo.png'],
+    ['logoPrincipal', 'Logo central — imagem', 'Logo grande da página inicial (5)', 'inicio', 800, 471, 'Logo', '.hero-logo-big', '', 'favu.png'],
+    ['imgRodape', 'Rodapé — faixa (imagem)', 'Rodapé da página inicial (10)', 'inicio', 1376, 196, 'Rodapé', 'footer', '', 'roda.png'],
     ['logoRodape', 'Rodapé — logo', 'Rodapé no celular', 'inicio', 800, 471, 'Rodapé', '.footer-logo', '', 'logoroda.png'],
-    ['logoMenu', 'Menu — logo', 'Em branco = logo principal', 'menu', 800, 471, 'Menu lateral', '.menu-logo-img', 'menu', 'favu.png'],
-    ['imgQuemSomos', 'Janela — imagem', 'Imagem no topo da janela', 'quemsomos', 600, 600, 'Janela Quem somos', '#aboutModal .modal-img', 'quemsomos', 'BS.png']
+    ['logoMenu', 'Menu — logo', 'Logo do menu (12) · em branco = logo central', 'menu', 800, 471, 'Menu lateral', '.menu-logo-img', 'menu', 'favu.png'],
+    ['imgQuemSomos', 'Janela — imagem', 'Imagem no topo da janela (19)', 'quemsomos', 600, 600, 'Janela Quem somos', '#aboutModal .modal-img', 'quemsomos', 'BS.png'],
+    ['imgTopoCardapio', 'Topo — faixa (imagem)', 'Cabeçalho do cardápio · em branco = faixa padrão (não copia a da página inicial)', 'cardapio', 1376, 196, 'Topo', 'header', '', 'topo.png'],
+    ['imgRodapeCardapio', 'Rodapé — faixa (imagem)', 'Rodapé do cardápio · em branco = faixa padrão (não copia a da página inicial)', 'cardapio', 1376, 196, 'Rodapé', 'footer', '', 'roda.png'],
+    ['logoMenuCardapio', 'Menu — logo', 'Logo do menu do cardápio · em branco = logo padrão', 'menuc', 800, 471, 'Menu lateral', '.menu-logo-img', 'menu', 'favu.png']
 ];
 const CHAVES_IMG_TEMA = CAMPOS_IMG_TEMA.map(c => c[0]);
 const ROTULO_IMG_TEMA = Object.fromEntries(CAMPOS_IMG_TEMA.map(c => [c[0], [c[1], `${c[2]} · ideal ${c[4]} × ${c[5]} px${/logo|imgQuemSomos/i.test(c[0]) ? ', PNG transparente' : ''}`]]));
@@ -12970,7 +13138,7 @@ function gerarIdTema() {
 
 async function salvarListaTemas() {
     const lista = temasLista.map(t => {
-        const limpo = { id: t.id, nome: t.nome || 'Tema', ordem: t.ordem || 0, agendaInicio: t.agendaInicio || '', agendaFim: t.agendaFim || '', conteudoInicio: t.conteudoInicio || '', conteudoCardapio: t.conteudoCardapio || '' };
+        const limpo = { id: t.id, nome: t.nome || 'Tema', ordem: t.ordem || 0, agendaInicio: t.agendaInicio || '', agendaFim: t.agendaFim || '', conteudoInicio: t.conteudoInicio || '', conteudoCardapio: t.conteudoCardapio || '', porCardapio: t.porCardapio || {} };
         CHAVES_COR_TEMA.forEach(k => { limpo[k] = t[k] || ''; });
         CHAVES_IMG_TEMA.forEach(k => { limpo[k] = t[k] || ''; });
         return limpo;
@@ -12996,12 +13164,23 @@ const fmtAgenda = v => { const t = msAgenda(v); return t == null ? '' : new Date
 
 // O que vai para config/tema (o que os sites leem): tudo já resolvido.
 // Regras de estilo de cada elemento (só as que mudaram em relação ao site de hoje).
-function regrasCssTema(valorDe) {
+// prefixo: 'pagina' usa body.pg-inicio / body.pg-cardapio; ou um texto pronto (ex.: body.cardapio-natal).
+function regrasCssTema(valorDe, opcoes = {}) {
     const regras = [];
-    ELEMENTOS_TEMA.forEach(([k, , padrao, , , , , sel, prop]) => {
-        if (!sel || !prop) return;
+    ELEMENTOS_TEMA.forEach(([k, , padrao, area, , , , selBase, prop, , pg]) => {
+        // Fundo da tela de um cardápio específico (o padrão usa as variáveis do site).
+        if (selBase === 'body' && opcoes.prefixo && (!opcoes.somente || opcoes.somente.includes(area))) {
+            const v = valorDe(k), comparar = opcoes.base ? opcoes.base(k) : padrao;
+            if (v && normCor(v) !== normCor(comparar)) regras.push(`${opcoes.prefixo} { background: ${v} !important; background-attachment: fixed !important; }`);
+            return;
+        }
+        if (!selBase || !prop) return;
+        if (opcoes.somente && !opcoes.somente.includes(area)) return;
         const v = valorDe(k);
-        if (!v || normCor(v) === normCor(padrao)) return;
+        const comparar = opcoes.base ? opcoes.base(k) : padrao;
+        if (!v || normCor(v) === normCor(comparar)) return;
+        const pref = opcoes.prefixo || (pg === 'i' ? 'body.pg-inicio' : pg === 'c' ? 'body.pg-cardapio' : '');
+        const sel = pref ? selBase.split(',').map(x => `${pref} ${x.trim()}`).join(', ') : selBase;
         if (/gradient\(/i.test(v) && prop === 'color') {
             // Degradê nas letras.
             regras.push(`${sel} { background: ${v} !important; -webkit-background-clip: text !important; background-clip: text !important; -webkit-text-fill-color: transparent !important; color: transparent !important; }`);
@@ -13034,6 +13213,11 @@ function dadosPublicosTema(t) {
     out.regrasCss = regrasCssTema(k => valorEfetivoTema(t, k));
     out.conteudoInicio = conteudoEfetivoTema(t, 'inicio');
     out.conteudoCardapio = conteudoEfetivoTema(t, 'cardapio');
+    out.porCardapio = {};
+    Object.entries(t.porCardapio || {}).forEach(([idCard, st]) => {
+        const regrasCss = regrasCssTema(k => (st.cores || {})[k] || valorEfetivoTema(t, k), { somente: AREAS_POR_CARDAPIO, prefixo: `body.cardapio-${idCard}`, base: k => valorEfetivoTema(t, k) });
+        out.porCardapio[idCard] = { regrasCss, imgs: { ...(st.imgs || {}) }, conteudoCardapio: st.conteudo || null };
+    });
     CHAVES_IMG_TEMA.forEach(k => { out[k] = imagemEfetivaTema(t, k); });
     return out;
 }
@@ -13170,12 +13354,30 @@ window.excluirTema = function(id) {
 };
 
 // ---------- Editor ----------
+// ---------- Valores do editor por cardápio (2026-10-15) ----------
+// No editor do cardápio, com "Natal" escolhido, as cores/imagens das áreas do cardápio
+// ficam em ed.porCardapio.natal; o que não mudar segue o cardápio padrão do mesmo tema.
+function escopoEd() { const ed = window.__temaEdicao; return ed && ed.pagina === 'cardapio' && ed.escopo && ed.escopo !== 'padrao' ? ed.escopo : null; }
+function areaDoCampo(k) { const e = ELEMENTOS_TEMA.find(x => x[0] === k); if (e) return e[3]; const im = CAMPOS_IMG_TEMA.find(x => x[0] === k); return im ? im[3] : ''; }
+function campoPorCardapio(k) { return AREAS_POR_CARDAPIO.includes(areaDoCampo(k)); }
+function guardaEscopo(id = escopoEd()) { const ed = window.__temaEdicao; ed.porCardapio = ed.porCardapio || {}; ed.porCardapio[id] = ed.porCardapio[id] || { cores: {}, imgs: {}, arquivos: {} }; ['cores', 'imgs', 'arquivos'].forEach(x => { ed.porCardapio[id][x] = ed.porCardapio[id][x] || {}; }); return ed.porCardapio[id]; }
+function noEscopo(k) { return !!escopoEd() && campoPorCardapio(k); }
+// Cores de cada botão: "item|site|lista|posição|propriedade".
+function corItemGet(k) { const [, site, lista, idx, prop] = k.split('|'); return window.__siteEd?.[site]?.[lista]?.[+idx]?.[prop] || ''; }
+function corItemSet(k, v) { const [, site, lista, idx, prop] = k.split('|'); const it = window.__siteEd?.[site]?.[lista]?.[+idx]; if (it) { if (v) it[prop] = v; else delete it[prop]; } window.renderEditorSite(site); }
+function corEdGet(k) { const ed = window.__temaEdicao; if (k.startsWith('item|')) return corItemGet(k); if (noEscopo(k)) return guardaEscopo().cores[k] || ed.cores[k]; return ed.cores[k]; }
+function corEdBase(k) { const ed = window.__temaEdicao; return noEscopo(k) ? ed.cores[k] : basePadraoCampo(ed.id, k); }
+function corEdSet(k, v) { const ed = window.__temaEdicao; if (k.startsWith('item|')) return corItemSet(k, v); if (noEscopo(k)) guardaEscopo().cores[k] = v; else ed.cores[k] = v; }
+function corEdReset(k) { const ed = window.__temaEdicao; if (k.startsWith('item|')) return corItemSet(k, ''); if (noEscopo(k)) delete guardaEscopo().cores[k]; else ed.cores[k] = basePadraoCampo(ed.id, k); }
+function imgsEd(k) { return noEscopo(k) ? guardaEscopo().imgs : window.__temaEdicao.imgs; }
+function arqEd(k) { return noEscopo(k) ? guardaEscopo().arquivos : window.__temaEdicao.arquivos; }
+
 function htmlCampoCorTema(campo) {
     const ed = window.__temaEdicao;
     const def = CAMPOS_COR_TEMA.find(c => c[0] === campo);
     const [titulo, ajuda] = ROTULO_COR_TEMA[campo] || [def[1], ''];
-    const valor = ed.cores[campo];
-    const igual = normCor(valor) === normCor(basePadraoCampo(ed.id, campo));
+    const valor = corEdGet(campo);
+    const igual = normCor(valor) === normCor(corEdBase(campo));
     return `<div class="tema-item-caixa tema-cor-campo" data-campo="${campo}" onclick="window.destacarElementoTema('${campo}')">
         <div class="tema-campo-topo"><label title="${escapeHtmlPedido(def[1])}">${titulo}</label>${igual ? '<span class="tema-badge-padrao">padrão</span>' : ''}</div>
         <small class="tema-campo-ajuda">${ajuda}</small>
@@ -13191,16 +13393,15 @@ function atualizarCampoCorTema(campo) {
     if (el) el.outerHTML = htmlCampoCorTema(campo);
 }
 window.retomarPadraoCor = function(campo) {
-    const ed = window.__temaEdicao;
-    ed.cores[campo] = basePadraoCampo(ed.id, campo);
-    atualizarCampoCorTema(campo);
+    corEdReset(campo);
+    if (!campo.startsWith('item|')) atualizarCampoCorTema(campo);
     window.enviarTemaAoVivo?.();
 };
 
 function htmlCampoImgTema([campo, label, ajuda]) {
     const ed = window.__temaEdicao;
-    const temPropria = !!ed.imgs[campo] || !!ed.arquivos[campo];
-    const semImagem = ed.imgs[campo] === '__sem__' && !ed.arquivos[campo];
+    const temPropria = !!imgsEd(campo)[campo] || !!arqEd(campo)[campo];
+    const semImagem = imgsEd(campo)[campo] === '__sem__' && !arqEd(campo)[campo];
     const [titulo, legenda] = ROTULO_IMG_TEMA[campo] || [label, ajuda];
     return `<div class="tema-item-caixa tema-img-campo" data-campo-img="${campo}" onclick="window.destacarElementoTema('${campo}')">
         <div class="tema-campo-topo"><label title="${escapeHtmlPedido(label)}">${titulo}</label>${!temPropria ? '<span class="tema-badge-padrao">padrão</span>' : ''}</div>
@@ -13220,8 +13421,10 @@ async function mostrarPreviaImgTema(campo) {
     if (!prev) return;
     const vazio = prev.parentElement?.querySelector('.tema-img-vazio');
     const mostrar = (src) => { if (src) { prev.src = src; prev.style.display = ''; if (vazio) vazio.style.display = 'none'; } else { prev.style.display = 'none'; if (vazio) vazio.style.display = ''; } };
-    if (ed.arquivos[campo]) return mostrar(URL.createObjectURL(ed.arquivos[campo]));
-    const ref = ed.imgs[campo] || (ed.id !== 'padrao' ? getTemaPadrao()[campo] : '');
+    if (arqEd(campo)[campo]) return mostrar(URL.createObjectURL(arqEd(campo)[campo]));
+    // No cardápio Natal (por ex.), sem imagem própria = a do cardápio padrão deste tema.
+    if (noEscopo(campo) && !imgsEd(campo)[campo] && ed.arquivos[campo]) return mostrar(URL.createObjectURL(ed.arquivos[campo]));
+    const ref = imgsEd(campo)[campo] || (noEscopo(campo) ? ed.imgs[campo] : '') || (ed.id !== 'padrao' ? getTemaPadrao()[campo] : '');
     if (ref === '__sem__') return mostrar('');
     const def = CAMPOS_IMG_TEMA.find(c => c[0] === campo);
     mostrar(ref ? await resolverImagemTemaAdmin(ref) : (def && def[9] ? URL_IMG_PADRAO(def[9]) : ''));
@@ -13230,14 +13433,14 @@ async function mostrarPreviaImgTema(campo) {
 // Blocos do editor: cada um reúne botões/textos, imagens e cores da sua parte do site.
 const BLOCOS_TEMA = {
     inicio: [
-        { id: 'inicio', nome: 'Página inicial', conteudo: 'cont-inicio-pagina', areas: ['geral', 'inicio'], carrossel: true, abrir: '' },
+        { id: 'inicio', nome: 'Página inicial', conteudo: 'cont-inicio-pagina', areas: ['inicio'], carrossel: true, abrir: '' },
         { id: 'menu', nome: 'Menu lateral', conteudo: 'cont-inicio-menu', areas: ['menu'], abrir: 'menu' },
         { id: 'quemsomos', nome: 'Quem somos', conteudo: 'cont-inicio-quemsomos', areas: ['quemsomos'], abrir: 'quemsomos' },
         { id: 'agenda', nome: 'Agendamento', agenda: true }
     ],
     cardapio: [
-        { id: 'cardapio', nome: 'Cardápio', conteudo: '', areas: ['geral', 'cardapio'], abrir: '' },
-        { id: 'menu', nome: 'Menu lateral', conteudo: 'cont-cardapio-menu', areas: ['menu'], abrir: 'menu' },
+        { id: 'cardapio', nome: 'Cardápio', conteudo: 'cont-cardapio-pagina', areas: ['cardapio'], abrir: '' },
+        { id: 'menu', nome: 'Menu lateral', conteudo: 'cont-cardapio-menu', areas: ['menuc'], abrir: 'menu' },
         { id: 'resumo', nome: 'Janela do resumo', conteudo: 'cont-cardapio-resumo', areas: ['resumo'], abrir: 'resumo' },
         { id: 'info', nome: 'Informações do pedido', conteudo: 'cont-cardapio-info', areas: ['info'], abrir: 'info' },
         { id: 'agenda', nome: 'Agendamento', agenda: true }
@@ -13254,7 +13457,8 @@ window.abrirEditorTema = function(id = '') {
     }
     devolverCarrosselAoLayout();
     const pagina = window.__paginaLayout === 'cardapio' ? 'cardapio' : 'inicio';
-    const ed = window.__temaEdicao = { id: id || '', imgs: {}, arquivos: {}, cores: {}, pagina, bloco: BLOCOS_TEMA[pagina][0].id };
+    const ed = window.__temaEdicao = { id: id || '', imgs: {}, arquivos: {}, cores: {}, pagina, bloco: BLOCOS_TEMA[pagina][0].id, escopo: 'padrao', porCardapio: {} };
+    Object.entries(t.porCardapio || {}).forEach(([k, st]) => { ed.porCardapio[k] = { cores: { ...(st.cores || {}) }, imgs: { ...(st.imgs || {}) }, arquivos: {}, conteudoSalvo: st.conteudo || null }; });
     CHAVES_IMG_TEMA.forEach(k => { ed.imgs[k] = t[k] || ''; });
     CHAVES_COR_TEMA.forEach(k => { ed.cores[k] = t[k] || basePadraoCampo(ed.id, k); });
     // Botões e textos das duas páginas (cópias para editar).
@@ -13293,9 +13497,10 @@ window.abrirEditorTema = function(id = '') {
             <div class="modal-body tema-editor-corpo">
                 <div class="tema-editor-campos">
                     <div style="margin-bottom:12px;"><label>Nome do tema</label><input type="text" id="tema-nome" value="${escapeHtmlPedido(t.nome || '')}" placeholder="Ex.: Natal 2026" ${id === 'padrao' ? 'readonly' : ''}></div>
+                    ${pagina === 'cardapio' && (window.__cardapios || []).length > 1 ? `<div class="tema-escopo"><label>Editando o cardápio</label><select id="tema-escopo-sel" onchange="window.trocarEscopoTema(this.value)">${window.__cardapios.map(c => `<option value="${c.id}">${escapeHtmlPedido(c.nome)}</option>`).join('')}</select><small>O que você mudar aqui vale só para este cardápio. O que não mudar segue o cardápio padrão.</small></div>` : ''}
                     <div class="prod-tabs tema-areas" data-blocos-de="${pagina}">${BLOCOS_TEMA[pagina].map(b => `<button type="button" class="prod-tab-btn" data-bloco-btn="${pagina}:${b.id}" onclick="window.trocarBlocoTema('${b.id}')">${b.nome}</button>`).join('')}</div>
                     <small class="tema-campo-ajuda tema-secao-ajuda">Cores com "padrão" seguem o tema Padrão. Clique em qualquer item para ver onde ele fica na prévia.</small>
-                    ${BLOCOS_TEMA[pagina].map(b => painelBloco(pagina, b)).join('')}
+                    <div id="tema-blocos">${BLOCOS_TEMA[pagina].map(b => painelBloco(pagina, b)).join('')}</div>
                     <div class="tema-editor-acoes">
                         <button type="button" class="btn btn-secondary" onclick="window.closeModal('modal-editor-tema')">Cancelar</button>
                         <button type="button" class="btn btn-primary" id="btn-salvar-tema" onclick="window.salvarTema()">Salvar tema</button>
@@ -13314,11 +13519,13 @@ window.abrirEditorTema = function(id = '') {
         </div>`;
     window.openModal('modal-editor-tema');
     CHAVES_IMG_TEMA.forEach(mostrarPreviaImgTema);
+    ed.__renderBlocos = () => BLOCOS_TEMA[pagina].map(b => painelBloco(pagina, b)).join('');
     renderEditorSite('inicio');
     renderEditorSite('cardapio');
     // Retrato do conteúdo como abriu (mesmo formato do editor), para saber se mudou.
     ed.conteudoInicial = {};
     ['inicio', 'cardapio'].forEach(pg => { lerCamposFixosSite(pg); ed.conteudoInicial[pg] = JSON.stringify(window.__siteEd[pg]); });
+    ed.conteudoPadraoCardapio = window.__siteEd.cardapio;
     // Carrossel (global) dentro do bloco Página inicial.
     const holder = document.getElementById('bloco-carrossel-holder');
     const car = document.getElementById('secao-carrossel');
@@ -13379,11 +13586,13 @@ window.trocarPaginaAoVivo = function(pagina, depois) {
     const f = iframeAoVivo();
     if (!f) return;
     document.querySelectorAll('#modal-editor-tema [data-viva-pagina]').forEach(b => b.classList.toggle('active', b.dataset.vivaPagina === pagina));
-    if (f.dataset.pagina === pagina && f.dataset.pronta === '1') { depois?.(); return; }
+    if (f.dataset.pagina === pagina && f.dataset.pronta === '1' && (f.dataset.escopo || 'padrao') === (window.__temaEdicao?.escopo || 'padrao')) { depois?.(); return; }
     f.dataset.pagina = pagina; f.dataset.pronta = '0';
     const idBase = window.__temaEdicao?.id || 'padrao';
     f.onload = () => { f.dataset.pronta = '1'; setTimeout(() => { window.enviarTemaAoVivo(); depois?.(); }, 400); };
-    f.src = `${urlSiteClientes()}${pagina}?tema_previa=${encodeURIComponent(idBase)}&ao_vivo=1&t=${Date.now()}`;
+    const escopo = pagina === 'cardapio.html' && window.__temaEdicao?.escopo && window.__temaEdicao.escopo !== 'padrao' ? `&menu=${encodeURIComponent(window.__temaEdicao.escopo)}` : '';
+    f.dataset.escopo = window.__temaEdicao?.escopo || 'padrao';
+    f.src = `${urlSiteClientes()}${pagina}?tema_previa=${encodeURIComponent(idBase)}&ao_vivo=1${escopo}&t=${Date.now()}`;
 };
 // Monta o tema como está no editor (ainda sem salvar) e manda para a prévia.
 window.enviarTemaAoVivo = function() {
@@ -13396,6 +13605,13 @@ window.enviarTemaAoVivo = function() {
         if (ed.arquivos[k]) { ed.__blobs = ed.__blobs || {}; if (!ed.__blobs[k] || ed.__blobs[k].f !== ed.arquivos[k]) ed.__blobs[k] = { f: ed.arquivos[k], u: URL.createObjectURL(ed.arquivos[k]) }; dados[k] = ed.__blobs[k].u; }
         else dados[k] = ed.imgs[k] || (ed.id !== 'padrao' ? (getTemaPadrao()[k] || '') : '');
     });
+    // Cardápio escolhido no editor (Natal…): regras e imagens próprias.
+    if (ed.pagina === 'cardapio' && ed.escopo && ed.escopo !== 'padrao') {
+        const st = guardaEscopo(ed.escopo);
+        const imgsCard = { ...(st.imgs || {}) };
+        Object.entries(st.arquivos || {}).forEach(([k, file]) => { ed.__blobs = ed.__blobs || {}; const ch = `${ed.escopo}:${k}`; if (!ed.__blobs[ch] || ed.__blobs[ch].f !== file) ed.__blobs[ch] = { f: file, u: URL.createObjectURL(file) }; imgsCard[k] = ed.__blobs[ch].u; });
+        dados.porCardapio = { [ed.escopo]: { regrasCss: regrasCssTema(k => st.cores[k] || valor(k), { somente: AREAS_POR_CARDAPIO, prefixo: `body.cardapio-${ed.escopo}`, base: k => valor(k) }), imgs: imgsCard } };
+    }
     // Botões e textos da página que está sendo editada.
     try { ['inicio', 'cardapio'].forEach(pg => { if (window.__siteEd?.[pg]) { lerCamposFixosSite(pg); dados[chaveConteudo(pg)] = window.__siteEd[pg]; } }); } catch (e) {}
     try { f.contentWindow.postMessage({ tipo: 'favu-tema-ao-vivo', dados }, location.origin); } catch (e) {}
@@ -13405,6 +13621,25 @@ let __timerConteudoVivo = null;
 function avisarConteudoAoVivo() { clearTimeout(__timerConteudoVivo); __timerConteudoVivo = setTimeout(() => window.enviarTemaAoVivo?.(), 350); }
 document.addEventListener('input', e => { if (e.target.closest?.('#modal-editor-tema .tema-conteudo-pagina')) avisarConteudoAoVivo(); });
 document.addEventListener('change', e => { if (e.target.closest?.('#modal-editor-tema .tema-conteudo-pagina')) avisarConteudoAoVivo(); });
+// 2026-11-25: incluir, ocultar, liberar, mover ou apagar botões também atualiza a prévia na hora
+// (antes só textos digitados e listas de seleção atualizavam).
+(function() {
+    let observador = null;
+    const ligar = () => {
+        const modal = document.getElementById('modal-editor-tema');
+        if (!modal || observador) return;
+        observador = new MutationObserver(lista => {
+            if (lista.some(m => m.target.closest?.('.tema-conteudo-pagina') || [...m.addedNodes].some(n => n.nodeType === 1 && (n.matches?.('.tema-conteudo-pagina') || n.closest?.('.tema-conteudo-pagina'))))) avisarConteudoAoVivo();
+        });
+        observador.observe(modal, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'checked', 'data-oculto', 'data-ativo'] });
+    };
+    document.addEventListener('click', e => {
+        if (e.target.closest?.('#modal-editor-tema .tema-conteudo-pagina')) { ligar(); setTimeout(avisarConteudoAoVivo, 50); }
+    }, true);
+    document.addEventListener('DOMContentLoaded', ligar);
+    setTimeout(ligar, 1500);
+})();
+
 window.destacarElementoTema = function(campo) {
     const e = ELEMENTOS_TEMA.find(x => x[0] === campo), im = CAMPOS_IMG_TEMA.find(x => x[0] === campo);
     const seletor = e ? (e[7] === 'body' ? '' : e[7]) : (im ? im[7] : '');
@@ -13420,7 +13655,7 @@ window.selecionarImagemTema = function(campo, input) {
     const file = input.files && input.files[0];
     if (!file) return;
     const ed = window.__temaEdicao;
-    ed.arquivos[campo] = file;
+    arqEd(campo)[campo] = file;
     const def = CAMPOS_IMG_TEMA.find(c => c[0] === campo);
     const el = document.querySelector(`#modal-editor-tema [data-campo-img="${campo}"]`);
     if (el) el.outerHTML = htmlCampoImgTema(def);
@@ -13445,8 +13680,8 @@ window.selecionarImagemTema = function(campo, input) {
 
 window.semImagemTema = function(campo) {
     const ed = window.__temaEdicao;
-    ed.imgs[campo] = '__sem__';
-    delete ed.arquivos[campo];
+    imgsEd(campo)[campo] = '__sem__';
+    delete arqEd(campo)[campo];
     const def = CAMPOS_IMG_TEMA.find(c => c[0] === campo);
     const el = document.querySelector(`#modal-editor-tema [data-campo-img="${campo}"]`);
     if (el) el.outerHTML = htmlCampoImgTema(def);
@@ -13455,8 +13690,8 @@ window.semImagemTema = function(campo) {
 };
 window.limparImagemTema = function(campo) {
     const ed = window.__temaEdicao;
-    ed.imgs[campo] = '';
-    delete ed.arquivos[campo];
+    imgsEd(campo)[campo] = '';
+    delete arqEd(campo)[campo];
     const def = CAMPOS_IMG_TEMA.find(c => c[0] === campo);
     const el = document.querySelector(`#modal-editor-tema [data-campo-img="${campo}"]`);
     if (el) el.outerHTML = htmlCampoImgTema(def);
@@ -13527,6 +13762,7 @@ window.salvarTema = async function() {
     let etapa = 'imagens';
     try {
         const anterior = temasLista.find(x => x.id === ed.id) || {};
+        guardarConteudoDoEscopo(); // devolve os textos do cardápio padrão para o editor
         const imgs = { ...ed.imgs };
         for (const [campo, file] of Object.entries(ed.arquivos)) imgs[campo] = await enviarImagemTema(file);
         etapa = 'tema';
@@ -13551,6 +13787,19 @@ window.salvarTema = async function() {
             const v = ed.cores[k];
             dados[k] = normCor(v) === normCor(basePadraoCampo(dados.id, k)) ? '' : v;
         });
+        // Cada cardápio (Natal…): só o que é diferente do cardápio padrão deste tema.
+        dados.porCardapio = {};
+        for (const [idCard, st] of Object.entries(ed.porCardapio || {})) {
+            if (!(window.__cardapios || []).some(c => c.id === idCard)) continue;
+            const cores = {};
+            Object.entries(st.cores || {}).forEach(([k, v]) => { if (v && normCor(v) !== normCor(ed.cores[k])) cores[k] = v; });
+            const imgsCard = { ...(st.imgs || {}) };
+            for (const [k, file] of Object.entries(st.arquivos || {})) imgsCard[k] = await enviarImagemTema(file);
+            Object.keys(imgsCard).forEach(k => { if (!imgsCard[k]) delete imgsCard[k]; });
+            let conteudo = st.conteudoSalvo || null;
+            if (st.conteudo && JSON.stringify(st.conteudo) !== st.conteudoInicial) conteudo = JSON.parse(JSON.stringify(st.conteudo));
+            if (Object.keys(cores).length || Object.keys(imgsCard).length || conteudo) dados.porCardapio[idCard] = { cores, imgs: imgsCard, conteudo };
+        }
         const idx = temasLista.findIndex(x => x.id === dados.id);
         if (idx > -1) temasLista[idx] = dados; else temasLista.push(dados);
         await salvarListaTemas();
@@ -13606,8 +13855,8 @@ window.fecharSeletorCor = fecharSeletorCor;
 window.usarCorSeletor = function(valor, salvar = false) {
     const campo = window.__seletorCorCampo;
     if (!campo || !valor) return;
-    window.__temaEdicao.cores[campo] = valor;
-    atualizarCampoCorTema(campo);
+    corEdSet(campo, valor);
+    if (!campo.startsWith('item|')) atualizarCampoCorTema(campo);
     if (salvar) salvarNaPaleta(valor);
     fecharSeletorCor();
     window.enviarTemaAoVivo?.();
@@ -13641,7 +13890,7 @@ window.abrirSeletorCor = async function(campo, ancora) {
     window.__seletorCorAncora = ancora;
     const def = CAMPOS_COR_TEMA.find(c => c[0] === campo);
     const aceitaDegrade = true; // 2026-10-15: degradê em todas as cores
-    const atual = window.__temaEdicao.cores[campo] || '#FFFFFF';
+    const atual = corEdGet(campo) || '#FFFFFF';
     const hexAtual = /^#/.test(atual) ? atual : '#E09F41';
     const salvas = (await carregarPaletaCores()).filter(c => aceitaDegrade || !/gradient/i.test(c));
     const sw = (v, i, removivel) => `<span class="sc-sw-wrap"><button type="button" class="sc-sw ${normCor(v) === normCor(atual) ? 'sel' : ''}" title="${escapeHtmlPedido(v)}" style="background:${v};" onclick="window.usarCorSeletor('${v.replace(/'/g, "\\'")}')"></button>${removivel ? `<button type="button" class="sc-sw-x" title="Tirar da paleta" onclick="window.removerCorPaleta(${i})">×</button>` : ''}</span>`;
@@ -13740,6 +13989,26 @@ window.trocarPreviaTema = function(tipo, valor) {
     if (iframe) iframe.src = url;
 };
 
+
+// 2026-11-25: a janela "Prévia" mostra o site como numa tela de computador de verdade (1366 × 768),
+// reduzida para caber. Antes o site era espremido na altura da janela e o logo passava por cima dos botões.
+window.ajustarMolduraPrevia = function() {
+    const iframe = document.getElementById('previa-tema-iframe'); const m = iframe?.parentElement; const p = window.__previa;
+    if (!iframe || !m || !p) return;
+    if (p.aparelho === 'celular') { ['width', 'height', 'transform', 'transformOrigin', 'flex', 'marginLeft'].forEach(k => iframe.style[k] = ''); m.style.height = ''; m.style.display = ''; m.style.overflow = ''; return; }
+    const larg = Math.max(200, m.clientWidth - 20);
+    const alt = Math.max(220, window.innerHeight - m.getBoundingClientRect().top - 60);
+    const s = Math.min(1, larg / 1366, alt / 768);
+    Object.assign(iframe.style, { width: '1366px', height: '768px', transform: `scale(${s})`, transformOrigin: 'top left', flex: 'none', marginLeft: `${Math.max(0, (larg - 1366 * s) / 2)}px` });
+    Object.assign(m.style, { display: 'block', overflow: 'hidden', height: `${Math.round(768 * s) + 20}px` });
+};
+['abrirPreviaTema', 'trocarPreviaTema'].forEach(nome => {
+    const original = window[nome];
+    if (typeof original !== 'function' || original.__comMoldura) return;
+    window[nome] = function(...args) { const r = original.apply(this, args); setTimeout(window.ajustarMolduraPrevia, 0); return r; };
+    window[nome].__comMoldura = true;
+});
+window.addEventListener('resize', () => { if (document.getElementById('modal-previa-tema')?.style.display !== 'none') window.ajustarMolduraPrevia(); });
 setTimeout(() => { if (document.getElementById('lista-temas')) carregarTemas(); }, 1500);
 
 // =====================================================================
@@ -14312,6 +14581,7 @@ function padraoSiteInicio() {
             { id: novoIdSite(), titulo: 'Nos siga no Instagram', icone: 'fab fa-instagram', acao: 'link', link: INSTA_FAVU, visivel: true },
             { id: novoIdSite(), titulo: 'Falar com o Favu', icone: 'fab fa-whatsapp', acao: 'whatsapp', link: WHATS_FAVU, visivel: true }
         ],
+        menuIcone: 'fa-solid fa-bars',
         quemSomos: {
             texto: '<p>Inspirada nas receitas e lembranças de família, juntamos a tradição e a criatividade para criar pratos, bolos e salgados sob encomenda, uma coisa melhor que a outra.</p><p>Tudo artesanal, feito a quatro mãos, de <b>mãe para filho</b>, com ingredientes selecionados e um toque especial que só a FAVU tem!</p>',
             destaque: 'Faça sua encomenda e vamos transformar seus momentos especiais em inesquecíveis!',
@@ -14330,7 +14600,8 @@ function padraoSiteCardapio() {
             { id: novoIdSite(), titulo: 'Nos siga no Instagram', icone: 'fab fa-instagram', acao: 'link', link: INSTA_FAVU, visivel: true },
             { id: novoIdSite(), titulo: 'Falar com o Favu', icone: 'fab fa-whatsapp', acao: 'whatsapp', link: WHATS_FAVU, visivel: true }
         ],
-        textos: { tituloResumo: 'RESUMO DO PEDIDO', botaoFazerPedido: 'FAZER PEDIDO', tituloInfo: 'INFORMAÇÕES DO PEDIDO', botaoConfirmar: 'CONFIRMAR PEDIDO', saudacaoWhatsapp: 'Olá, Favu!\nGostaria de encomendar os itens abaixo:' }
+        textos: { tituloResumo: 'RESUMO DO PEDIDO', botaoFazerPedido: 'FAZER PEDIDO', tituloCupom: 'CUPOM DE DESCONTO', phCupom: 'CÓDIGO', botaoAplicar: 'APLICAR', tituloInfo: 'INFORMAÇÕES DO PEDIDO', rotuloNome: 'Nome:', phNome: 'Nome Completo', rotuloTelefone: 'Número (WhatsApp):', phTelefone: '(DDD) 9XXXX-XXXX', rotuloData: 'Data de Entrega:', rotuloPagamento: 'Forma de pagamento:', rotuloObs: 'Observações:', phObs: 'EX: Retirar Itens, Alergias, Etc.', botaoEditar: 'EDITAR PEDIDO', botaoAdicionar: 'ADICIONAR ITENS', botaoConfirmar: 'CONFIRMAR PEDIDO', saudacaoWhatsapp: 'Olá, Favu!\nGostaria de encomendar os itens abaixo:' },
+        rodape: { assinatura: 'FAVU Cozinha Afetiva', copyright: '© 2026 Todos os direitos reservados.' }, menuIcone: 'fa-solid fa-bars'
     };
 }
 window.__siteEd = { inicio: null, cardapio: null };
@@ -14370,14 +14641,14 @@ window.trocarSubAbaLayout = function(sub) {
     if (titulo) titulo.textContent = window.__paginaLayout === 'cardapio' ? 'Temas do cardápio' : 'Temas da página inicial';
 };
 
-const LINK_PADRAO_ACAO = { cardapio: 'cardapio.html', inicio: 'index.html' };
+const LINK_PADRAO_ACAO = { cardapio: 'pedido.html', inicio: 'index.html' };
 function linhaItemSite(site, lista, item, idx, total, opc) {
     const acaoId = item.acao || 'link';
     const acao = ACOES_SITE[acaoId] || ACOES_SITE.link;
     const base = `window.editarItemSite('${site}','${lista}',${idx}`;
     // Link visível em todas as ações (dá para trocar no futuro). "Quem somos" não usa link.
     const cardapioId = item.cardapio || 'padrao';
-    const linkCardapioAcao = cardapioId === 'padrao' ? 'cardapio.html' : `cardapio.html?menu=${cardapioId}`;
+    const linkCardapioAcao = cardapioId === 'padrao' ? 'pedido.html' : `pedido.html?menu=${cardapioId}`;
     const campoLink = acaoId === 'quem_somos'
         ? `<div class="site-campo site-campo-link"><label>Link</label><input type="text" value="Abre a janela (sem link)" disabled></div>`
         : acaoId === 'cardapio'
@@ -14397,6 +14668,7 @@ function linhaItemSite(site, lista, item, idx, total, opc) {
             <div class="site-campo"><label>Ação</label><select onchange="${base},'acao',this.value); window.editarItemSite('${site}','${lista}',${idx},'link',''); window.renderEditorSite('${site}')">${Object.entries(ACOES_SITE).map(([v, [n]]) => `<option value="${v}" ${v === acaoId ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
             ${campoLink}
         </div>
+        ${coresItemSite(site, lista, idx, item)}
         <small class="site-item-regra"><i class="fas fa-info-circle"></i> Regra: ${acao[1]}</small>
         </div>
         <div class="site-item-botoes">
@@ -14413,7 +14685,7 @@ function blocoListaSite(site, lista, titulo, ajuda, opc) {
         <div class="secao-aba-cabecalho"><h2 class="font-display">${titulo}</h2>
             <button type="button" class="btn btn-primary" onclick="window.adicionarItemSite('${site}','${lista}')"><i class="fas fa-plus"></i> Adicionar</button></div>
         ${ajuda ? `<small class="campo-ajuda">${ajuda}</small>` : ''}
-        <div class="site-itens">${itens.length ? itens.map((it, i) => linhaItemSite(site, lista, it, i, itens.length, opc)).join('') : '<small class="campo-ajuda">Nenhum item. Clique em Adicionar.</small>'}</div>
+        <div class="site-itens" data-site="${site}" data-lista="${lista}">${itens.length ? itens.map((it, i) => linhaItemSite(site, lista, it, i, itens.length, opc)).join('') : '<small class="campo-ajuda">Nenhum item. Clique em Adicionar.</small>'}</div>
     </section>`;
 }
 function rodapeSalvarSite(site) {
@@ -14435,10 +14707,11 @@ function renderEditorSite(site) {
         const bAcao = qs.botaoAcao || 'link';
         const pagina = por('cont-inicio-pagina'), menu = por('cont-inicio-menu'), quem = por('cont-inicio-quemsomos');
         if (pagina) pagina.innerHTML = `
-            ${blocoListaSite('inicio', 'botoesCapa', 'Botões da capa', 'Os cartões grandes da página inicial.', { legenda: true, icone: true })}
+            <section class="panel-card secao-aba"><div class="secao-aba-cabecalho"><h2 class="font-display">Topo</h2></div>${seletorIconeMenu('inicio', d.menuIcone)}</section>
+            ${blocoListaSite('inicio', 'botoesCapa', 'Botões da capa', 'Os cartões grandes da página inicial. Cada botão pode ter as próprias cores.', { legenda: true, icone: true })}
             <section class="panel-card secao-aba">
                 <div class="secao-aba-cabecalho"><h2 class="font-display">Rodapé — textos</h2></div>
-                <div class="form-grid">
+                <div class="form-grid" data-destaque="footer" data-abrir="">
                     <div><label>Assinatura (computador)</label><input type="text" id="rodape-assinatura" value="${escapeHtmlPedido(rd.assinatura || '')}"></div>
                     <div><label>Direitos reservados</label><input type="text" id="rodape-copyright" value="${escapeHtmlPedido(rd.copyright || '')}"></div>
                 </div>
@@ -14448,7 +14721,7 @@ function renderEditorSite(site) {
             ${blocoListaSite('inicio', 'redes', 'Redes sociais', 'Links que ficam no fim do menu lateral.', { icone: true })}`;
         if (quem) {
             quem.innerHTML = `
-            <section class="panel-card secao-aba">
+            <section class="panel-card secao-aba" data-destaque="#aboutModal .modal-text" data-abrir="quemsomos">
                 <div class="secao-aba-cabecalho"><h2 class="font-display">Textos</h2></div>
                 <div class="cat-rich-wrapper"><label>Texto</label>${barraRicaSite('qs')}<div id="qs-obs-editor" class="cat-rich-editor site-rich" contenteditable="true" onfocus="window.focusCatEditor('qs')"></div><textarea id="qs-obs" style="display:none;"></textarea></div>
                 <div class="cat-rich-wrapper"><label>Frase em destaque</label>${barraRicaSite('qsd')}<div id="qsd-obs-editor" class="cat-rich-editor site-rich" contenteditable="true" onfocus="window.focusCatEditor('qsd')"></div><textarea id="qsd-obs" style="display:none;"></textarea></div>
@@ -14464,14 +14737,34 @@ function renderEditorSite(site) {
         }
     } else {
         const t = d.textos || {};
-        const campoTexto = (k, label) => `<div><label>${label}</label><input type="text" id="txt-cardapio-${k}" value="${escapeHtmlPedido(t[k] || '')}"></div>`;
-        const menu = por('cont-cardapio-menu'), resumo = por('cont-cardapio-resumo'), info = por('cont-cardapio-info');
+        const padroes = padraoSiteCardapio().textos;
+        const destino = { tituloResumo: ['#popup-resumo h2', 'resumo'], botaoFazerPedido: ['#popup-resumo .btn-fazer-pedido', 'resumo'], tituloCupom: ['#cupom-container strong', 'resumo'], phCupom: ['#cupom-input', 'resumo'], botaoAplicar: ['#apply-cupom-btn', 'resumo'],
+            tituloInfo: ['#popup-pedido h2', 'info'], rotuloNome: ['#popup-pedido label[for="nome"]', 'info'], phNome: ['#nome', 'info'], rotuloTelefone: ['#popup-pedido label[for="telefone"]', 'info'], phTelefone: ['#telefone', 'info'],
+            rotuloData: ['#popup-pedido label[for="data"]', 'info'], rotuloPagamento: ['#popup-pedido label[for="pagamento"]', 'info'], rotuloObs: ['#popup-pedido label[for="observacoes"]', 'info'], phObs: ['#observacoes', 'info'],
+            botaoEditar: ['#popup-pedido .btn-secondary[onclick*="editarPedido"]', 'info'], botaoAdicionar: ['#popup-pedido .btn-secondary[onclick*="fecharPopup"]', 'info'], botaoConfirmar: ['#popup-pedido .btn-primary-large', 'info'], saudacaoWhatsapp: ['', 'info'] };
+        const campoTexto = (k, label) => `<div data-destaque='${escapeHtmlPedido(destino[k]?.[0] || '')}' data-abrir="${destino[k]?.[1] || ''}"><label>${label}</label><input type="text" id="txt-cardapio-${k}" value="${escapeHtmlPedido(t[k] != null && t[k] !== '' ? t[k] : (padroes[k] || ''))}"></div>`;
+        const menu = por('cont-cardapio-menu'), resumo = por('cont-cardapio-resumo'), info = por('cont-cardapio-info'), paginaC = por('cont-cardapio-pagina');
+        const rdc = d.rodape || {};
+        if (paginaC) paginaC.innerHTML = `
+            <section class="panel-card secao-aba">
+                <div class="secao-aba-cabecalho"><h2 class="font-display">Topo e rodapé</h2></div>
+                ${seletorIconeMenu('cardapio', d.menuIcone)}
+                <div class="form-grid" data-destaque="footer" data-abrir="">
+                    <div><label>Rodapé — assinatura</label><input type="text" id="rodape-c-assinatura" value="${escapeHtmlPedido(rdc.assinatura || 'FAVU Cozinha Afetiva')}"></div>
+                    <div><label>Rodapé — direitos reservados</label><input type="text" id="rodape-c-copyright" value="${escapeHtmlPedido(rdc.copyright || '© 2026 Todos os direitos reservados.')}"></div>
+                </div>
+            </section>`;
         if (menu) menu.innerHTML = `
             ${blocoListaSite('cardapio', 'menuLateral', 'Links do menu', 'Links do menu ☰ do cardápio.', {})}
             ${blocoListaSite('cardapio', 'redes', 'Redes sociais', 'Links que ficam no fim do menu lateral do cardápio.', { icone: true })}`;
-        if (resumo) resumo.innerHTML = `<section class="panel-card secao-aba"><div class="secao-aba-cabecalho"><h2 class="font-display">Textos</h2></div><div class="form-grid">${campoTexto('tituloResumo', 'Título da janela')}${campoTexto('botaoFazerPedido', 'Botão "Fazer pedido"')}</div></section>`;
-        if (info) info.innerHTML = `<section class="panel-card secao-aba"><div class="secao-aba-cabecalho"><h2 class="font-display">Textos</h2></div><div class="form-grid">${campoTexto('tituloInfo', 'Título da janela')}${campoTexto('botaoConfirmar', 'Botão "Confirmar pedido"')}</div>
-            <div style="margin-top:12px;"><label>Saudação da mensagem do WhatsApp</label><textarea id="txt-cardapio-saudacaoWhatsapp" rows="2">${escapeHtmlPedido(t.saudacaoWhatsapp || '')}</textarea></div></section>`;
+        if (resumo) resumo.innerHTML = `<section class="panel-card secao-aba"><div class="secao-aba-cabecalho"><h2 class="font-display">Textos</h2></div><div class="form-grid">${campoTexto('tituloResumo', 'Título da janela (56)')}${campoTexto('tituloCupom', 'Título do cupom')}${campoTexto('phCupom', 'Texto dentro do campo do cupom')}${campoTexto('botaoAplicar', 'Botão "Aplicar"')}${campoTexto('botaoFazerPedido', 'Botão "Fazer pedido"')}</div></section>`;
+        if (info) info.innerHTML = `<section class="panel-card secao-aba"><div class="secao-aba-cabecalho"><h2 class="font-display">Textos</h2></div>
+            <div class="form-grid">${campoTexto('tituloInfo', 'Título da janela (75)')}</div>
+            <h4 class="tema-sub-rotulo">Títulos dos campos (79) e texto dentro deles (81)</h4>
+            <div class="form-grid">${campoTexto('rotuloNome', 'Título "Nome"')}${campoTexto('phNome', 'Dentro do campo "Nome"')}${campoTexto('rotuloTelefone', 'Título "Número"')}${campoTexto('phTelefone', 'Dentro do campo "Número"')}${campoTexto('rotuloData', 'Título "Data"')}${campoTexto('rotuloPagamento', 'Título "Pagamento"')}${campoTexto('rotuloObs', 'Título "Observações"')}${campoTexto('phObs', 'Dentro do campo "Observações"')}</div>
+            <h4 class="tema-sub-rotulo">Botões (83, 85, 87)</h4>
+            <div class="form-grid">${campoTexto('botaoEditar', 'Botão "Editar pedido"')}${campoTexto('botaoAdicionar', 'Botão "Adicionar itens"')}${campoTexto('botaoConfirmar', 'Botão "Confirmar pedido"')}</div>
+            <div style="margin-top:12px;" data-destaque="" data-abrir="info"><label>Saudação da mensagem do WhatsApp</label><textarea id="txt-cardapio-saudacaoWhatsapp" rows="2">${escapeHtmlPedido(t.saudacaoWhatsapp || padroes.saudacaoWhatsapp)}</textarea></div></section>`;
     }
 }
 window.renderEditorSite = renderEditorSite;
@@ -14496,8 +14789,9 @@ function lerCamposFixosSite(site) {
     }
     if (site === 'cardapio' && document.getElementById('txt-cardapio-tituloResumo')) {
         const t = {};
-        ['tituloResumo', 'botaoFazerPedido', 'tituloInfo', 'botaoConfirmar', 'saudacaoWhatsapp'].forEach(k => { t[k] = document.getElementById(`txt-cardapio-${k}`)?.value || ''; });
+        Object.keys(padraoSiteCardapio().textos).forEach(k => { const el = document.getElementById(`txt-cardapio-${k}`); t[k] = el ? el.value : ((d.textos || {})[k] || ''); });
         d.textos = t;
+        if (document.getElementById('rodape-c-assinatura')) d.rodape = { assinatura: document.getElementById('rodape-c-assinatura').value.trim(), copyright: document.getElementById('rodape-c-copyright').value.trim() };
     }
 }
 const redesenharSite = site => { lerCamposFixosSite(site); renderEditorSite(site); };
@@ -14655,7 +14949,13 @@ window.filtrarBuscaGastos = function() {
     ['gastos-planilha-body', 'gastos-lancamentos-lista-body'].forEach(id => {
         document.querySelectorAll(`#${id} > tr`).forEach(tr => {
             if (tr.matches('.gastos-rebuild-total-row, .gastos-lancamentos-total-row')) return;
-            const texto = (Array.from(tr.querySelectorAll('input')).map(i => i.value).join(' ') + ' ' + tr.textContent).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+            // 2026-11-19: só o que aparece na linha. Antes, o texto das listas de escolha
+            // trazia TODAS as opções (todos os itens e marcas), e nenhuma linha era escondida.
+            const copia = tr.cloneNode(true);
+            const origSelects = tr.querySelectorAll('select'), origInputs = tr.querySelectorAll('input, textarea');
+            copia.querySelectorAll('select').forEach((sel, i) => { const o = origSelects[i]; sel.replaceWith(document.createTextNode(' ' + (o && o.selectedIndex >= 0 ? o.options[o.selectedIndex].text : '') + ' ')); });
+            copia.querySelectorAll('input, textarea').forEach((inp, i) => { const o = origInputs[i]; inp.replaceWith(document.createTextNode(' ' + (o ? o.value : '') + ' ')); });
+            const texto = copia.textContent.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
             tr.style.display = !termo || texto.includes(termo) ? '' : 'none';
         });
     });
@@ -14755,7 +15055,11 @@ function simplificarTotaisItensGastos() {
 window.__cardapios = [{ id: 'padrao', nome: 'Cardápio padrão', ativo: true, ordem: 0 }];
 window.__cardapioAdmin = 'padrao'; // 'todos' mostra tudo no painel
 // 2026-10-15: cada categoria pertence a UM cardápio (sem o campo = padrão).
-function cardapioDaCategoriaAdmin(c) { return Array.isArray(c?.cardapios) ? (c.cardapios[0] || '') : 'padrao'; }
+// Proteção: cardápio que não existe (ou vazio) = padrão, para a categoria nunca sumir.
+function cardapioDaCategoriaAdmin(c) {
+    const id = Array.isArray(c?.cardapios) ? (c.cardapios[0] || '') : 'padrao';
+    return id && (window.__cardapios || []).some(x => x.id === id) ? id : 'padrao';
+}
 function cardapiosDaCategoria(c) { const id = cardapioDaCategoriaAdmin(c); return id ? [id] : []; }
 function categoriaNoCardapioAdmin(c, paraOrcamento = false) {
     const atual = window.__cardapioAdmin === 'todos' ? (paraOrcamento ? 'padrao' : null) : window.__cardapioAdmin;
@@ -14772,19 +15076,26 @@ async function carregarCardapios() {
         const snap = await getDoc(doc(db, 'config', 'cardapios'));
         const lista = snap.exists() && Array.isArray(snap.data().lista) ? snap.data().lista : [];
         const padrao = lista.find(c => c.id === 'padrao') || { id: 'padrao', nome: 'Cardápio padrão', ativo: true, ordem: 0 };
-        window.__cardapios = [{ ...padrao, ativo: true }, ...lista.filter(c => c.id !== 'padrao').sort((a, b) => (a.ordem || 0) - (b.ordem || 0))];
+        window.__cardapios = [{ ...padrao, ativo: true, marca: 0 }, ...lista.filter(c => c.id !== 'padrao').sort((a, b) => (a.ordem || 0) - (b.ordem || 0))];
+        // Cada cardápio (fora o padrão) tem um número de marca único e fixo.
+        let maior = Math.max(0, ...window.__cardapios.map(c => c.marca || 0));
+        window.__cardapios.forEach(c => { if (c.id !== 'padrao' && !c.marca) c.marca = ++maior; });
     } catch (e) { console.warn('Cardápios:', e); }
     renderSeletoresCardapio();
 }
 window.carregarCardapios = carregarCardapios;
 async function salvarCardapios() {
-    const lista = window.__cardapios.map((c, i) => ({ id: c.id, nome: c.nome, ativo: c.id === 'padrao' ? true : c.ativo !== false, ordem: i }));
+    const lista = window.__cardapios.map((c, i) => ({ id: c.id, nome: c.nome, ativo: c.id === 'padrao' ? true : c.ativo !== false, ordem: i, marca: c.id === 'padrao' ? 0 : (c.marca || 0) }));
     await setDoc(doc(db, 'config', 'cardapios'), { lista, atualizadoEm: Date.now() });
 }
 function renderSeletoresCardapio() {
     const opcoes = [...window.__cardapios, { id: 'todos', nome: 'Todos' }];
+    const varios = window.__cardapios.length > 1;
+    document.body.classList.toggle('um-so-cardapio', !varios);
     document.querySelectorAll('[data-seletor-cardapio]').forEach(box => {
         const noOrcamento = !!box.closest('#t-orcamentos');
+        // Com um só cardápio, não há o que escolher: só o botão para criar outros (em Categorias).
+        if (!varios) { box.innerHTML = box.closest('#t-cats') ? `<div class="seletor-cardapio-linha so-gerenciar"><button type="button" class="btn btn-outline seletor-cardapio-gerenciar" onclick="window.abrirGerenciarCardapios()"><i class="fas fa-cog"></i> Cardápios</button></div>` : ''; return; }
         const itens = noOrcamento ? window.__cardapios : opcoes;
         box.innerHTML = `<div class="seletor-cardapio-linha">
             <span class="seletor-cardapio-rotulo"><i class="fas fa-book-open"></i> Cardápio:</span>
@@ -14817,10 +15128,17 @@ function nomeCategoriaEmUso(nome, ignorarId = '') {
     const k = String(nome || '').trim().toLowerCase();
     return globalCategories.find(c => c.id !== ignorarId && String(c.nome || '').trim().toLowerCase() === k) || null;
 }
-function avisoNomeCategoriaRepetido(existente, nome) {
-    const card = (window.__cardapios.find(x => x.id === cardapioDaCategoriaAdmin(existente)) || {}).nome || 'outro cardápio';
-    customAlert(`Já existe a categoria "${existente.nome}" em ${card}. Para os itens não se misturarem, cada cardápio precisa de nomes próprios — use, por exemplo, "${nome} de Natal".`, 'Atenção');
+function avisoNomeCategoriaRepetido(existente) {
+    const card = (window.__cardapios.find(x => x.id === cardapioDaCategoriaAdmin(existente)) || {}).nome || 'este cardápio';
+    customAlert(`Já existe a categoria "${baseNomeCategoria(existente.nome)}" em ${card}.`, 'Atenção');
 }
+// Marca invisível de cada cardápio no fim do nome da categoria: "Doces" do padrão e
+// "Doces" do Natal aparecem iguais, mas são categorias diferentes (itens separados).
+const MARCA_CARDAPIO = '\u200B';
+function baseNomeCategoria(nome) { return String(nome || '').replace(/\u200B/g, '').trim(); }
+function marcaDoCardapio(id) { const c = (window.__cardapios || []).find(x => x.id === id); return c && c.marca ? MARCA_CARDAPIO.repeat(c.marca) : ''; }
+function chaveCategoria(nome, cardapioId) { return baseNomeCategoria(nome) + marcaDoCardapio(cardapioId || 'padrao'); }
+window.baseNomeCategoria = baseNomeCategoria;
 // Ao abrir "Nova categoria", já vem marcado o cardápio escolhido no topo.
 (function() {
     const abrir = window.openModal;
@@ -14833,8 +15151,8 @@ function avisoNomeCategoriaRepetido(existente, nome) {
 // ---------- Gerenciar cardápios ----------
 const slugCardapio = nome => String(nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'cardapio';
 function linkCardapioSite(id) {
-    const base = (window.URL_SITE_CLIENTES || 'https://favucozinha.github.io/').replace(/\/?$/, '/');
-    return id === 'padrao' ? `${base}cardapio.html` : `${base}cardapio.html?menu=${id}`;
+    const base = (window.URL_SITE_CLIENTES || 'https://favucozinha.com.br/').replace(/\/?$/, '/');
+    return id === 'padrao' ? `${base}pedido` : `${base}pedido?menu=${id}`;
 }
 window.abrirGerenciarCardapios = function() {
     let m = document.getElementById('modal-cardapios');
@@ -14848,7 +15166,7 @@ window.abrirGerenciarCardapios = function() {
                 <div class="cardapio-linha ${c.ativo === false ? 'pausado' : ''}">
                     <div class="cardapio-linha-info">
                         <input type="text" value="${escapeHtmlPedido(c.nome)}" onchange="window.renomearCardapio(${i}, this.value)">
-                        <small><i class="fas fa-link"></i> <span class="cardapio-link">cardapio.html${c.id === 'padrao' ? '' : `?menu=${c.id}`}</span> · ${contarCats(c.id)} categoria(s)${c.id === 'padrao' ? ' · padrão' : ''}</small>
+                        <small><i class="fas fa-link"></i> <span class="cardapio-link">pedido${c.id === 'padrao' ? '' : `?menu=${c.id}`}</span> · ${contarCats(c.id)} categoria(s)${c.id === 'padrao' ? ' · padrão' : ''}</small>
                     </div>
                     <div class="cardapio-linha-acoes">
                         <button type="button" class="btn-action" title="Copiar o link" onclick="window.copiarLinkCardapio('${c.id}')"><i class="fas fa-copy"></i></button>
@@ -14865,7 +15183,7 @@ window.criarCardapio = async function() {
     if (!nome) return window.showToast('Digite o nome do cardápio.', true);
     let id = slugCardapio(nome), n = 2;
     while (window.__cardapios.some(c => c.id === id) || id === 'todos' || id === 'padrao') id = `${slugCardapio(nome)}-${n++}`;
-    window.__cardapios.push({ id, nome, ativo: true, ordem: window.__cardapios.length });
+    window.__cardapios.push({ id, nome, ativo: true, ordem: window.__cardapios.length, marca: Math.max(0, ...window.__cardapios.map(c => c.marca || 0)) + 1 });
     try { await salvarCardapios(); window.showToast('Cardápio criado!'); } catch (e) { console.error(e); window.showToast('Erro ao criar cardápio.', true); }
     renderSeletoresCardapio(); window.abrirGerenciarCardapios();
 };
@@ -14888,10 +15206,10 @@ window.copiarLinkCardapio = function(id) {
 window.excluirCardapio = function(i) {
     const c = window.__cardapios[i]; if (!c || c.id === 'padrao') return;
     const so = globalCategories.filter(x => { const l = cardapiosDaCategoria(x); return l.length === 1 && l[0] === c.id; });
-    customConfirm(`Excluir o cardápio "${c.nome}"?${so.length ? ` As ${so.length} categoria(s) que só estavam nele ficam sem cardápio (não aparecem no site); dá para achá-las em "Todos".` : ''}`, async () => {
+    customConfirm(`Excluir o cardápio "${c.nome}"?${so.length ? ` As ${so.length} categoria(s) dele voltam para o cardápio padrão, porém OCULTAS (não aparecem no site). Depois você decide se reaproveita ou apaga.` : ''}`, async () => {
         try {
             const afetadas = globalCategories.filter(x => Array.isArray(x.cardapios) && x.cardapios.includes(c.id));
-            await Promise.all(afetadas.map(x => { x.cardapios = x.cardapios.filter(id => id !== c.id); return updateDoc(doc(db, 'categorias', x.id), { cardapios: x.cardapios }); }));
+            await Promise.all(afetadas.map(x => { x.cardapios = ['padrao']; x.ativo = false; return updateDoc(doc(db, 'categorias', x.id), { cardapios: ['padrao'], ativo: false }); }));
             window.__cardapios.splice(i, 1);
             if (window.__cardapioAdmin === c.id) window.__cardapioAdmin = 'padrao';
             await salvarCardapios();
@@ -14960,4 +15278,351 @@ window.salvarOutroItemOrcamento = function() {
     window.closeModal('modal-outro-item-orc');
     window.calcOrcamentoTotal();
     window.showToast('Item incluído no orçamento!');
+};
+
+// =====================================================================
+// DATAS ESPECÍFICAS POR CARDÁPIO + PERÍODO (2026-10-15)
+// Chave da regra: "AAAA-MM-DD" (padrão) ou "AAAA-MM-DD__<cardápio>".
+// "Até" aplica a mesma regra a todos os dias do período de uma vez.
+// =====================================================================
+function chaveExcecao(dataISO, cardapioId) { return !cardapioId || cardapioId === 'padrao' ? dataISO : `${dataISO}__${cardapioId}`; }
+function partesExcecao(chave) { const [data, cardapio] = String(chave || '').split('__'); return { data, cardapio: cardapio || 'padrao' }; }
+window.chaveExcecao = chaveExcecao;
+function selectCardapioExcecao(boxId, selId, atual, aoMudar) {
+    const box = document.getElementById(boxId); if (!box) return;
+    box.innerHTML = `<select id="${selId}" onchange="${aoMudar}">${(window.__cardapios || [{ id: 'padrao', nome: 'Cardápio padrão' }]).map(c => `<option value="${c.id}" ${c.id === atual ? 'selected' : ''}>${escapeHtmlPedido(c.nome)}</option>`).join('')}</select>`;
+}
+// Categorias da restrição: só as do cardápio escolhido.
+function renderCategoriasExcecaoCardapio(containerId, cardapioId, marcadas) {
+    const box = document.getElementById(containerId); if (!box) return;
+    const lista = (globalCategories || []).filter(c => cardapioDaCategoriaAdmin(c) === cardapioId).map(c => c.nome)
+        .sort((a, b) => baseNomeCategoria(a).localeCompare(baseNomeCategoria(b), 'pt-BR'));
+    const set = new Set(marcadas || []);
+    box.innerHTML = lista.length ? lista.map(n => `<label class="exc-cat-opcao"><input type="checkbox" value="${escapeHtmlPedido(n)}" ${set.has(n) ? 'checked' : ''}> <span>${escapeHtmlPedido(baseNomeCategoria(n))}</span></label>`).join('')
+        : '<small style="color:#999;">Nenhuma categoria neste cardápio.</small>';
+}
+window.trocarCardapioNovaExcecao = function() { renderCategoriasExcecaoCardapio('exc-categorias', document.getElementById('exc-cardapio-sel')?.value || 'padrao', []); };
+window.trocarCardapioEditExcecao = function() { renderCategoriasExcecaoCardapio('edit-exc-categorias', document.getElementById('edit-exc-cardapio-sel')?.value || 'padrao', []); };
+window.abrirModalNovaDataEspecifica = function() {
+    const form = document.getElementById('form-add-excecao'); if (form) form.reset();
+    const horas = document.getElementById('container-exc-horas'), msg = document.getElementById('container-exc-msg');
+    if (horas) horas.style.display = 'block'; if (msg) msg.style.display = 'none';
+    const atual = window.__cardapioAdmin && window.__cardapioAdmin !== 'todos' ? window.__cardapioAdmin : 'padrao';
+    selectCardapioExcecao('exc-cardapio-box', 'exc-cardapio-sel', atual, 'window.trocarCardapioNovaExcecao()');
+    renderCategoriasExcecaoCardapio('exc-categorias', atual, []);
+    window.openModal('modal-add-excecao');
+};
+window.salvarExcecaoData = async function() {
+    const ini = document.getElementById('exc-data')?.value, fim = document.getElementById('exc-data-fim')?.value || '';
+    const cardapio = document.getElementById('exc-cardapio-sel')?.value || 'padrao';
+    const fechado = document.getElementById('exc-fechado')?.checked;
+    const horarios = document.getElementById('exc-horas')?.value.trim() || '';
+    const mensagem = document.getElementById('exc-mensagem')?.value.trim() || '';
+    if (!ini) return window.showToast('Selecione uma data.', true);
+    if (fim && fim < ini) return window.showToast('A data "Até" precisa ser depois do início.', true);
+    const payload = { indisponivel: !!fechado, horarios: fechado ? '' : horarios, mensagem: fechado ? mensagem : '', categorias: lerCategoriasExcecao('exc-categorias') };
+    const regras = {};
+    const d = new Date(`${ini}T12:00:00`), ate = new Date(`${fim || ini}T12:00:00`);
+    for (let n = 0; d <= ate && n < 366; n++) {
+        const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        regras[chaveExcecao(iso, cardapio)] = { ...payload };
+        d.setDate(d.getDate() + 1);
+    }
+    window.mostrarLoading(true);
+    try {
+        await setDoc(doc(db, 'config', 'agenda_excecoes'), regras, { merge: true });
+        const qtd = Object.keys(regras).length;
+        window.showToast(qtd > 1 ? `Regra aplicada a ${qtd} dias!` : 'Regra aplicada!');
+        await window.carregarExcecoesLista();
+        window.closeModal('modal-add-excecao', 'form-add-excecao');
+    } catch (e) { console.error(e); window.showToast('Erro ao gravar.', true); }
+    window.mostrarLoading(false);
+};
+async function prepararEdicaoExcecao(chave, copiar) {
+    let regra = window.cacheExcecoesAgenda?.[chave];
+    if (!regra) {
+        try { const snap = await getDoc(doc(db, 'config', 'agenda_excecoes')); window.cacheExcecoesAgenda = snap.exists() ? (snap.data() || {}) : {}; regra = window.cacheExcecoesAgenda[chave]; }
+        catch (e) { return window.showToast('Erro ao carregar data específica.', true); }
+    }
+    if (!regra) return;
+    const { data, cardapio } = partesExcecao(chave);
+    document.getElementById('edit-exc-data').value = copiar ? '' : chave;
+    document.getElementById('edit-exc-data-display').value = copiar ? '' : data;
+    document.getElementById('edit-exc-fechado').checked = !!regra.indisponivel;
+    document.getElementById('edit-exc-horas').value = regra.horarios || '';
+    document.getElementById('edit-exc-mensagem').value = regra.mensagem || '';
+    selectCardapioExcecao('edit-exc-cardapio-box', 'edit-exc-cardapio-sel', cardapio, 'window.trocarCardapioEditExcecao()');
+    renderCategoriasExcecaoCardapio('edit-exc-categorias', cardapio, regra.categorias || []);
+    window.toggleEditExcecaoCampos();
+    window.openModal('modal-editar-excecao');
+}
+window.editarExcecaoData = chave => prepararEdicaoExcecao(chave, false);
+window.copiarExcecaoData = chave => prepararEdicaoExcecao(chave, true);
+window.deletarExcecaoData = async function(chave) {
+    const { data, cardapio } = partesExcecao(chave);
+    const nomeCard = cardapio !== 'padrao' ? ` (${((window.__cardapios || []).find(c => c.id === cardapio) || {}).nome || cardapio})` : '';
+    window.customConfirm(`Remover a data específica ${formatarDataAgendaBR(data)}${nomeCard}?`, async () => {
+        window.mostrarLoading(true);
+        try { await updateDoc(doc(db, 'config', 'agenda_excecoes'), { [chave]: deleteField() }); window.showToast('Data específica removida!'); await window.carregarExcecoesLista(); }
+        catch (e) { window.showToast('Erro ao remover data específica.', true); }
+        window.mostrarLoading(false);
+    });
+};
+if (formEditExcecaoAgenda) formEditExcecaoAgenda.onsubmit = async function(e) {
+    e.preventDefault();
+    const original = document.getElementById('edit-exc-data')?.value || '';
+    const data = document.getElementById('edit-exc-data-display')?.value || '';
+    const cardapio = document.getElementById('edit-exc-cardapio-sel')?.value || 'padrao';
+    const fechado = document.getElementById('edit-exc-fechado')?.checked;
+    if (!data) return window.showToast('Informe a data específica.', true);
+    const payload = { indisponivel: !!fechado, horarios: fechado ? '' : (document.getElementById('edit-exc-horas')?.value.trim() || ''), mensagem: fechado ? (document.getElementById('edit-exc-mensagem')?.value.trim() || '') : '', categorias: lerCategoriasExcecao('edit-exc-categorias') };
+    const nova = chaveExcecao(data, cardapio);
+    window.mostrarLoading(true);
+    try {
+        const ref = doc(db, 'config', 'agenda_excecoes');
+        if (original && original !== nova) await updateDoc(ref, { [original]: deleteField() });
+        await setDoc(ref, { [nova]: payload }, { merge: true });
+        window.closeModal('modal-editar-excecao', 'form-edit-excecao');
+        window.showToast('Data específica salva!');
+        await window.carregarExcecoesLista();
+    } catch (er) { console.error(er); window.showToast('Erro ao salvar data específica.', true); }
+    window.mostrarLoading(false);
+};
+// Lista: só as datas do cardápio escolhido no topo (com etiqueta quando há vários).
+window.renderizarExcecoesAgendaLista = function() {
+    const ativas = document.getElementById('lista-excecoes-container'), passadas = document.getElementById('lista-excecoes-passadas');
+    if (!ativas) return;
+    const dados = window.cacheExcecoesAgenda || {};
+    const hoje = dataHojeAgendaKey();
+    const varios = (window.__cardapios || []).length > 1;
+    const filtro = window.__cardapioAdmin || 'padrao';
+    const card = chave => {
+        const regra = dados[chave] || {}, { data, cardapio } = partesExcecao(chave);
+        const nomeCard = ((window.__cardapios || []).find(c => c.id === cardapio) || {}).nome || cardapio;
+        return `<div class="excecao-card" onclick="window.editarExcecaoData('${chave}')">
+            <div class="excecao-card-main">
+                <strong class="excecao-card-data">${formatarDataAgendaBR(data)}</strong>
+                ${varios ? `<span class="excecao-card-cardapio">${escapeHtmlPedido(nomeCard)}</span>` : ''}
+                <div class="excecao-card-resumo">${escapeHtmlAgenda(resumoRegraAgenda({ ...regra, categorias: (regra.categorias || []).map(baseNomeCategoria) }))}</div>
+            </div>
+            <div class="excecao-card-actions" onclick="event.stopPropagation();">
+                <button type="button" class="btn-action edit" title="Editar" onclick="window.editarExcecaoData('${chave}')"><i class="fas fa-pencil-alt"></i></button>
+                <button type="button" class="btn-action copy" title="Copiar" onclick="window.copiarExcecaoData('${chave}')"><i class="fas fa-copy"></i></button>
+                <button type="button" class="btn-action del" title="Excluir" onclick="window.deletarExcecaoData('${chave}')"><i class="fas fa-trash"></i></button>
+            </div>
+        </div>`;
+    };
+    const chaves = Object.keys(dados).filter(k => filtro === 'todos' || partesExcecao(k).cardapio === filtro);
+    const at = chaves.filter(k => partesExcecao(k).data >= hoje).sort();
+    const pa = chaves.filter(k => partesExcecao(k).data < hoje).sort().reverse();
+    const vazio = msg => `<p class="excecoes-vazio">${msg}</p>`;
+    ativas.innerHTML = at.length ? at.map(card).join('') : vazio('Nenhuma data ativa.');
+    if (passadas) passadas.innerHTML = pa.length ? pa.map(card).join('') : vazio('Nenhuma data passada.');
+};
+(function() {
+    const escolher = window.escolherCardapioAdmin;
+    window.escolherCardapioAdmin = function(id) { const r = escolher(id); try { window.renderizarExcecoesAgendaLista(); } catch (e) {} return r; };
+})();
+
+// ---------- Editor do cardápio: trocar o cardápio que está sendo editado ----------
+function guardarConteudoDoEscopo() {
+    const ed = window.__temaEdicao;
+    if (!ed || ed.pagina !== 'cardapio' || !window.__siteEd?.cardapio) return;
+    lerCamposFixosSite('cardapio');
+    if (!ed.escopo || ed.escopo === 'padrao') ed.conteudoPadraoCardapio = window.__siteEd.cardapio;
+    else {
+        guardaEscopo(ed.escopo).conteudo = window.__siteEd.cardapio;
+        window.__siteEd.cardapio = ed.conteudoPadraoCardapio;
+        ed.escopo = 'padrao';
+        // Redesenha os campos com os textos do cardápio padrão (sem ler a tela antes),
+        // para os textos do Natal não serem lidos de novo e gravados no padrão.
+        renderEditorSite('cardapio');
+    }
+}
+window.trocarEscopoTema = function(idCard) {
+    const ed = window.__temaEdicao; if (!ed) return;
+    guardarConteudoDoEscopo();
+    ed.escopo = idCard || 'padrao';
+    let st = null;
+    if (ed.escopo !== 'padrao') {
+        st = guardaEscopo(ed.escopo);
+        if (!st.conteudo) st.conteudo = JSON.parse(JSON.stringify(st.conteudoSalvo || ed.conteudoPadraoCardapio));
+        window.__siteEd.cardapio = st.conteudo;
+    } else window.__siteEd.cardapio = ed.conteudoPadraoCardapio;
+    const box = document.getElementById('tema-blocos');
+    if (box && ed.__renderBlocos) box.innerHTML = ed.__renderBlocos();
+    renderEditorSite('cardapio');
+    CHAVES_IMG_TEMA.forEach(mostrarPreviaImgTema);
+    if (st && !st.conteudoInicial) { lerCamposFixosSite('cardapio'); st.conteudo = window.__siteEd.cardapio; st.conteudoInicial = JSON.stringify(st.conteudo); }
+    const sel = document.getElementById('tema-escopo-sel'); if (sel) sel.value = ed.escopo;
+    window.trocarBlocoTema(ed.bloco);
+};
+
+// ---------- Cores de cada botão, ícone do ☰ e destaque na prévia ao clicar ----------
+const CORES_ITEM_SITE = {
+    botoesCapa: [['corFundo', 'Fundo'], ['corIcone', 'Ícone'], ['corTitulo', 'Nome'], ['corLegenda', 'Legenda']],
+    menuLateral: [['corTexto', 'Texto']],
+    redes: [['corIcone', 'Ícone'], ['corTexto', 'Texto']]
+};
+function coresItemSite(site, lista, idx, item) {
+    const props = CORES_ITEM_SITE[lista]; if (!props) return '';
+    return `<div class="site-item-cores"><span>Cores deste botão:</span>${props.map(([p, n]) => {
+        const v = item[p] || '';
+        const chave = `item|${site}|${lista}|${idx}|${p}`;
+        return `<span class="site-cor-item ${v ? 'definida' : ''}"><button type="button" title="${n}: ${v ? 'cor própria' : 'segue a cor de todos'}" onclick="event.stopPropagation(); window.abrirSeletorCor('${chave}', this)"><i style="background:${v || 'transparent'}"></i>${n}</button>${v ? `<button type="button" class="limpar" title="Voltar a seguir a cor de todos" onclick="event.stopPropagation(); window.retomarPadraoCor('${chave}')">×</button>` : ''}</span>`;
+    }).join('')}</div>`;
+}
+const ICONES_MENU = ['fa-solid fa-bars', 'fa-solid fa-bars-staggered', 'fa-solid fa-grip-lines', 'fa-solid fa-ellipsis-vertical', 'fa-solid fa-circle-chevron-down', 'fa-solid fa-utensils', 'fa-solid fa-heart', 'fa-solid fa-star'];
+function seletorIconeMenu(site, atual) {
+    const ic = atual || 'fa-solid fa-bars';
+    return `<div class="site-icone-menu" data-destaque=".menu-btn" data-abrir=""><label>Ícone do botão ☰ (2)</label><div class="site-icone-menu-opcoes">${ICONES_MENU.map(v => `<button type="button" class="${v === ic ? 'sel' : ''}" onclick="window.escolherIconeMenuSite('${site}','${v}')"><i class="${v}"></i></button>`).join('')}</div></div>`;
+}
+window.escolherIconeMenuSite = function(site, icone) {
+    if (!window.__siteEd?.[site]) return;
+    lerCamposFixosSite(site);
+    window.__siteEd[site].menuIcone = icone;
+    window.renderEditorSite(site);
+    avisarConteudoAoVivo();
+    try { iframeAoVivo().contentWindow.postMessage({ tipo: 'favu-destacar', seletor: '.menu-btn', abrir: '' }, location.origin); } catch (e) {}
+};
+// Clicar/focar em um campo de botões e textos mostra na prévia onde ele fica.
+document.addEventListener('focusin', destacarConteudoNaPrevia);
+document.addEventListener('click', e => { if (e.target.closest?.('#modal-editor-tema .tema-conteudo-pagina') && !e.target.closest('input,select,textarea,button')) destacarConteudoNaPrevia(e); });
+function destacarConteudoNaPrevia(e) {
+    const alvo = e.target; if (!alvo?.closest?.('#modal-editor-tema .tema-conteudo-pagina')) return;
+    let seletor = '', abrir = '';
+    const linha = alvo.closest('.site-item'), lista = alvo.closest('.site-itens');
+    if (linha && lista) {
+        const i = Array.from(lista.querySelectorAll(':scope > .site-item')).indexOf(linha) + 1;
+        const qual = lista.dataset.lista;
+        if (qual === 'botoesCapa') seletor = `#dynamic-grid-links > :nth-child(${i})`;
+        else if (qual === 'menuLateral') { seletor = `#side-menu .nav-links li:nth-child(${i})`; abrir = 'menu'; }
+        else if (qual === 'redes') { seletor = `#side-menu .menu-socials > :nth-child(${i})`; abrir = 'menu'; }
+    } else {
+        const d = alvo.closest('[data-destaque], [data-abrir]');
+        if (!d) return;
+        seletor = d.dataset.destaque || ''; abrir = d.dataset.abrir || '';
+    }
+    const ed = window.__temaEdicao; if (!ed) return;
+    window.trocarPaginaAoVivo(ed.pagina === 'cardapio' ? 'cardapio.html' : 'index.html', () => {
+        try { iframeAoVivo().contentWindow.postMessage({ tipo: 'favu-destacar', seletor, abrir }, location.origin); } catch (er) {}
+    });
+}
+
+// =====================================================================
+// DATAS ESPECÍFICAS EM BLOCOS (2026-11-19)
+// Datas seguidas, do mesmo cardápio e com a MESMA regra, aparecem num card só
+// ("01/12/2026 a 12/12/2026"). Editar, copiar e excluir valem para o bloco inteiro.
+// Se um dia do meio ganhar outra regra, o bloco se divide sozinho.
+// =====================================================================
+function isoMaisUmDia(iso) { const d = new Date(`${iso}T12:00:00`); d.setDate(d.getDate() + 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+function assinaturaRegraExcecao(r) { r = r || {}; return JSON.stringify([!!r.indisponivel, String(r.horarios || '').trim(), String(r.mensagem || '').trim(), [...(r.categorias || [])].sort()]); }
+function diasDoPeriodo(ini, fim) {
+    const lista = []; let d = ini;
+    for (let n = 0; d <= (fim || ini) && n < 366; n++) { lista.push(d); d = isoMaisUmDia(d); }
+    return lista;
+}
+function agruparExcecoes(chaves, dados) {
+    const ordenadas = chaves.map(k => ({ k, ...partesExcecao(k) })).sort((a, b) => a.cardapio === b.cardapio ? a.data.localeCompare(b.data) : a.cardapio.localeCompare(b.cardapio));
+    const grupos = [];
+    ordenadas.forEach(x => {
+        const ult = grupos[grupos.length - 1];
+        const ass = assinaturaRegraExcecao(dados[x.k]);
+        if (ult && ult.cardapio === x.cardapio && ult.ass === ass && isoMaisUmDia(ult.fim) === x.data) { ult.fim = x.data; ult.chaves.push(x.k); }
+        else grupos.push({ cardapio: x.cardapio, ini: x.data, fim: x.data, ass, chaves: [x.k] });
+    });
+    return grupos;
+}
+window.renderizarExcecoesAgendaLista = function() {
+    const ativas = document.getElementById('lista-excecoes-container'), passadas = document.getElementById('lista-excecoes-passadas');
+    if (!ativas) return;
+    const dados = window.cacheExcecoesAgenda || {};
+    const hoje = dataHojeAgendaKey();
+    const varios = (window.__cardapios || []).length > 1;
+    const filtro = window.__cardapioAdmin || 'padrao';
+    const chaves = Object.keys(dados).filter(k => filtro === 'todos' || partesExcecao(k).cardapio === filtro);
+    const grupos = agruparExcecoes(chaves, dados);
+    window.__gruposExcecao = grupos;
+    const card = (g) => {
+        const i = grupos.indexOf(g);
+        const regra = dados[g.chaves[0]] || {};
+        const nomeCard = ((window.__cardapios || []).find(c => c.id === g.cardapio) || {}).nome || g.cardapio;
+        const titulo = g.ini === g.fim ? formatarDataAgendaBR(g.ini) : `${formatarDataAgendaBR(g.ini)} a ${formatarDataAgendaBR(g.fim)}`;
+        return `<div class="excecao-card" onclick="window.editarGrupoExcecao(${i})">
+            <div class="excecao-card-main">
+                <strong class="excecao-card-data">${titulo}</strong>
+                ${g.chaves.length > 1 ? `<span class="excecao-card-dias">${g.chaves.length} dias</span>` : ''}
+                ${varios ? `<span class="excecao-card-cardapio">${escapeHtmlPedido(nomeCard)}</span>` : ''}
+                <div class="excecao-card-resumo">${escapeHtmlAgenda(resumoRegraAgenda({ ...regra, categorias: (regra.categorias || []).map(baseNomeCategoria) }))}</div>
+            </div>
+            <div class="excecao-card-actions" onclick="event.stopPropagation();">
+                <button type="button" class="btn-action edit" title="Editar" onclick="window.editarGrupoExcecao(${i})"><i class="fas fa-pencil-alt"></i></button>
+                <button type="button" class="btn-action copy" title="Copiar" onclick="window.copiarGrupoExcecao(${i})"><i class="fas fa-copy"></i></button>
+                <button type="button" class="btn-action del" title="Excluir" onclick="window.deletarGrupoExcecao(${i})"><i class="fas fa-trash"></i></button>
+            </div>
+        </div>`;
+    };
+    const at = grupos.filter(g => g.fim >= hoje).sort((a, b) => a.ini.localeCompare(b.ini));
+    const pa = grupos.filter(g => g.fim < hoje).sort((a, b) => b.ini.localeCompare(a.ini));
+    const vazio = msg => `<p class="excecoes-vazio">${msg}</p>`;
+    ativas.innerHTML = at.length ? at.map(card).join('') : vazio('Nenhuma data ativa.');
+    if (passadas) passadas.innerHTML = pa.length ? pa.map(card).join('') : vazio('Nenhuma data passada.');
+};
+function abrirEdicaoGrupo(g, copiar) {
+    const regra = (window.cacheExcecoesAgenda || {})[g.chaves[0]] || {};
+    window.__excEdicaoChaves = copiar ? [] : [...g.chaves];
+    document.getElementById('edit-exc-data').value = copiar ? '' : g.chaves[0];
+    document.getElementById('edit-exc-data-display').value = copiar ? '' : g.ini;
+    const fim = document.getElementById('edit-exc-data-fim'); if (fim) fim.value = copiar || g.fim === g.ini ? '' : g.fim;
+    document.getElementById('edit-exc-fechado').checked = !!regra.indisponivel;
+    document.getElementById('edit-exc-horas').value = regra.horarios || '';
+    document.getElementById('edit-exc-mensagem').value = regra.mensagem || '';
+    selectCardapioExcecao('edit-exc-cardapio-box', 'edit-exc-cardapio-sel', g.cardapio, 'window.trocarCardapioEditExcecao()');
+    renderCategoriasExcecaoCardapio('edit-exc-categorias', g.cardapio, regra.categorias || []);
+    window.toggleEditExcecaoCampos();
+    window.openModal('modal-editar-excecao');
+}
+window.editarGrupoExcecao = i => { const g = (window.__gruposExcecao || [])[i]; if (g) abrirEdicaoGrupo(g, false); };
+window.copiarGrupoExcecao = i => { const g = (window.__gruposExcecao || [])[i]; if (g) abrirEdicaoGrupo(g, true); };
+// Mantém os nomes antigos funcionando (uma data só).
+window.editarExcecaoData = chave => abrirEdicaoGrupo({ ...partesExcecao(chave), ini: partesExcecao(chave).data, fim: partesExcecao(chave).data, chaves: [chave] }, false);
+window.copiarExcecaoData = chave => abrirEdicaoGrupo({ ...partesExcecao(chave), ini: partesExcecao(chave).data, fim: partesExcecao(chave).data, chaves: [chave] }, true);
+window.deletarGrupoExcecao = function(i) {
+    const g = (window.__gruposExcecao || [])[i]; if (!g) return;
+    const nomeCard = g.cardapio !== 'padrao' ? ` (${((window.__cardapios || []).find(c => c.id === g.cardapio) || {}).nome || g.cardapio})` : '';
+    const texto = g.ini === g.fim ? `a data específica ${formatarDataAgendaBR(g.ini)}` : `as datas de ${formatarDataAgendaBR(g.ini)} a ${formatarDataAgendaBR(g.fim)} (${g.chaves.length} dias)`;
+    window.customConfirm(`Remover ${texto}${nomeCard}?`, async () => {
+        window.mostrarLoading(true);
+        try {
+            const apagar = {}; g.chaves.forEach(k => { apagar[k] = deleteField(); });
+            await updateDoc(doc(db, 'config', 'agenda_excecoes'), apagar);
+            window.showToast(g.chaves.length > 1 ? `${g.chaves.length} dias removidos!` : 'Data específica removida!');
+            await window.carregarExcecoesLista();
+        } catch (e) { console.error(e); window.showToast('Erro ao remover.', true); }
+        window.mostrarLoading(false);
+    });
+};
+if (formEditExcecaoAgenda) formEditExcecaoAgenda.onsubmit = async function(e) {
+    e.preventDefault();
+    const ini = document.getElementById('edit-exc-data-display')?.value || '';
+    const fim = document.getElementById('edit-exc-data-fim')?.value || '';
+    const cardapio = document.getElementById('edit-exc-cardapio-sel')?.value || 'padrao';
+    const fechado = document.getElementById('edit-exc-fechado')?.checked;
+    if (!ini) return window.showToast('Informe a data específica.', true);
+    if (fim && fim < ini) return window.showToast('A data "Até" precisa ser depois do início.', true);
+    const payload = { indisponivel: !!fechado, horarios: fechado ? '' : (document.getElementById('edit-exc-horas')?.value.trim() || ''), mensagem: fechado ? (document.getElementById('edit-exc-mensagem')?.value.trim() || '') : '', categorias: lerCategoriasExcecao('edit-exc-categorias') };
+    const novas = {}; diasDoPeriodo(ini, fim).forEach(d => { novas[chaveExcecao(d, cardapio)] = { ...payload }; });
+    const antigas = (window.__excEdicaoChaves || []).filter(k => !(k in novas));
+    window.mostrarLoading(true);
+    try {
+        const ref = doc(db, 'config', 'agenda_excecoes');
+        if (antigas.length) { const apagar = {}; antigas.forEach(k => { apagar[k] = deleteField(); }); await updateDoc(ref, apagar); }
+        await setDoc(ref, novas, { merge: true });
+        window.__excEdicaoChaves = [];
+        window.closeModal('modal-editar-excecao', 'form-edit-excecao');
+        const qtd = Object.keys(novas).length;
+        window.showToast(qtd > 1 ? `Regra salva para ${qtd} dias!` : 'Data específica salva!');
+        await window.carregarExcecoesLista();
+    } catch (er) { console.error(er); window.showToast('Erro ao salvar data específica.', true); }
+    window.mostrarLoading(false);
 };
